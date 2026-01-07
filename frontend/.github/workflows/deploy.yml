@@ -1,47 +1,31 @@
-name: Deploy to GitHub Pages
+name: Deploy MyCFO to Azure
 
 on:
   push:
-    branches:
-      - main  # o master, según tu rama principal
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+    branches: [ "main" ] # Se activa cuando haces push a tu nuevo repo
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Conectar a Azure por SSH y actualizar
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          node-version: '18'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build
-        run: npm run build
-        env:
-          CI: false
-          # Agrega tus variables de entorno aquí si las necesitas
-          # REACT_APP_API_URL: ${{ secrets.API_URL }}
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './build'
-      
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/mycfo
+            # 1. Vincular el servidor con TU nuevo repo
+            git remote set-url origin https://github.com/ErikOteo/mycfo-server.git
+            
+            # 2. Bajar tus cambios
+            git fetch origin
+            git reset --hard origin/main
+            
+            # 3. Asegurar memoria (vital por los 4GB de RAM)
+            sudo swapon /swapfile || true
+            
+            # 4. Reconstruir todo con Docker
+            docker compose up -d --build
+            docker image prune -f
