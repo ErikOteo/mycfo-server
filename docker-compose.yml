@@ -1,0 +1,222 @@
+services:
+  administracion:
+    container_name: administracion
+    build: ./administracion
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mysql
+    networks:
+      - mycfo_network
+    environment:
+      - SERVER_PORT=8081
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/administracion_db
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+
+      - ADMINISTRACION_URL=http://administracion:8081
+      - CONSOLIDACION_URL=http://consolidacion:8082
+      - IA_URL=http://ia:8083
+      - NOTIFICACION_URL=http://notificacion:8084
+      - PRONOSTICO_URL=http://pronostico:8085
+      - REGISTRO_URL=http://registro:8086
+      - REPORTE_URL=http://reporte:8087
+
+      # AWS Cognito (desde .env)
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - AWS_REGION=${AWS_REGION}
+
+      # AWS Credenciales (desde .env)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+  ia:
+    container_name: ia
+    build: ./ia
+    ports:
+      - "8083:8083"
+    depends_on:
+      - mysql
+    networks:
+      - mycfo_network
+    environment:
+      - SERVER_PORT=8083
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ia_db
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+
+      - ADMINISTRACION_URL=http://administracion:8081
+      - CONSOLIDACION_URL=http://consolidacion:8082
+      - IA_URL=http://ia:8083
+      - NOTIFICACION_URL=http://notificacion:8084
+      - PRONOSTICO_URL=http://pronostico:8085
+      - REGISTRO_URL=http://registro:8086
+      - REPORTE_URL=http://reporte:8087
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL}
+
+  notificacion:
+    container_name: notificacion
+    build: ./notificacion
+    ports:
+      - "8084:8084"
+    depends_on:
+      - mysql
+    networks:
+      - mycfo_network
+    environment:
+      - SERVER_PORT=8084
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/notificacion_db
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+
+      - ADMINISTRACION_URL=http://administracion:8081
+      - CONSOLIDACION_URL=http://consolidacion:8082
+      - IA_URL=http://ia:8083
+      - NOTIFICACION_URL=http://notificacion:8084
+      - PRONOSTICO_URL=http://pronostico:8085
+      - REGISTRO_URL=http://registro:8086
+      - REPORTE_URL=http://reporte:8087
+
+      # Email configuration (desde .env)
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_SSL_TRUST=${MAIL_SSL_TRUST}
+      - NOTIFICATIONS_EMAIL_FROM=${NOTIFICATIONS_EMAIL_FROM}
+
+  pronostico:
+    container_name: pronostico
+    build: ./pronostico
+    ports:
+      - "8085:8085"
+    depends_on:
+      - mysql
+    networks:
+      - mycfo_network
+    environment:
+      - SERVER_PORT=8085
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/pronostico_db
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+
+      - ADMINISTRACION_URL=http://administracion:8081
+      - CONSOLIDACION_URL=http://consolidacion:8082
+      - IA_URL=http://ia:8083
+      - NOTIFICACION_URL=http://notificacion:8084
+      - PRONOSTICO_URL=http://pronostico:8085
+      - REGISTRO_URL=http://registro:8086
+      - REPORTE_URL=http://reporte:8087
+      - FORECAST_URL=http://forecast:8088
+
+  registro:
+    container_name: registro
+    build: ./registro
+    ports:
+      - "8086:8086"
+    depends_on:
+      - mysql
+    networks:
+      - mycfo_network
+    environment:
+      - SERVER_PORT=8086
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/registro_db
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+
+      - ADMINISTRACION_URL=http://administracion:8081
+      - CONSOLIDACION_URL=http://consolidacion:8082
+      - IA_URL=http://ia:8083
+      - NOTIFICACION_URL=http://notificacion:8084
+      - PRONOSTICO_URL=http://pronostico:8085
+      - REGISTRO_URL=http://registro:8086
+      - REPORTE_URL=http://reporte:8087
+
+      # Mercado Pago (desde .env)
+      - MERCADOPAGO_CLIENT_ID=${MERCADOPAGO_CLIENT_ID}
+      - MERCADOPAGO_CLIENT_SECRET=${MERCADOPAGO_CLIENT_SECRET}
+      - MERCADOPAGO_REDIRECT_URI=${MERCADOPAGO_REDIRECT_URI}
+      - MERCADOPAGO_OAUTH_AUTHORIZE=${MERCADOPAGO_OAUTH_AUTHORIZE}
+      - MERCADOPAGO_BASE_URL=${MERCADOPAGO_BASE_URL}
+      - MERCADOPAGO_SCOPE=${MERCADOPAGO_SCOPE}
+      - MERCADOPAGO_FRONTEND_URL=${MERCADOPAGO_FRONTEND_URL}
+
+      # Encriptación de datos sensibles
+      - APP_ENCRYPT_SECRET=${APP_ENCRYPT_SECRET}
+
+  reporte:
+    container_name: reporte
+    build: ./reporte
+    ports:
+      - "8087:8087"
+    depends_on:
+      - mysql
+    networks:
+      - mycfo_network
+    environment:
+      - SERVER_PORT=8087
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reporte_db
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+
+      - ADMINISTRACION_URL=http://administracion:8081
+      - CONSOLIDACION_URL=http://consolidacion:8082
+      - IA_URL=http://ia:8083
+      - NOTIFICACION_URL=http://notificacion:8084
+      - PRONOSTICO_URL=http://pronostico:8085
+      - REGISTRO_URL=http://registro:8086
+      - REPORTE_URL=http://reporte:8087
+
+  forecast:
+    container_name: forecast
+    build: ./forecast
+    ports:
+      - "8088:8088"
+    networks:
+      - mycfo_network
+
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mycfo_network
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_BASE_URL: http://4.206.176.204
+        REACT_APP_URL_ADMINISTRACION: http://4.206.176.204:8081
+        REACT_APP_URL_IA: http://4.206.176.204:8083
+        REACT_APP_URL_NOTIFICACION: http://4.206.176.204:8084
+        REACT_APP_URL_PRONOSTICO: http://4.206.176.204:8085
+        REACT_APP_URL_REGISTRO: http://4.206.176.204:8086
+        REACT_APP_URL_REPORTE: http://4.206.176.204:8087
+        REACT_APP_WEBSOCKET_URL: http://4.206.176.204:8084/ws
+        REACT_APP_COGNITO_USER_POOL_ID: sa-east-1_lTMNrWW7R
+        REACT_APP_COGNITO_CLIENT_ID: 3ksssqtg3r49rf6js1t1177hrd
+        REACT_APP_AWS_REGION: sa-east-1
+    ports:
+      - "80:80"
+    depends_on:
+      - administracion
+      - registro
+    networks:
+      - mycfo_network
+volumes:
+  mysql_data:
+
+networks:
+  mycfo_network:

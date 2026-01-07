@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invitación a MyCFO</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+        .title {
+            font-size: 20px;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #2563eb;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background-color: #1d4ed8;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+            text-align: center;
+        }
+        .warning {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">MyCFO</div>
+            <h1 class="title">¡Te han invitado a unirte!</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hola,</p>
+            
+            <p>Has sido invitado a unirte a la empresa <strong th:text="${empresaNombre}">Mi Empresa</strong> en MyCFO, 
+            la plataforma de gestión financiera empresarial.</p>
+            
+            <p>Para completar tu registro y acceder a la plataforma, haz clic en el siguiente botón:</p>
+            
+            <div style="text-align: center;">
+                <a th:href="${invitacionLink}" class="button">Unirse a la Empresa</a>
+            </div>
+            
+            <div class="warning">
+                <strong>⚠️ Importante:</strong> Este enlace expirará en 30 minutos por seguridad. 
+                Si no puedes acceder ahora, solicita una nueva invitación.
+            </div>
+            
+            <p>Una vez que completes el registro, podrás:</p>
+            <ul>
+                <li>Acceder al dashboard financiero de la empresa</li>
+                <li>Gestionar movimientos y facturas</li>
+                <li>Ver reportes y análisis financieros</li>
+                <li>Colaborar con el equipo</li>
+            </ul>
+            
+            <p>Si no esperabas esta invitación, puedes ignorar este email.</p>
+        </div>
+        
+        <div class="footer">
+            <p>Este email fue enviado desde MyCFO</p>
+            <p>Si tienes problemas con el enlace, copia y pega esta URL en tu navegador:</p>
+            <p style="word-break: break-all; font-size: 12px;" th:text="${invitacionLink}">Link de invitación</p>
+        </div>
+    </div>
+</body>
+</html>

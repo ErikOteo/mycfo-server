@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <title th:text="'MyCFO - ' + ${reminder.title}">MyCFO - Recordatorio</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 300;
+      }
+      .content {
+        padding: 30px;
+      }
+      .reminder-card {
+        border-left: 4px solid #28a745;
+        background-color: #f8f9fa;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 0 8px 8px 0;
+      }
+      .reminder-title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      .reminder-message {
+        color: #666;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+      .reminder-details {
+        background-color: #e9ecef;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+      .reminder-details h4 {
+        margin: 0 0 10px 0;
+        color: #495057;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 8px 0;
+        font-size: 14px;
+      }
+      .detail-label {
+        font-weight: 600;
+        color: #6c757d;
+      }
+      .detail-value {
+        color: #333;
+      }
+      .recurring-badge {
+        display: inline-block;
+        background-color: #28a745;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 10px;
+      }
+      .footer {
+        background-color: #f8f9fa;
+        padding: 20px;
+        text-align: center;
+        font-size: 12px;
+        color: #6c757d;
+        border-top: 1px solid #dee2e6;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        margin: 10px 0;
+        font-weight: 500;
+      }
+      .btn:hover {
+        background-color: #218838;
+      }
+      .date {
+        color: #6c757d;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>MyCFO</h1>
+        <p>Recordatorio Personalizado</p>
+      </div>
+
+      <div class="content">
+        <div
+          class="date"
+          th:text="${#temporals.format(reminder.scheduledFor, 'dd/MM/yyyy HH:mm', 'America/Argentina/Buenos_Aires')}"
+        >
+          Fecha programada
+        </div>
+
+        <div class="reminder-card">
+          <div class="reminder-title" th:text="${reminder.title}">
+            Título del Recordatorio
+          </div>
+          <div class="reminder-message" th:text="${reminder.message}">
+            Mensaje del recordatorio
+          </div>
+        </div>
+
+        <div class="reminder-details">
+          <h4>Detalles del Recordatorio</h4>
+          <div class="detail-row">
+            <span class="detail-label">Tipo:</span>
+            <span class="detail-value">
+              <span th:if="${reminder.recurring}">Recurrente</span>
+              <span th:unless="${reminder.recurring}">Único</span>
+              <span
+                th:if="${reminder.recurring}"
+                class="recurring-badge"
+                th:text="${reminder.recurrencePattern}"
+              >
+                PATRÓN
+              </span>
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Programado para:</span>
+            <span
+              class="detail-value"
+              th:text="${#temporals.format(reminder.scheduledFor, 'dd/MM/yyyy HH:mm', 'America/Argentina/Buenos_Aires')}"
+            >
+              Fecha
+            </span>
+          </div>
+          <div th:if="${reminder.recurring}">
+            <div class="detail-row">
+              <span class="detail-label">Próxima ejecución:</span>
+              <span
+                class="detail-value"
+                th:text="${reminder.nextTrigger != null ? #temporals.format(reminder.nextTrigger, 'dd/MM/yyyy HH:mm', 'America/Argentina/Buenos_Aires') : 'No programado'}"
+              >
+                Próxima fecha
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px">
+          <a href="http://localhost:3000/recordatorios" class="btn">
+            Ver Recordatorios
+          </a>
+        </div>
+
+        <div
+          style="
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 6px;
+          "
+        >
+          <h4>¿Qué puedes hacer ahora?</h4>
+          <ul>
+            <li>Revisar el recordatorio en la aplicación</li>
+            <li>Marcar como completado si ya lo realizaste</li>
+            <li>Editar o eliminar el recordatorio si es necesario</li>
+            <li>Crear nuevos recordatorios para el futuro</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Este es un recordatorio automático del sistema MyCFO.</p>
+        <p>
+          Si no deseas recibir estos recordatorios, puedes desactivarlos en tu
+          perfil de notificaciones.
+        </p>
+        <p>&copy; 2024 MyCFO. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </body>
+</html>

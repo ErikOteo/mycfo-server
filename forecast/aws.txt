@@ -1,0 +1,31 @@
+docker build -t mycfo-forecast .
+
+docker buildx build --platform linux/amd64 -t mycfo-forecast --load .
+
+docker desktop genera imagenes multiplataforma (no me sirve)
+
+aws ecr get-login-password --region sa-east-1 | docker login --username AWS --password-stdin 788352914509.dkr.ecr.sa-east-1.amazonaws.com
+
+docker tag mycfo-forecast:latest 788352914509.dkr.ecr.sa-east-1.amazonaws.com/mycfo-forecast:latest
+
+docker push 788352914509.dkr.ecr.sa-east-1.amazonaws.com/mycfo-forecast:latest
+
+
+docker inspect mycfo-forecast:latest
+
+docker buildx build --platform linux/amd64 -t mycfo-forecast --load .
+
+
+
+docker buildx prune -f
+docker system prune -f
+
+docker build -t 788352914509.dkr.ecr.sa-east-1.amazonaws.com/mycfo-forecast:latest .
+
+aws ecr get-login-password --region sa-east-1 | docker login --username AWS --password-stdin 788352914509.dkr.ecr.sa-east-1.amazonaws.com
+docker push 788352914509.dkr.ecr.sa-east-1.amazonaws.com/mycfo-forecast:latest
+
+
+
+
+

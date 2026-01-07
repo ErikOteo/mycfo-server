@@ -1,0 +1,39 @@
+Descargar e instalar Node.js
+
+https://nodejs.org/es/download
+
+(No instalar Chocolatey)
+
+Abrir CMD de Windows en la carpeta donde esta el Proyecto React (mycfo/frontend):
+
+Escribir estos comandos para verificar que Node.js esta instalado:
+
+node -v 
+npm -v 
+
+Escribir este comando para instalar dependencias necesarias para correr el proyecto:
+
+npm install @mui/material @mui/icons-material @emotion/styled @emotion/react @mui/x-charts @mui/x-date-pickers @mui/x-data-grid @mui/x-tree-view @react-spring/web dayjs react-router-dom @mui/x-data-grid-pro recharts react-dropzone axios
+
+Comando para Amazon Cognito
+
+npm install oidc-client-ts react-oidc-context --save
+
+npm install amazon-cognito-identity-js
+
+
+Para utilizar Github Pages:
+
+npm install gh-pages --save-dev
+
+Escribir este comando para ejecutar el proyecto:
+
+npm start
+
+
+
+
+para cuadros
+npm install recharts
+
+npm install xlsx html2pdf.js

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyCFO - Resumen de Notificaciones</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 300;
+      }
+      .content {
+        padding: 30px;
+      }
+      .digest-summary {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .notification-item {
+        border-left: 4px solid #28a745;
+        background-color: #f8f9fa;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 0 8px 8px 0;
+      }
+      .severity-critical {
+        border-left-color: #dc3545;
+        background-color: #f8d7da;
+      }
+      .severity-warning {
+        border-left-color: #ffc107;
+        background-color: #fff3cd;
+      }
+      .severity-info {
+        border-left-color: #17a2b8;
+        background-color: #d1ecf1;
+      }
+      .notification-title {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 5px;
+      }
+      .notification-body {
+        color: #666;
+        margin-bottom: 10px;
+      }
+      .notification-date {
+        color: #999;
+        font-size: 12px;
+      }
+      .footer {
+        background-color: #f8f9fa;
+        padding: 20px;
+        text-align: center;
+        font-size: 12px;
+        color: #6c757d;
+        border-top: 1px solid #dee2e6;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        margin: 10px 0;
+        font-weight: 500;
+      }
+      .btn:hover {
+        background-color: #218838;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>MyCFO</h1>
+        <p>Resumen de Notificaciones</p>
+      </div>
+
+      <div class="content">
+        <div class="digest-summary">
+          <h2>📧 Resumen de Notificaciones</h2>
+          <p>
+            Has recibido
+            <strong th:text="${notifications.size()}">0</strong> notificaciones
+          </p>
+        </div>
+
+        <div
+          th:each="notification : ${notifications}"
+          class="notification-item"
+          th:classappend="'severity-' + ${notification.severity.name().toLowerCase()}"
+        >
+          <div class="notification-title" th:text="${notification.title}">
+            Título
+          </div>
+          <div class="notification-body" th:text="${notification.body}">
+            Contenido
+          </div>
+          <div
+            class="notification-date"
+            th:text="${#strings.substring(notification.createdAt.toString(), 8, 10) + '/' + #strings.substring(notification.createdAt.toString(), 5, 7) + '/' + #strings.substring(notification.createdAt.toString(), 0, 4)}"
+          >
+            Fecha
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px">
+          <a href="http://localhost:3000/listado-notificaciones" class="btn">
+            Ver Todas las Notificaciones
+          </a>
+        </div>
+
+        <div
+          style="
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 6px;
+          "
+        >
+          <h4>¿Qué puedes hacer ahora?</h4>
+          <ul>
+            <li>Revisar el detalle completo de cada notificación</li>
+            <li>Configurar alertas personalizadas</li>
+            <li>Gestionar tus preferencias de notificación</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Este es un resumen automático del sistema MyCFO.</p>
+        <p>
+          Si no deseas recibir estos resúmenes, puedes configurarlos en tu
+          perfil.
+        </p>
+        <p>&copy; 2024 MyCFO. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </body>
+</html>

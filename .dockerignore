@@ -1,0 +1,37 @@
+# Maven
+administracion/target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+
+# Archivos sensibles - NUNCA incluir en imagen Docker
+.env
+.env.local
+.env.*.local
+*.env
+application-local.properties
+application-dev.properties
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentación
+*.md
+!README.md
+

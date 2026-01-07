@@ -1,0 +1,45 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+
+# Environment files - NUNCA SUBIR CREDENCIALES
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Docker
+docker-compose.override.yml
+
+# Application properties con credenciales
+application-local.properties
+application-dev.properties
+application-prod.properties
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Spring Boot
+HELP.md
+.mvn/wrapper/maven-wrapper.jar

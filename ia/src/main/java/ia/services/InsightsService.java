@@ -1,0 +1,478 @@
+package ia.services;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.LocalDate;
+import java.util.*;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class InsightsService {
+
+    private static final String[] MESES = {
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    };
+
+    @Value("${mycfo.reporte.url}")
+    private String reporteUrl;
+
+    @Value("${deepseek.api.key:}")
+    private String deepseekApiKey;
+
+    @Value("${deepseek.base.url:https://api.deepseek.com}")
+    private String deepseekBaseUrl;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    public Map<String, Object> generarInsights(String userSub, Integer anio, Integer mes) {
+        LocalDate now = LocalDate.now();
+        int year = (anio != null) ? anio : now.getYear();
+        int month = (mes != null) ? mes : now.getMonthValue();
+        int analysisMonth = month - 1;
+        int analysisYear = year;
+        if (analysisMonth < 1) {
+            analysisMonth = 12;
+            analysisYear = year - 1;
+        }
+
+        // Llamar microservicio reporte para obtener datos compactos
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("anio", year);
+        payload.put("mes", month);
+        payload.put("anioAnalisis", analysisYear);
+        payload.put("mesAnalisis", analysisMonth);
+
+        try {
+            var headers = new HttpHeaders();
+            headers.add("X-Usuario-Sub", userSub);
+
+            // P&L (devengado)
+            String pylUrl = reporteUrl + "/pyl?anio=" + year;
+            var pylResp = restTemplate.exchange(
+                    pylUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+            Map<String, Object> pyl = Optional.ofNullable(pylResp.getBody()).orElse(Map.of());
+
+            // Cashflow (caja)
+            String cashUrl = reporteUrl + "/cashflow?anio=" + analysisYear;
+            var cashResp = restTemplate.exchange(
+                    cashUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+            );
+            List<Map<String, Object>> cash = Optional.ofNullable(cashResp.getBody()).orElse(List.of());
+
+            // Resumen mensual (caja)
+            String resumenUrl = reporteUrl + "/resumen?anio=" + analysisYear + "&mes=" + analysisMonth;
+            var resResp = restTemplate.exchange(
+                    resumenUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+            Map<String, Object> resumen = Optional.ofNullable(resResp.getBody()).orElse(Map.of());
+
+            // Reducir datos a lo esencial para el prompt
+            Map<String, Object> compact = compactarDatos(year, month, analysisYear, analysisMonth, pyl, cash, resumen);
+            payload.put("datos", compact);
+
+            Map<String, Object> ai = llamarDeepSeek(compact);
+            payload.put("ai", ai);
+            return ai;
+        } catch (Exception e) {
+            log.error("Error generando insights para userSub={}, anio={}, mes={}", userSub, anio, mes, e);
+            Map<String, Object> fallback = new HashMap<>();
+            fallback.put("diagnostico_corto", "No se pudo generar el análisis en este momento.");
+            fallback.put("senales", Map.of());
+            fallback.put("tips", List.of("Reintenta en unos minutos", "Verifica tu conexión"));
+            fallback.put("error", e.getMessage());
+            return fallback;
+        }
+    }
+
+    private Map<String, Object> compactarDatos(int anioPyl, int mesActual,
+                                               int anioAnalisis, int mesAnalisis,
+                                               Map<String, Object> pyl,
+                                               List<Map<String, Object>> cash,
+                                               Map<String, Object> resumen) {
+        Map<String, Object> out = new HashMap<>();
+        out.put("anio", anioPyl);
+        out.put("mes", mesActual);
+        out.put("anioAnalisis", anioAnalisis);
+        out.put("mesAnalisis", mesAnalisis);
+        out.put("mesActualNombre", nombreMes(mesActual));
+        out.put("mesAnalisisNombre", nombreMes(mesAnalisis));
+
+        // P&L arrays
+        double[] ingPyl = toDoubleArray((List<?>) pyl.getOrDefault("ingresosMensuales", List.of()));
+        double[] egrPyl = toDoubleArray((List<?>) pyl.getOrDefault("egresosMensuales", List.of()));
+        out.put("pyl", Map.of(
+                "ingresosMensuales", ingPyl,
+                "egresosMensuales", egrPyl,
+                "detalleIngresos", pyl.getOrDefault("detalleIngresos", List.of()),
+                "detalleEgresos", pyl.getOrDefault("detalleEgresos", List.of())
+        ));
+
+        // Cashflow: agregamos totales por mes
+        double[] ingCash = new double[12];
+        double[] egrCash = new double[12];
+        for (Map<String, Object> mov : cash) {
+            try {
+                String tipo = Objects.toString(mov.get("tipo"), "");
+                String fecha = Objects.toString(mov.get("fechaEmision"), null);
+                Double monto = (mov.get("montoTotal") instanceof Number) ? ((Number) mov.get("montoTotal")).doubleValue() : 0.0;
+                if (fecha == null) continue;
+                int monthIdx = LocalDate.parse(fecha).getMonthValue() - 1;
+                if ("Ingreso".equalsIgnoreCase(tipo)) ingCash[monthIdx] += monto;
+                else if ("Egreso".equalsIgnoreCase(tipo)) egrCash[monthIdx] += monto;
+            } catch (Exception ignore) { }
+        }
+        out.put("cashflow", Map.of("ingresosMensuales", ingCash, "egresosMensuales", egrCash));
+
+        // Resumen mensual (categorías)
+        out.put("resumen", Map.of(
+                "detalleIngresos", resumen.getOrDefault("detalleIngresos", List.of()),
+                "detalleEgresos", resumen.getOrDefault("detalleEgresos", List.of())
+        ));
+
+        // Derivados
+        int idxCash = Math.max(0, Math.min(11, mesAnalisis - 1));
+        int idxDevengado = (anioAnalisis == anioPyl)
+                ? idxCash
+                : Math.max(0, Math.min(11, mesActual - 1));
+        double cajaNeta = ingCash[idxCash] - egrCash[idxCash];
+        double devengadoNeto = (idxDevengado < ingPyl.length ? ingPyl[idxDevengado] : 0)
+                - (idxDevengado < egrPyl.length ? egrPyl[idxDevengado] : 0);
+        double gapLiquidez = devengadoNeto - cajaNeta;
+        double ingresosMes = (idxCash < ingCash.length) ? ingCash[idxCash] : 0;
+        double egresosMes = (idxCash < egrCash.length) ? egrCash[idxCash] : 0;
+
+        int idxYtd = Math.max(0, Math.min(11, mesActual - 1));
+        double ingresosYtd = 0;
+        double egresosYtd = 0;
+        for (int i = 0; i <= idxYtd && i < ingPyl.length; i++) {
+            ingresosYtd += ingPyl[i];
+        }
+        for (int i = 0; i <= idxYtd && i < egrPyl.length; i++) {
+            egresosYtd += egrPyl[i];
+        }
+        double devengadoYtd = ingresosYtd - egresosYtd;
+
+        out.put("derivados", Map.of(
+                "gapLiquidez", gapLiquidez,
+                "cajaNetaMes", cajaNeta,
+                "devengadoNetoMes", devengadoNeto,
+                "ingresosMes", ingresosMes,
+                "egresosMes", egresosMes,
+                "devengadoYtd", devengadoYtd,
+                "ingresosYtd", ingresosYtd,
+                "egresosYtd", egresosYtd,
+                "mesAnalisis", mesAnalisis,
+                "anioAnalisis", anioAnalisis
+        ));
+        return out;
+    }
+
+    private double[] toDoubleArray(List<?> list) {
+        double[] out = new double[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            Object v = list.get(i);
+            out[i] = (v instanceof Number) ? ((Number) v).doubleValue() : 0.0;
+        }
+        return out;
+    }
+
+    private Map<String, Object> construirInsightBasico(Map<String, Object> compact) {
+        Map<String, Object> derivados = mapOrEmpty(compact.get("derivados"));
+        double gapLiquidez = asDouble(derivados.get("gapLiquidez"));
+        double cajaNeta = asDouble(derivados.get("cajaNetaMes"));
+        double devengadoMes = asDouble(derivados.get("devengadoNetoMes"));
+        double ingresosMes = asDouble(derivados.get("ingresosMes"));
+        double egresosMes = asDouble(derivados.get("egresosMes"));
+        double devengadoYtd = asDouble(derivados.get("devengadoYtd"));
+        double ingresosYtd = asDouble(derivados.get("ingresosYtd"));
+        double egresosYtd = asDouble(derivados.get("egresosYtd"));
+
+        int anioAnalisis = asInt(compact.get("anioAnalisis"), LocalDate.now().getYear());
+        int anioPyl = asInt(compact.get("anio"), anioAnalisis);
+        String mesAnalisisNombre = Objects.toString(compact.getOrDefault("mesAnalisisNombre", "Mes analizado"));
+        String mesActualNombre = Objects.toString(compact.getOrDefault("mesActualNombre", "Mes actual"));
+
+        String estadoLiquidez = gapLiquidez >= 0 ? "sana" : "tensionada";
+        String estadoSolvencia = devengadoYtd >= 0 ? "solvente" : "en riesgo";
+        String estadoMes = ingresosMes >= egresosMes ? "genero caja positiva" : "presento deficit de caja";
+
+        Map<String, Object> resumen = mapOrEmpty(compact.get("resumen"));
+        Map<String, Object> ingresoTop = obtenerMaxCategoria(resumen.get("detalleIngresos"));
+        Map<String, Object> egresoTop = obtenerMaxCategoria(resumen.get("detalleEgresos"));
+
+        String lineaLiquidez = String.format(
+                "Liquidez (cashflow vs devengado %s %d): %s; gap = devengado (%s) - caja (%s) = %s.",
+                mesAnalisisNombre, anioAnalisis, estadoLiquidez,
+                formatCurrency(devengadoMes), formatCurrency(cajaNeta), formatCurrency(gapLiquidez));
+
+        String lineaSolvencia = String.format(
+                "Solvencia (P&L %d acumulado a %s): %s con resultado neto %s (ingresos %s vs egresos %s).",
+                anioPyl, mesActualNombre, estadoSolvencia,
+                formatCurrency(devengadoYtd), formatCurrency(ingresosYtd), formatCurrency(egresosYtd));
+
+        String lineaIngreso = formatearCategoria(
+                String.format("Ingreso mayor del mes %s %d", mesAnalisisNombre, anioAnalisis), ingresoTop);
+        String lineaEgreso = formatearCategoria(
+                String.format("Egreso mayor del mes %s %d", mesAnalisisNombre, anioAnalisis), egresoTop);
+
+        String lineaEstado = String.format(
+                "Estado reportes mes %s %d (cashflow/resumen): %s; ingresos %s vs egresos %s. %s / %s.",
+                mesAnalisisNombre, anioAnalisis, estadoMes,
+                formatCurrency(ingresosMes), formatCurrency(egresosMes),
+                lineaIngreso, lineaEgreso);
+
+        String diagnostico = String.join("\n", List.of(lineaLiquidez, lineaSolvencia, lineaEstado));
+
+        Map<String, String> senales = new LinkedHashMap<>();
+        senales.put("liquidez", lineaLiquidez);
+        senales.put("rentabilidad", lineaSolvencia);
+
+        Map<String, String> detalles = new LinkedHashMap<>();
+        detalles.put("ingresoMaximo", lineaIngreso);
+        detalles.put("egresoMaximo", lineaEgreso);
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("diagnostico_corto", diagnostico);
+        resp.put("senales", senales);
+        resp.put("detalles", detalles);
+        resp.put("riesgos_clave", List.of());
+        resp.put("tips", List.of());
+        resp.put("alerta", gapLiquidez < 0 || devengadoYtd < 0);
+        return resp;
+    }
+
+    private Map<String, Object> adaptarRespuestaLlm(Map<String, Object> raw, Map<String, Object> compact) {
+        Map<String, Object> base = construirInsightBasico(compact);
+        if (raw == null || raw.isEmpty()) {
+            return base;
+        }
+
+        Map<String, Object> resp = new HashMap<>(base);
+
+        String diag = Objects.toString(raw.get("diagnostico_corto"), "").trim();
+        if (!diag.isEmpty()) {
+            List<String> lines = diag.replace("\r", "")
+                    .lines()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .filter(line -> !line.startsWith("{") && !line.startsWith("```"))
+                    .toList();
+            if (!lines.isEmpty()) {
+                resp.put("diagnostico_corto", String.join("\n", lines));
+            }
+        }
+
+        Map<String, Object> rawSenales = mapOrEmpty(raw.get("senales"));
+        if (!rawSenales.isEmpty()) {
+            Map<String, String> senales = new LinkedHashMap<>();
+            rawSenales.forEach((k, v) -> senales.put(k, Objects.toString(v, "")));
+            resp.put("senales", senales);
+        }
+
+        Map<String, Object> rawDetalles = mapOrEmpty(raw.get("detalles"));
+        if (!rawDetalles.isEmpty()) {
+            Map<String, String> detalles = new LinkedHashMap<>();
+            rawDetalles.forEach((k, v) -> detalles.put(k, Objects.toString(v, "")));
+            resp.put("detalles", detalles);
+        }
+
+        List<String> riesgos = extraerListaTexto(raw.get("riesgos_clave"));
+        if (riesgos != null) {
+            resp.put("riesgos_clave", riesgos);
+        }
+
+        List<String> tips = extraerListaTexto(raw.get("tips"));
+        if (tips != null) {
+            resp.put("tips", tips);
+        }
+
+        if (raw.containsKey("alerta")) {
+            resp.put("alerta", Boolean.TRUE.equals(raw.get("alerta")));
+        }
+
+        return resp;
+    }
+
+    private Map<String, Object> llamarDeepSeek(Map<String, Object> compact) throws Exception {
+        if (deepseekApiKey == null || deepseekApiKey.isBlank()) {
+            throw new IllegalStateException("No se configuró la propiedad deepseek.api.key.");
+        }
+
+        String url = deepseekBaseUrl + "/chat/completions";
+        var headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(deepseekApiKey);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", "deepseek-chat");
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content",
+                "Eres un analista financiero. Explica en lenguaje simple, directo y accionable. No inventes datos."));
+        messages.add(Map.of("role", "user", "content",
+                "Analiza estos datos de la empresa (JSON) y responde SOLO en JSON con la forma exacta: "
+                        + "{diagnostico_corto,string, senales:{liquidez,rentabilidad}, detalles:{ingresoMaximo,egresoMaximo},"
+                        + " riesgos_clave:[], tips:[], alerta:boolean}. "
+                        + "Usa mesAnalisis/mesAnalisisNombre/anioAnalisis para interpretar el ULTIMO mes (cashflow/resumen) "
+                        + "y mesActual/mesActualNombre/anio (anio P&L) para los datos anuales. "
+                        + "diagnostico_corto DEBE tener 3 lineas separadas por \\n en este orden exacto: "
+                        + "\"Liquidez (cashflow vs devengado mesAnalisisNombre anioAnalisis): ...\", "
+                        + "\"Solvencia (P&L anio acumulado a mesActualNombre): ...\", "
+                        + "\"Estado reportes mesAnalisisNombre anioAnalisis: ...\". "
+                        + "En cada linea indica si el indicador esta bien/mal/mejorable, menciona el reporte usado y explica el calculo "
+                        + "(ej. gap = devengadoNetoMes - cajaNetaMes, devengadoYtd = ingresosYtd - egresosYtd, ingresosMes/egresosMes del cashflow/resumen). "
+                        + "En detalles.ingresoMaximo y detalles.egresoMaximo describe la categoria top del mes analizado usando resumen.detalle* "
+                        + "y formatea los montos como $1,234,567. "
+                        + "En riesgos_clave y tips agrega frases cortas basadas en los datos (si no aplican, deja listas vacias). "
+                        + "No inventes datos ni menciones otras empresas. Datos: "
+                        + mapper.writeValueAsString(compact)));
+        body.put("messages", messages);
+        body.put("temperature", 0.4);
+        body.put("max_tokens", 700);
+
+        String req = mapper.writeValueAsString(body);
+        try {
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    url, HttpMethod.POST, new HttpEntity<>(req, headers), String.class);
+            String json = Optional.ofNullable(resp.getBody()).orElse("{}");
+
+            // Parse respuesta tipo OpenAI
+            JsonNode root = mapper.readTree(json);
+            String content = Optional.ofNullable(root.path("choices").get(0))
+                    .map(n -> n.path("message").path("content").asText())
+                    .orElse("");
+
+            // Intentar parsear contenido a JSON; si falla, devolver texto crudo
+            try {
+                Map<String, Object> parsed = mapper.readValue(
+                        normalizarContenido(content),
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>(){}
+                );
+                return adaptarRespuestaLlm(parsed, compact);
+            } catch (Exception ex) {
+                log.warn("No se pudo parsear respuesta de DeepSeek como JSON estructurado: {}", content, ex);
+                return construirInsightBasico(compact);
+            }
+        } catch (RestClientResponseException ex) {
+            log.error("DeepSeek API respondió con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Error inesperado al invocar DeepSeek", ex);
+            throw ex;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> mapOrEmpty(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
+        }
+        return Map.of();
+    }
+
+    private double asDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String str) {
+            try {
+                return Double.parseDouble(str);
+            } catch (NumberFormatException ignore) { }
+        }
+        return 0d;
+    }
+
+    private int asInt(Object value, int defaultValue) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String str) {
+            try {
+                return Integer.parseInt(str);
+            } catch (NumberFormatException ignore) { }
+        }
+        return defaultValue;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> obtenerMaxCategoria(Object detalle) {
+        if (!(detalle instanceof List<?> lista) || lista.isEmpty()) {
+            return null;
+        }
+        return lista.stream()
+                .filter(Map.class::isInstance)
+                .map(item -> (Map<String, Object>) item)
+                .max(Comparator.comparingDouble(m -> asDouble(m.get("total"))))
+                .orElse(null);
+    }
+
+    private String formatearCategoria(String titulo, Map<String, Object> categoria) {
+        if (categoria == null) {
+            return titulo + ": sin datos";
+        }
+        String nombre = Objects.toString(categoria.getOrDefault("categoria", "Sin categorizar"));
+        double monto = asDouble(categoria.get("total"));
+        return String.format("%s: %s en %s", titulo, formatCurrency(monto), nombre);
+    }
+
+    private String formatCurrency(double value) {
+        String formatted = String.format(Locale.US, "%,.0f", Math.abs(value));
+        return (value < 0 ? "-$" : "$") + formatted;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> extraerListaTexto(Object value) {
+        if (value instanceof List<?> list) {
+            return list.stream()
+                    .map(item -> Objects.toString(item, ""))
+                    .filter(str -> !str.isBlank())
+                    .toList();
+        }
+        return null;
+    }
+
+    private String nombreMes(int mes) {
+        if (mes < 1 || mes > 12) {
+            return "Mes";
+        }
+        String nombre = MESES[mes - 1];
+        return nombre.substring(0, 1).toUpperCase() + nombre.substring(1);
+    }
+
+    private String normalizarContenido(String content) {
+        String sanitized = content == null ? "" : content.trim();
+        if (sanitized.startsWith("```")) {
+            // quitar etiqueta inicial (``` o ```json)
+            int firstLineBreak = sanitized.indexOf('\n');
+            if (firstLineBreak > 0) {
+                String firstLine = sanitized.substring(0, firstLineBreak);
+                if (firstLine.startsWith("```")) {
+                    sanitized = sanitized.substring(firstLineBreak + 1);
+                }
+            } else {
+                sanitized = sanitized.replaceFirst("^```[a-zA-Z0-9]*", "");
+            }
+            int closing = sanitized.lastIndexOf("```");
+            if (closing >= 0) {
+                sanitized = sanitized.substring(0, closing);
+            }
+        }
+        return sanitized.trim();
+    }
+}
+

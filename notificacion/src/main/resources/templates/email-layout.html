@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title th:text="${title} ?: 'MyCFO - Notificación'">
+      MyCFO - Notificación
+    </title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 300;
+      }
+      .content {
+        padding: 30px;
+      }
+      .notification-card {
+        border-left: 4px solid #28a745;
+        background-color: #f8f9fa;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 0 8px 8px 0;
+      }
+      .severity-critical {
+        border-left-color: #dc3545;
+        background-color: #f8d7da;
+      }
+      .severity-warning {
+        border-left-color: #ffc107;
+        background-color: #fff3cd;
+      }
+      .severity-info {
+        border-left-color: #17a2b8;
+        background-color: #d1ecf1;
+      }
+      .footer {
+        background-color: #f8f9fa;
+        padding: 20px;
+        text-align: center;
+        font-size: 12px;
+        color: #6c757d;
+        border-top: 1px solid #dee2e6;
+      }
+      .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        margin: 10px 0;
+        font-weight: 500;
+      }
+      .btn:hover {
+        background-color: #218838;
+      }
+      .date {
+        color: #6c757d;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>MyCFO</h1>
+        <p>Gestión Financiera Inteligente</p>
+      </div>
+
+      <div class="content" th:fragment="content">
+        <!-- Contenido específico de cada template -->
+      </div>
+
+      <div class="footer">
+        <p>Este es un mensaje automático del sistema MyCFO.</p>
+        <p>
+          Si no deseas recibir estas notificaciones, puedes configurarlas en tu
+          perfil.
+        </p>
+        <p>&copy; 2024 MyCFO. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </body>
+</html>

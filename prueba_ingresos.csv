@@ -1,0 +1,11 @@
+fecha,monto_total,descripcion,categoria,origen_nombre,origen_cuit,destino_nombre,destino_cuit,medio_pago,moneda,estado,periodicidad
+2025-11-26,152000,Consultoría financiera mensual,Otros Ingresos,Cliente SA,30-11111111-2,MyCFO SRL,30-99999999-7,Transferencia,ARS,PAGADO,mensual
+2025-11-26,98000,Ajuste por servicios adicionales,Otros Ingresos,Metalurgica Sur SA,30-42998817-4,MyCFO SRL,30-99999999-7,MercadoPago,ARS,PAGADO,-
+2025-11-26,45000,Reintegro por nota de crédito,Otros Ingresos,Terceros Varios,27-33333333-9,MyCFO SRL,30-99999999-7,Efectivo,ARS,PAGADO,-
+2025-11-26,187000,Servicio profesional avanzado,Otros Ingresos,Empresa Norte SRL,30-22222222-3,MyCFO SRL,30-99999999-7,Transferencia,ARS,PAGADO,mensual
+2025-11-26,62000,Compra de insumos para oficina,Otros Ingresos,Proveedora Delta SA,30-55555555-1,MyCFO SRL,30-99999999-7,Transferencia,ARS,PAGADO,-
+2025-11-26,34500,Reparación de equipos informáticos,Otros Ingresos,Servicios Técnicos SRL,30-66666666-2,MyCFO SRL,30-99999999-7,Efectivo,ARS,PAGADO,-
+2025-11-26,89000,Capacitación del equipo contable,Otros Ingresos,Academia Expert SA,30-77777777-3,MyCFO SRL,30-99999999-7,Tarjeta,ARS,PAGADO,mensual
+2025-11-26,129000,Servicio de análisis de datos,Otros Ingresos,DataCorp SA,30-88888888-4,MyCFO SRL,30-99999999-7,Transferencia,ARS,PAGADO,-
+2025-11-26,51000,Comisión por servicios bancarios,Otros Ingresos,Banco Río,30-12121212-9,MyCFO SRL,30-99999999-7,Transferencia,ARS,PAGADO,-
+2025-11-26,74000,Venta de informe financiero,Otros Ingresos,Consultora Global SRL,30-99999111-5,MyCFO SRL,30-99999999-7,MercadoPago,ARS,PAGADO,-
