@@ -1,20 +1,20 @@
-FROM public.ecr.aws/lambda/python:3.10
+# Usamos una imagen de Python normal (no Lambda)
+FROM python:3.10-slim
 
-# -------------------------------
+# Definir carpeta de trabajo
+WORKDIR /app
+
+# Instalar librerías del sistema necesarias para Prophet y Numpy
+# (gcc, g++, libgomp1 son vitales para cálculos matemáticos)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Actualizar pip
-# -------------------------------
 RUN pip install --no-cache-dir --upgrade pip
 
-# -------------------------------
-# Librerías requeridas por numpy/scipy/statsmodels
-# -------------------------------
-RUN yum install -y gcc gcc-c++ make \
-    && yum install -y libgfortran libquadmath \
-    && yum clean all
-
-# -------------------------------
-# Instalar dependencias Python
-# -------------------------------
+# Instalar librerías de Python
 RUN pip install --no-cache-dir \
     numpy \
     pandas \
@@ -27,12 +27,11 @@ RUN pip install --no-cache-dir \
     flask-cors \
     joblib
 
-# -------------------------------
-# Copiar tu aplicación
-# -------------------------------
-COPY app.py ${LAMBDA_TASK_ROOT}/app.py
+# Copiar el código a la carpeta /app
+COPY app.py .
 
-# -------------------------------
-# Comando handler
-# -------------------------------
-CMD ["app.lambda_handler"]
+# Exponer el puerto 8088
+EXPOSE 8088
+
+# Ejecutar como servidor web normal
+CMD ["python", "app.py"]
