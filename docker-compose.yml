@@ -2,6 +2,7 @@ services:
   administracion:
     container_name: administracion
     build: ./administracion
+    restart: always
     ports:
       - "8081:8081"
     depends_on:
@@ -13,7 +14,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/administracion_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
-
       - ADMINISTRACION_URL=http://administracion:8081
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
@@ -21,12 +21,10 @@ services:
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
-
       # AWS Cognito (desde .env)
       - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
       - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
       - AWS_REGION=${AWS_REGION}
-
       # AWS Credenciales (desde .env)
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -34,6 +32,7 @@ services:
   ia:
     container_name: ia
     build: ./ia
+    restart: always
     ports:
       - "8083:8083"
     depends_on:
@@ -45,7 +44,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ia_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
-
       - ADMINISTRACION_URL=http://administracion:8081
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
@@ -59,6 +57,7 @@ services:
   notificacion:
     container_name: notificacion
     build: ./notificacion
+    restart: always
     ports:
       - "8084:8084"
     depends_on:
@@ -70,7 +69,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/notificacion_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
-
       - ADMINISTRACION_URL=http://administracion:8081
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
@@ -78,7 +76,6 @@ services:
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
-
       # Email configuration (desde .env)
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
@@ -90,6 +87,7 @@ services:
   pronostico:
     container_name: pronostico
     build: ./pronostico
+    restart: always
     ports:
       - "8085:8085"
     depends_on:
@@ -101,7 +99,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/pronostico_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
-
       - ADMINISTRACION_URL=http://administracion:8081
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
@@ -114,6 +111,7 @@ services:
   registro:
     container_name: registro
     build: ./registro
+    restart: always
     ports:
       - "8086:8086"
     depends_on:
@@ -125,7 +123,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/registro_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
-
       - ADMINISTRACION_URL=http://administracion:8081
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
@@ -133,7 +130,6 @@ services:
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
-
       # Mercado Pago (desde .env)
       - MERCADOPAGO_CLIENT_ID=${MERCADOPAGO_CLIENT_ID}
       - MERCADOPAGO_CLIENT_SECRET=${MERCADOPAGO_CLIENT_SECRET}
@@ -142,13 +138,13 @@ services:
       - MERCADOPAGO_BASE_URL=${MERCADOPAGO_BASE_URL}
       - MERCADOPAGO_SCOPE=${MERCADOPAGO_SCOPE}
       - MERCADOPAGO_FRONTEND_URL=${MERCADOPAGO_FRONTEND_URL}
-
       # Encriptación de datos sensibles
       - APP_ENCRYPT_SECRET=${APP_ENCRYPT_SECRET}
 
   reporte:
     container_name: reporte
     build: ./reporte
+    restart: always
     ports:
       - "8087:8087"
     depends_on:
@@ -160,7 +156,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reporte_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
       - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
-
       - ADMINISTRACION_URL=http://administracion:8081
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
@@ -172,6 +167,7 @@ services:
   forecast:
     container_name: forecast
     build: ./forecast
+    restart: always
     ports:
       - "8088:8088"
     networks:
@@ -192,8 +188,10 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - mycfo_network
+
   frontend:
     container_name: frontend
+    restart: always
     build:
       context: ./frontend
       args:
@@ -215,6 +213,7 @@ services:
       - registro
     networks:
       - mycfo_network
+
 volumes:
   mysql_data:
 
