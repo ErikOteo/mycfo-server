@@ -41,7 +41,7 @@ services:
     networks:
       - mycfo_network
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx450m
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
       - SERVER_PORT=8083
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ia_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
@@ -67,7 +67,7 @@ services:
     networks:
       - mycfo_network
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx450m
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
       - SERVER_PORT=8084
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/notificacion_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
@@ -98,7 +98,7 @@ services:
     networks:
       - mycfo_network
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx450m
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
       - SERVER_PORT=8085
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/pronostico_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
@@ -123,7 +123,7 @@ services:
     networks:
       - mycfo_network
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx450m
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
       - SERVER_PORT=8086
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/registro_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
@@ -157,7 +157,7 @@ services:
     networks:
       - mycfo_network
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx450m
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx300m
       - SERVER_PORT=8087
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reporte_db
       - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
