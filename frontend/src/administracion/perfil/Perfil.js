@@ -81,7 +81,7 @@ export default function Perfil() {
   return (
     <Box sx={{ width: "100%", maxWidth: 1000, mx: "auto", mt: 4, p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Perfilllllllll de Usuario
+        Perfil de Usuario
       </Typography>
       <Typography variant="subtitle1" sx={{ mb: 3 }}>
         Actualiza tu información personal (los cambios se guardan en la base de datos)
