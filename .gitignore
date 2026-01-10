@@ -43,7 +43,7 @@ build/
 
 # Application properties con credenciales
 **/application-local.properties
-**/application-dev.properties
+#**/application-dev.properties
 **/application-prod.properties
 
 # Archivos de credenciales AWS
