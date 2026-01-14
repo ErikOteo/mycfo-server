@@ -1,5 +1,6 @@
 // Configuración de URLs de los microservicios para AZURE
-const BASE_URL = process.env.REACT_APP_BASE_URL || 'http://4.206.176.204';
+//const BASE_URL = process.env.REACT_APP_BASE_URL || 'http://4.206.176.204';
+const BASE_URL = process.env.REACT_APP_BASE_URL || 'https://mycfo.com.ar';
 
 const API_CONFIG = {
   // URLs apuntando al Proxy Nginx (Puerto 80)
