@@ -6,9 +6,11 @@ export async function getNotifications({
   limit = 50,
   page = 0,
   since,
+  signal,
 }) {
   const { data } = await api.get(`/users/${userId}/notifications`, {
     params: { status, size: limit, page, since },
+    signal: signal,
   });
   return data; // { unread, items: [...] }
 }

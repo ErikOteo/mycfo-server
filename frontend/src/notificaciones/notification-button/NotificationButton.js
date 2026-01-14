@@ -1,5 +1,3 @@
-// components/NotificationButton.js
-
 import React from "react";
 import IconButton from "@mui/material/IconButton";
 import Badge from "@mui/material/Badge";
@@ -27,63 +25,78 @@ export default function NotificationButton(props) {
   const [drawerLoading, setDrawerLoading] = React.useState(false);
   const [drawerError, setDrawerError] = React.useState(null);
 
-  // Polling cada 10s de las notificaciones NO leídas
+  // Lógica de Smart Polling (reemplaza a setInterval)
   React.useEffect(() => {
+    // Si no hay usuario, limpiamos y no hacemos nada
     if (!isAuthenticated || !userId) {
       setUnread(0);
       setDrawerItems([]);
       return;
     }
 
-    let cancelled = false;
+    // 1. Controlador para cancelar la petición si el componente se desmonta
+    const controller = new AbortController();
+    let timeoutId;
 
     const fetchNotifications = async () => {
       try {
-        setLoading(true);
+        // Solo mostramos loading visual en la primera carga si la lista está vacía
+        if (drawerItems.length === 0) {
+            setLoading(true);
+        }
+
+        // Pasamos la señal de cancelación a la API (requiere actualización en notificationsApi.js)
         const data = await getNotifications({
           userId,
           status: "unread",
           limit: 50,
+          signal: controller.signal, 
         });
-
-        if (cancelled) return;
 
         const items = data.items || [];
 
-        // La lista de la solapa refleja SIEMPRE el estado del backend (solo no leídas)
+        // La lista de la solapa refleja el estado del backend
         setDrawerItems(items);
 
         // Actualizar contador para el badge
-        const unreadCount =
-          typeof data.unread === "number" ? data.unread : items.length;
+        const unreadCount = typeof data.unread === "number" ? data.unread : items.length;
         setUnread(unreadCount);
-      } catch (err) {
-        if (!cancelled) {
-          // Si el backend responde 304 (Not Modified), lo tomamos como "sin cambios"
-          // y mantenemos la lista actual sin marcar error.
-          const status = err?.response?.status;
-          if (status === 304) {
-            return;
-          }
+        
+        // Si tuvo éxito, limpiamos errores previos de red
+        setDrawerError(null);
 
-          console.error("Error en polling de notificaciones:", err);
-          setDrawerError(err);
+      } catch (err) {
+        // Si el error es por cancelación (usuario salió de pantalla), no hacemos nada
+        if (err.name === 'CanceledError' || err.code === "ERR_CANCELED") {
+            return;
+        }
+
+        // Ignoramos errores 304 (Not Modified)
+        const status = err?.response?.status;
+        if (status !== 304) {
+          console.error("Error en polling de notificaciones:", err.message);
+          // Opcional: setDrawerError(err); // Descomentar si quieres mostrar alerta visual
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
+        setLoading(false);
+        
+        // 2. SMART POLLING:
+        // Solo programamos la SIGUIENTE llamada cuando la actual terminó.
+        // Y solo si el componente sigue montado (signal no abortada).
+        if (!controller.signal.aborted) {
+            // Aumentado a 15 segundos para dar respiro al servidor
+            timeoutId = setTimeout(fetchNotifications, 15000); 
         }
       }
     };
 
-    // Primera carga inmediata
+    // Iniciar el ciclo
     fetchNotifications();
 
-    const intervalId = setInterval(fetchNotifications, 10000); // 10 segundos
-
+    // Cleanup: Se ejecuta si el usuario cambia de página o cierra sesión
     return () => {
-      cancelled = true;
-      clearInterval(intervalId);
+      controller.abort(); // Cancela petición de red en curso
+      clearTimeout(timeoutId); // Cancela el timer pendiente
     };
   }, [isAuthenticated, userId]);
 
@@ -176,7 +189,7 @@ export default function NotificationButton(props) {
             disableRipple
             size="small"
             aria-label="Open notifications"
-            disabled={loading}
+            disabled={loading && drawerItems.length === 0} // Solo deshabilitar si carga por primera vez
             sx={(theme) => ({
               color: (theme.vars || theme).palette.text.primary,
               transition: 'color 0.2s, background-color 0.2s',
