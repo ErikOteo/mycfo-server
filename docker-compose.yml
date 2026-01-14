@@ -213,7 +213,7 @@ services:
         REACT_APP_COGNITO_CLIENT_ID: 3ksssqtg3r49rf6js1t1177hrd
         REACT_APP_AWS_REGION: sa-east-1
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - administracion
       - registro
