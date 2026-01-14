@@ -251,6 +251,7 @@ const BudgetWidget = ({
   const [budget, setBudget] = React.useState(null);
   const useMocks = process.env.REACT_APP_USE_MOCKS === "true";
   const baseURL = API_CONFIG.PRONOSTICO;
+  const usuarioSub = sessionStorage.getItem("sub");
   const referenceDate = React.useMemo(
     () => periodToDate(period) ?? new Date(),
     [period],
@@ -280,6 +281,11 @@ const BudgetWidget = ({
       params.set("sort", "createdAt,desc");
       const response = await http.get(
         `${baseURL}/api/presupuestos?${params.toString()}`,
+        {
+          headers: {
+            "X-Usuario-Sub": usuarioSub
+          }
+        }
       );
       const list = extractBudgetList(response?.data);
       const vigente = list.find((item) =>
@@ -291,6 +297,11 @@ const BudgetWidget = ({
       }
       const totalsResponse = await http.get(
         `${baseURL}/api/presupuestos/${vigente.id}/totales`,
+        {
+          headers: {
+            "X-Usuario-Sub": usuarioSub
+          }
+        }
       );
       const totales = Array.isArray(totalsResponse?.data)
         ? totalsResponse.data

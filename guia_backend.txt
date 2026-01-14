@@ -2,10 +2,58 @@
 
 Nos paramos en la carpeta mycfo y abrimos un cmd.
 
-Primero levantamos la base de datos mysql:
+Limpiar entorno anterior:
+docker rm -f mysql
 
-docker-compose up --build mysql
+Levantamos la base de datos mysql:
+docker-compose up -d mysql                  // antes decia: docker-compose up --build mysql
 
+----------------------------------------------------------------------------------------------------------
+Configuración de Microservicios (IntelliJ IDEA)
+Para ejecutar los microservicios localmente, se debe activar el perfil dev en cada uno de ellos. Esto fuerza la lectura del archivo application-dev.properties (credenciales locales) sobre el archivo estándar (credenciales Azure).
+
+Servicios a configurar:
+- AdministracionApplication
+- RegistroApplication
+- ReporteApplication
+- IaApplication
+- NotificacionApplication
+- PronosticoApplication
+
+Pasos de configuración:
+
+1. En IntelliJ, ir al menú Run > Edit Configurations...
+
+2. Seleccionar el servicio a configurar en la lista izquierda.
+
+3. Localizar el campo Active profiles.
+
+    -Caso A: El campo está visible: Escribir dev.
+
+    -Caso B: El campo NO está visible:
+
+        1. Hacer clic en Modify options (texto azul o Alt+M).
+
+        2. Seleccionar Add VM options.
+
+        3. En el nuevo campo que aparece, ingresar el siguiente comando: -Dspring.profiles.active=dev
+
+Nota: Repetir este procedimiento para cada uno de los 6 microservicios listados arriba.
+
+4. Orden de Ejecución
+Para garantizar la correcta comunicación entre servicios, se recomienda seguir este orden de inicio:
+
+    1. GatewayApplication (Puerto :8090).
+
+    2. Resto de Microservicios (Administración, Registro, IA, etc.).
+
+    3. Frontend:
+        cd frontend
+        npm start
+
+El sistema estará accesible en: http://localhost:3000
+
+----------------------------------------------------------------------------------------------------------
 PARA DESARROLLO CORRER EL MODULO EN INTELLIJ
 
 (OPCIONAL PARA REALIZAR PRUEBAS DE INTEGRACION DE MODULOS)

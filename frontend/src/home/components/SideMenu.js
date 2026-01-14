@@ -206,7 +206,7 @@ const SideMenu = React.memo(function SideMenu({
         <Avatar
           sizes="small"
           alt={userData.nombre}
-          src="/static/images/avatar/7.jpg"
+          //src="/static/images/avatar/7.jpg"
           sx={{ width: 36, height: 36 }}
         />
         {expanded && (

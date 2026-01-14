@@ -125,7 +125,7 @@ function SideMenuMobile({ open, toggleDrawer }) {
           <Avatar
             sizes="small"
             alt={userData.nombre}
-            src="/static/images/avatar/7.jpg"
+            //src="/static/images/avatar/7.jpg"
             sx={{ width: 24, height: 24 }}
           />
           <Box>
