@@ -201,14 +201,16 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_BASE_URL: http://4.206.176.204
-        REACT_APP_URL_ADMINISTRACION: http://4.206.176.204:8081
-        REACT_APP_URL_IA: http://4.206.176.204:8083
-        REACT_APP_URL_NOTIFICACION: http://4.206.176.204:8084
-        REACT_APP_URL_PRONOSTICO: http://4.206.176.204:8085
-        REACT_APP_URL_REGISTRO: http://4.206.176.204:8086
-        REACT_APP_URL_REPORTE: http://4.206.176.204:8087
-        REACT_APP_WEBSOCKET_URL: http://4.206.176.204:8084/ws
+        # --- AQUÍ ESTÁN LOS CAMBIOS CLAVE PARA HTTPS ---
+        REACT_APP_BASE_URL: https://mycfo.com.ar
+        REACT_APP_URL_ADMINISTRACION: https://mycfo.com.ar/api/administracion
+        REACT_APP_URL_IA: https://mycfo.com.ar/api/ia
+        REACT_APP_URL_NOTIFICACION: https://mycfo.com.ar/api/notificacion
+        REACT_APP_URL_PRONOSTICO: https://mycfo.com.ar/api/pronostico
+        REACT_APP_URL_REGISTRO: https://mycfo.com.ar/api/registro
+        REACT_APP_URL_REPORTE: https://mycfo.com.ar/api/reporte
+        REACT_APP_WEBSOCKET_URL: https://mycfo.com.ar/api/notificacion/ws
+        # AWS args se mantienen igual
         REACT_APP_COGNITO_USER_POOL_ID: sa-east-1_lTMNrWW7R
         REACT_APP_COGNITO_CLIENT_ID: 3ksssqtg3r49rf6js1t1177hrd
         REACT_APP_AWS_REGION: sa-east-1
