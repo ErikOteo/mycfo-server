@@ -93,6 +93,7 @@ const formatDeletedAt = (value) => {
   return date.toLocaleString("es-AR", { hour12: false });
 };
 const PAGE_SIZE = 3;
+const LARGE_PAGE_SIZE = 1000;
 const DEFAULT_SORT = "createdAt,desc";
 const createEmptyPage = () => ({
   content: [],
@@ -249,7 +250,7 @@ export default function MainGrid() {
         const trimmedQuery = query.trim();
         const shouldExpand = trimmedQuery.length >= 2;
         const effectivePage = shouldExpand ? 0 : Math.max(pageValue, 0);
-        const effectiveSize = shouldExpand ? 1000 : PAGE_SIZE;
+        const effectiveSize = shouldExpand ? LARGE_PAGE_SIZE : LARGE_PAGE_SIZE;
         const params = new URLSearchParams();
         params.set("status", statusValue);
         params.set("page", String(effectivePage));
@@ -294,7 +295,7 @@ export default function MainGrid() {
         const params = new URLSearchParams(searchParamsString || "");
         params.set("status", statusValue);
         params.set("page", String(Math.max(pageValue, 0)));
-        params.set("size", String(PAGE_SIZE));
+        params.set("size", String(LARGE_PAGE_SIZE));
         params.set("sort", DEFAULT_SORT);
         if (currency) params.set("moneda", currency);
         const res = await http.get(

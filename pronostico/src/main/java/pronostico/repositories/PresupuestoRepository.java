@@ -62,10 +62,10 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
                )
                AND (
                     :moneda IS NULL
-                 OR (UPPER(:moneda) = 'USD' AND LOWER(p.nombre) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
                  OR (UPPER(:moneda) = 'ARS' AND (
-                        LOWER(p.nombre) LIKE '[ars]%'
-                        OR (LOWER(p.nombre) NOT LIKE '[usd]%' AND LOWER(p.nombre) NOT LIKE '[ars]%')
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
                     ))
                )
         """,
@@ -81,10 +81,10 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
                )
                AND (
                     :moneda IS NULL
-                 OR (UPPER(:moneda) = 'USD' AND LOWER(p.nombre) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
                  OR (UPPER(:moneda) = 'ARS' AND (
-                        LOWER(p.nombre) LIKE '[ars]%'
-                        OR (LOWER(p.nombre) NOT LIKE '[usd]%' AND LOWER(p.nombre) NOT LIKE '[ars]%')
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
                     ))
                )
         """
@@ -109,10 +109,10 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
                )
                AND (
                     :moneda IS NULL
-                 OR (UPPER(:moneda) = 'USD' AND LOWER(p.nombre) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
                  OR (UPPER(:moneda) = 'ARS' AND (
-                        LOWER(p.nombre) LIKE '[ars]%'
-                        OR (LOWER(p.nombre) NOT LIKE '[usd]%' AND LOWER(p.nombre) NOT LIKE '[ars]%')
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
                     ))
                )
         """,
@@ -126,10 +126,10 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
                )
                AND (
                     :moneda IS NULL
-                 OR (UPPER(:moneda) = 'USD' AND LOWER(p.nombre) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
                  OR (UPPER(:moneda) = 'ARS' AND (
-                        LOWER(p.nombre) LIKE '[ars]%'
-                        OR (LOWER(p.nombre) NOT LIKE '[usd]%' AND LOWER(p.nombre) NOT LIKE '[ars]%')
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
                     ))
                )
         """
