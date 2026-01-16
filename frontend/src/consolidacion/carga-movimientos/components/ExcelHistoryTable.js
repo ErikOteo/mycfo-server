@@ -101,6 +101,7 @@ export default function ExcelHistoryTable({
       mycfo: { bg: "#e3f2fd", color: "#1976d2", border: "#1976d2" },
       "mercado-pago": { bg: "#f3e5f5", color: "#7b1fa2", border: "#7b1fa2" },
       santander: { bg: "#e8f5e8", color: "#388e3c", border: "#388e3c" },
+      galicia: { bg: "#e0f7fa", color: "#00838f", border: "#00838f" },
     };
 
     const color = colors[tipoOrigen] || {

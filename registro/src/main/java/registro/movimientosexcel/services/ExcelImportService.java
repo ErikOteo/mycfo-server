@@ -15,6 +15,7 @@ import registro.movimientosexcel.repositories.ExcelImportHistoryRepository;
 import registro.services.AdministracionService;
 
 import java.io.InputStream;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -46,6 +47,7 @@ public class ExcelImportService {
         switch (tipoOrigen.toLowerCase()) {
             case "mycfo": return procesarGenerico(file, usuarioSub, organizacionId);
             case "mercado-pago": return procesarMercadoPago(file, usuarioSub, organizacionId);
+            case "galicia": return procesarGalicia(file, usuarioSub, organizacionId);
             case "santander": return procesarSantander(file, usuarioSub, organizacionId);
             default: throw new IllegalArgumentException("Tipo de origen no soportado: " + tipoOrigen);
         }
@@ -56,6 +58,7 @@ public class ExcelImportService {
         switch (tipoOrigen.toLowerCase()) {
             case "mycfo": return procesarGenericoParaPreview(file, organizacionId);
             case "mercado-pago": return procesarMercadoPagoParaPreview(file, organizacionId);
+            case "galicia": return procesarGaliciaParaPreview(file, organizacionId);
             case "santander": return procesarSantanderParaPreview(file, organizacionId);
             default: throw new IllegalArgumentException("Tipo de origen no soportado: " + tipoOrigen);
         }
@@ -551,5 +554,218 @@ public class ExcelImportService {
                 movimiento.setMontoTotal(-monto);
             }
         }
+    }
+
+    private ResumenCargaDTO procesarGalicia(MultipartFile file, String usuarioSub, Long organizacionId) {
+        int total = 0;
+        int correctos = 0;
+        List<FilaConErrorDTO> errores = new ArrayList<>();
+
+        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet hoja = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            int headerIdx = buscarFilaEncabezadosGalicia(hoja, fmt);
+            if (headerIdx == -1) {
+                errores.add(new FilaConErrorDTO(0, "No se encontraron encabezados (Fecha, Movimiento, Debito/Credito)"));
+                return new ResumenCargaDTO(total, correctos, errores);
+            }
+
+            Map<String, Integer> idx = mapearColumnasGalicia(hoja.getRow(headerIdx), fmt);
+
+            for (int i = headerIdx + 1; i <= hoja.getLastRowNum(); i++) {
+                Row fila = hoja.getRow(i);
+                if (fila == null) continue;
+
+                try {
+                    String rawFecha = fmt.formatCellValue(fila.getCell(idx.get("FECHA"))).trim();
+                    String rawMov = fmt.formatCellValue(fila.getCell(idx.get("MOVIMIENTO"))).trim();
+                    String rawDeb = fmt.formatCellValue(fila.getCell(idx.get("DEBITO"))).trim();
+                    String rawCred = fmt.formatCellValue(fila.getCell(idx.get("CREDITO"))).trim();
+
+                    if (rawFecha.isEmpty() && rawMov.isEmpty() && rawDeb.isEmpty() && rawCred.isEmpty()) {
+                        continue;
+                    }
+                    total++;
+
+                    if (rawFecha.isEmpty()) {
+                        throw new RuntimeException("Falta la fecha.");
+                    }
+
+                    LocalDate fechaLocal = parseFechaGalicia(fila.getCell(idx.get("FECHA")));
+                    double debitoVal = parseMontoGalicia(rawDeb);
+                    double creditoVal = parseMontoGalicia(rawCred);
+
+                    if (debitoVal == 0 && creditoVal == 0) {
+                        throw new RuntimeException("Debe existir debito o credito distinto de cero.");
+                    }
+
+                    double monto = calcularMontoGalicia(debitoVal, creditoVal);
+
+                    Movimiento mov = new Movimiento();
+                    mov.setTipo(determinarTipoMovimiento(monto));
+                    mov.setMontoTotal(monto);
+                    // Hora no viene en el extracto: usar inicio del día
+                    mov.setFechaEmision(fechaLocal.atStartOfDay());
+                    mov.setDescripcion(rawMov);
+                    mov.setMedioPago(parseMedioPago("Transferencia"));
+                    mov.setMoneda(TipoMoneda.ARS);
+                    mov.setOrigenNombre("GALICIA");
+                    enriquecerConContexto(mov, usuarioSub, organizacionId);
+
+                    normalizarMontoMovimiento(mov);
+
+                    movimientoRepo.save(mov);
+                    correctos++;
+                    notifications.publishMovement(mov, 1L);
+
+                } catch (Exception ex) {
+                    errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
+                }
+            }
+
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, "Error al leer el archivo: " + e.getMessage()));
+        }
+
+        return new ResumenCargaDTO(total, correctos, errores);
+    }
+
+    private PreviewDataDTO procesarGaliciaParaPreview(MultipartFile file, Long organizacionId) {
+        List<RegistroPreviewDTO> registros = new ArrayList<>();
+        List<FilaConErrorDTO> errores = new ArrayList<>();
+        int total = 0;
+
+        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet hoja = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            int headerIdx = buscarFilaEncabezadosGalicia(hoja, fmt);
+            if (headerIdx == -1) {
+                errores.add(new FilaConErrorDTO(0, "No se encontraron encabezados (Fecha, Movimiento, Debito/Credito)"));
+                return new PreviewDataDTO(registros, total, 0, errores, "galicia");
+            }
+
+            Map<String, Integer> idx = mapearColumnasGalicia(hoja.getRow(headerIdx), fmt);
+
+            for (int i = headerIdx + 1; i <= hoja.getLastRowNum(); i++) {
+                Row fila = hoja.getRow(i);
+                if (fila == null) continue;
+
+                try {
+                    String rawFecha = fmt.formatCellValue(fila.getCell(idx.get("FECHA"))).trim();
+                    String rawMov = fmt.formatCellValue(fila.getCell(idx.get("MOVIMIENTO"))).trim();
+                    String rawDeb = fmt.formatCellValue(fila.getCell(idx.get("DEBITO"))).trim();
+                    String rawCred = fmt.formatCellValue(fila.getCell(idx.get("CREDITO"))).trim();
+
+                    if (rawFecha.isEmpty() && rawMov.isEmpty() && rawDeb.isEmpty() && rawCred.isEmpty()) {
+                        continue;
+                    }
+                    total++;
+
+                    if (rawFecha.isEmpty()) {
+                        throw new RuntimeException("Falta la fecha.");
+                    }
+
+                    LocalDate fechaLocal = parseFechaGalicia(fila.getCell(idx.get("FECHA")));
+                    double debitoVal = parseMontoGalicia(rawDeb);
+                    double creditoVal = parseMontoGalicia(rawCred);
+
+                    if (debitoVal == 0 && creditoVal == 0) {
+                        throw new RuntimeException("Debe existir debito o credito distinto de cero.");
+                    }
+
+                    double monto = calcularMontoGalicia(debitoVal, creditoVal);
+                    TipoMovimiento tipoMov = determinarTipoMovimiento(monto);
+
+                    RegistroPreviewDTO preview = new RegistroPreviewDTO(
+                            i + 1,
+                            tipoMov,
+                            monto,
+                            fechaLocal,
+                            rawMov,
+                            "GALICIA",
+                            parseMedioPago("Transferencia"),
+                            TipoMoneda.ARS
+                    );
+
+                    preview.setCategoriaSugerida(categorySuggestionService.sugerirCategoria(rawMov, tipoMov));
+                    verificarDuplicado(preview, registros);
+                    registros.add(preview);
+
+                } catch (Exception ex) {
+                    errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
+                }
+            }
+
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, "Error al leer el archivo: " + e.getMessage()));
+        }
+
+        List<RegistroPreviewDTO> registrosConDuplicados = duplicateDetectionService.detectarDuplicadosEnBD(registros, organizacionId);
+        return new PreviewDataDTO(registrosConDuplicados, total, registrosConDuplicados.size(), errores, "galicia");
+    }
+
+    private int buscarFilaEncabezadosGalicia(Sheet hoja, DataFormatter fmt) {
+        for (int r = 0; r <= hoja.getLastRowNum(); r++) {
+            Row fila = hoja.getRow(r);
+            if (fila == null) continue;
+            Map<String, Integer> idx = mapearColumnasGalicia(fila, fmt);
+            if (idx.containsKey("FECHA") && idx.containsKey("MOVIMIENTO")
+                    && (idx.containsKey("DEBITO") || idx.containsKey("CREDITO"))) {
+                return r;
+            }
+        }
+        return -1;
+    }
+
+    private Map<String, Integer> mapearColumnasGalicia(Row header, DataFormatter fmt) {
+        Map<String, Integer> idx = new HashMap<>();
+        for (int c = 0; c < header.getLastCellNum(); c++) {
+            String raw = fmt.formatCellValue(header.getCell(c)).trim();
+            if (raw.isEmpty()) continue;
+            String normalized = Normalizer.normalize(raw, Normalizer.Form.NFD)
+                    .replaceAll("\\p{M}", "")
+                    .toUpperCase(Locale.ROOT);
+            if (normalized.contains("FECHA")) idx.put("FECHA", c);
+            else if (normalized.contains("MOVIMIENTO")) idx.put("MOVIMIENTO", c);
+            else if (normalized.contains("DEBIT")) idx.put("DEBITO", c);
+            else if (normalized.contains("CREDITO")) idx.put("CREDITO", c);
+            else if (normalized.contains("SALDO")) idx.putIfAbsent("SALDO", c);
+        }
+        return idx;
+    }
+
+    private LocalDate parseFechaGalicia(Cell cFecha) {
+        if (cFecha == null) throw new RuntimeException("Fecha vacia.");
+        if (cFecha.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cFecha)) {
+            return cFecha.getLocalDateTimeCellValue().toLocalDate();
+        }
+        String raw = new DataFormatter().formatCellValue(cFecha).trim();
+        DateTimeFormatter f1 = DateTimeFormatter.ofPattern("dd/MM/uuuu");
+        DateTimeFormatter f2 = DateTimeFormatter.ofPattern("dd-MM-uuuu");
+        try { return LocalDate.parse(raw, f1); } catch (Exception ignore) {}
+        try { return LocalDate.parse(raw, f2); } catch (Exception ignore) {}
+        throw new RuntimeException("Formato de fecha invalido: " + raw);
+    }
+
+    private double parseMontoGalicia(String raw) {
+        if (raw == null || raw.isBlank()) return 0d;
+        String cleaned = raw.replace(".", "").replace(",", ".").replace("$", "").replaceAll("\\s+", "");
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Monto invalido: " + raw);
+        }
+    }
+
+    private double calcularMontoGalicia(double debito, double credito) {
+        if (credito != 0 && debito != 0) {
+            return credito - Math.abs(debito);
+        }
+        if (credito != 0) {
+            return credito;
+        }
+        return -Math.abs(debito);
     }
 }

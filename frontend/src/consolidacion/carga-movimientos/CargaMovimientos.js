@@ -28,7 +28,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
   const handleTipoOrigenChange = (event) => {
     const value = event.target.value;
     // Mostrar opciones pero ignorar selección para las bloqueadas
-    const bloqueados = ["santander", "modo", "galicia"];
+    const bloqueados = ["santander", "modo"];
     if (bloqueados.includes(value)) return;
     setTipoOrigen(value);
   };
