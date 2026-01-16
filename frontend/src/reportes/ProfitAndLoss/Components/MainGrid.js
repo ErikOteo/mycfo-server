@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas';
 import { exportToExcel } from '../../../utils/exportExcelUtils'; // Importando la utilidad de Excel
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
 
 export default function MainGrid() {
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
@@ -23,9 +24,13 @@ export default function MainGrid() {
     });
     const [loading, setLoading] = React.useState(false);
     const chartRef = React.useRef(null);
+    const [currency, setCurrency] = usePreferredCurrency("ARS");
 
     // Formateador de moneda para tooltips del gráfico
-    const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
+    const formatCurrency = React.useCallback(
+        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        [currency]
+    );
 
     const handleYearChange = (e) => setSelectedYear(Number(e.target.value));
 
@@ -35,6 +40,7 @@ export default function MainGrid() {
 
         const params = new URLSearchParams();
         params.set('anio', Number(selectedYear));
+        if (currency) params.set('moneda', currency);
 
         const headers = {};
         const sub = sessionStorage.getItem('sub');
@@ -61,7 +67,7 @@ export default function MainGrid() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [selectedYear]);
+    }, [currency, selectedYear]);
 
     const normalizeCategoria = (c) => {
         const s = (c ?? '').toString().trim();
@@ -95,7 +101,7 @@ export default function MainGrid() {
         ];
         const currencyColumns = ['C']; // Columna C para formato de moneda
 
-        exportToExcel(excelData, `estado-de-resultados-${selectedYear}`, "Estado de Resultados", colsConfig, mergesConfig, currencyColumns);
+        exportToExcel(excelData, `estado-de-resultados-${selectedYear}-${(currency || 'ARS').toLowerCase()}`, "Estado de Resultados", colsConfig, mergesConfig, currencyColumns);
     };
 
     const handleExportPdf = () => {
@@ -139,7 +145,7 @@ export default function MainGrid() {
             body.push(["Resultado del Ejercicio", "", resultado.toFixed(2)]);
 
             autoTable(doc, { head: head, body: body, startY: pdfHeight + 40 });
-            doc.save(`estado-de-resultados-${selectedYear}.pdf`);
+            doc.save(`estado-de-resultados-${selectedYear}-${(currency || 'ARS').toLowerCase()}.pdf`);
         });
     };
 
@@ -161,18 +167,21 @@ export default function MainGrid() {
                 sx={{
                     width: '100%',
                     maxWidth: { sm: '100%', md: '1700px' },
+                    px: { xs: 2, md: 3 },
+                    pt: { xs: 1.5, md: 2 },
+                    pb: 3,
                     mx: 'auto',
-                    p: 3,
                 }}
             >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography component="h2" variant="h4">
                         Estado de Resultados
                     </Typography>
                     <ExportadorSimple onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
                 </Box>
 
-                <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />
+            <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />
                 <TablaDetalle year={selectedYear} ingresos={data.detalleIngresos} egresos={data.detalleEgresos} />
 
                 <div ref={chartRef}>
@@ -183,7 +192,7 @@ export default function MainGrid() {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                                 <XAxis dataKey="mes" />
                                 <YAxis />
-                                <Tooltip formatter={(v) => currency(v)} />
+                                <Tooltip formatter={(v) => formatCurrency(v)} />
                                 <Legend />
                                 <Bar dataKey="Ingresos" fill="#2e7d32" />
                                 <Bar dataKey="Egresos" fill="#c62828" />

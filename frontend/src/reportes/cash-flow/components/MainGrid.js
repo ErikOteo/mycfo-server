@@ -12,15 +12,20 @@ import html2canvas from 'html2canvas';
 import { exportToExcel } from '../../../utils/exportExcelUtils'; // Importando la utilidad de Excel
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
 
 export default function MainGrid() {
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
     const [registros, setRegistros] = React.useState([]);
     const chartRef = React.useRef(null);
     const [loading, setLoading] = React.useState(false);
+    const [currency, setCurrency] = usePreferredCurrency("ARS");
 
     // Formateo de moneda para tooltips y ejes
-    const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
+    const formatCurrency = React.useCallback(
+        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        [currency]
+    );
 
     const handleYearChange = (e) => setSelectedYear(e.target.value);
 
@@ -34,8 +39,12 @@ export default function MainGrid() {
         if (sub) headers['X-Usuario-Sub'] = sub;
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
+        const params = new URLSearchParams();
+        params.set('anio', selectedYear);
+        if (currency) params.set('moneda', currency);
+
         setLoading(true);
-        fetch(`${baseUrl}/cashflow?anio=${selectedYear}`, { headers })
+        fetch(`${baseUrl}/cashflow?${params.toString()}`, { headers })
             .then(async (r) => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const json = await r.json();
@@ -49,7 +58,7 @@ export default function MainGrid() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [selectedYear]);
+    }, [currency, selectedYear]);
 
     // --- LÃ³gica para el GrÃ¡fico y la Tabla (recalculada para exportaciÃ³n) ---
     const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -144,7 +153,7 @@ export default function MainGrid() {
         // Columnas de moneda (desde la columna C en adelante)
         const currencyColumns = mesesVisibles.map((_, i) => String.fromCharCode(67 + i)); // C, D, E...
 
-        exportToExcel(excelData, `flujo-caja-${selectedYear}`, "Flujo de caja", colsConfig, mergesConfig, currencyColumns);
+        exportToExcel(excelData, `flujo-caja-${selectedYear}-${(currency || 'ARS').toLowerCase()}`, "Flujo de caja", colsConfig, mergesConfig, currencyColumns);
     };
 
     const handleExportPdf = () => {
@@ -183,7 +192,7 @@ export default function MainGrid() {
             autoTable(doc, { head, body, startY });
         }
 
-        doc.save(`flujo-caja-${selectedYear}.pdf`);
+        doc.save(`flujo-caja-${selectedYear}-${(currency || 'ARS').toLowerCase()}.pdf`);
     }).catch(() => alert("No se pudo generar el PDF. Intente nuevamente."));
 };
 
@@ -201,7 +210,8 @@ export default function MainGrid() {
     }
 
     return (
-        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, p: 3 }}>
+        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, px: { xs: 2, md: 3 }, pt: { xs: 1.5, md: 2 }, pb: 3 }}>
+            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography component="h2" variant="h4">
                     Flujo de caja anual
@@ -225,8 +235,8 @@ export default function MainGrid() {
                     <BarChart data={dataGrafico} margin={{ top: 8, right: 16, bottom: 8, left: 56 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                         <XAxis dataKey="mes" />
-                        <YAxis tickFormatter={(v) => currency(v)} width={80} />
-                        <Tooltip formatter={(v) => currency(v)} />
+                        <YAxis tickFormatter={(v) => formatCurrency(v)} width={80} />
+                        <Tooltip formatter={(v) => formatCurrency(v)} />
                         <Legend />
                         <Bar dataKey="Ingresos" fill="#2e7d32" />
                         <Bar dataKey="Egresos" fill="#c62828" />

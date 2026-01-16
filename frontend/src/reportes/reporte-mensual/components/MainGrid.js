@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas';
 import { exportToExcel } from '../../../utils/exportExcelUtils'; // Importando la utilidad de Excel
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#19C9FF'];
 
@@ -23,9 +24,13 @@ export default function MainGrid() {
     const chartRefIngresos = React.useRef(null);
     const chartRefEgresos = React.useRef(null);
     const [loading, setLoading] = React.useState(false);
+    const [currency, setCurrency] = usePreferredCurrency("ARS");
 
     // Formateo de moneda para tooltips de tortas
-    const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
+    const formatCurrency = React.useCallback(
+        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        [currency]
+    );
 
     React.useEffect(() => {
         const baseUrl = API_CONFIG.REPORTE;
@@ -34,6 +39,7 @@ export default function MainGrid() {
         const params = new URLSearchParams();
         params.set('anio', Number(selectedYear));
         params.set('mes', Number(selectedMonth) + 1);
+        if (currency) params.set('moneda', currency);
 
         if (Array.isArray(selectedCategoria) && selectedCategoria.length > 0) {
             selectedCategoria.forEach((c) => params.append('categoria', c));
@@ -59,7 +65,7 @@ export default function MainGrid() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [selectedYear, selectedMonth, selectedCategoria]);
+    }, [currency, selectedYear, selectedMonth, selectedCategoria]);
 
     const getNombreMes = (mesIndex) => {
         if (mesIndex === '' || mesIndex === null) return '';
@@ -101,7 +107,7 @@ export default function MainGrid() {
         ];
         const currencyColumns = ['C']; // Columna C para formato de moneda
 
-        exportToExcel(excelData, `reporte-mensual-${mesNombre}-${selectedYear}`, "Resumen Mensual", colsConfig, mergesConfig, currencyColumns);
+        exportToExcel(excelData, `reporte-mensual-${mesNombre}-${selectedYear}-${(currency || 'ARS').toLowerCase()}`, "Resumen Mensual", colsConfig, mergesConfig, currencyColumns);
     };
 
     const handleExportPdf = async () => {
@@ -153,7 +159,7 @@ export default function MainGrid() {
             }
 
             autoTable(doc, { head, body, startY: 30 + chartWidth * 0.75 + 10 });
-            doc.save(`reporte-mensual-${mesNombre}-${selectedYear}.pdf`);
+            doc.save(`reporte-mensual-${mesNombre}-${selectedYear}-${(currency || 'ARS').toLowerCase()}.pdf`);
 
         } catch (error) {
             console.error("Error al generar el PDF:", error);
@@ -199,13 +205,14 @@ export default function MainGrid() {
     }
 
     return (
-        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, p: 3 }}>
+        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, px: { xs: 2, md: 3 }, pt: { xs: 1.5, md: 2 }, pb: 3 }}>
+            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography component="h2" variant="h4">
                     Resumen mensual
                 </Typography>
-                <ExportadorSimple onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
-            </Box>
+            <ExportadorSimple onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
+        </Box>
 
             <Filtros
                 selectedMonth={selectedMonth}
@@ -232,10 +239,10 @@ export default function MainGrid() {
                     <div ref={chartRefIngresos}>
                         <Paper variant="outlined" sx={{ p: 2 }}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'text.primary' }}>Desglose de Ingresos</Typography>
-                            <Box sx={{ width: 280, height: 280, mx: 'auto', display: 'flex', alignItems: 'center' }} ref={chartRefIngresos}>
-                                {/* Guía de categorías (izquierda) */}
-                                <Box sx={{ width: 100, height: 240, overflow: 'auto', pr: 1 }}>
-                                    {ingresosDisplayData.map((item, i) => (
+                                <Box sx={{ width: 280, height: 280, mx: 'auto', display: 'flex', alignItems: 'center' }} ref={chartRefIngresos}>
+                                    {/* Guía de categorías (izquierda) */}
+                                    <Box sx={{ width: 100, height: 240, overflow: 'auto', pr: 1 }}>
+                                        {ingresosDisplayData.map((item, i) => (
                                         <Box key={`ing-cat-${i}`} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                                             <Box sx={{ width: 10, height: 10, borderRadius: '2px', mr: 1, bgcolor: totalIngresosPie > 0 ? COLORS[i % COLORS.length] : 'rgba(160,160,160,0.35)' }} />
                                             <Typography variant="caption" sx={{ lineHeight: 1.2 }} title={item.name}>{item.name}</Typography>
@@ -244,8 +251,8 @@ export default function MainGrid() {
                                 </Box>
                                 {/* Torta (derecha) */}
                                 <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                                    <PieChart width={180} height={180} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                                        <Pie
+                                        <PieChart width={180} height={180} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                                            <Pie
                                             data={ingresosDisplayData}
                                             dataKey="value"
                                             nameKey="name"
@@ -259,7 +266,7 @@ export default function MainGrid() {
                                                 <Cell key={`cell-ing-${index}`} fill={totalIngresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v, n) => [currency(v), n]} />
+                                        <Tooltip formatter={(v, n) => [formatCurrency(v), n]} />
                                     </PieChart>
                                 </Box>
                             </Box>
@@ -297,7 +304,7 @@ export default function MainGrid() {
                                                 <Cell key={`cell-egr-${index}`} fill={totalEgresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v, n) => [currency(v), n]} />
+                                        <Tooltip formatter={(v, n) => [formatCurrency(v), n]} />
                                     </PieChart>
                                 </Box>
                             </Box>

@@ -29,6 +29,10 @@ import VerDeuda from "./components/VerDeuda";
 import VerAcreencia from "./components/VerAcreencia";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
+import CurrencyTabs, {
+  getStoredCurrencyPreference,
+  persistCurrencyPreference,
+} from "../../shared-components/CurrencyTabs";
 
 export default function TablaRegistrosV2() {
   const [movimientos, setMovimientos] = useState([]);
@@ -39,6 +43,7 @@ export default function TablaRegistrosV2() {
   // Paginación del servidor
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
   const [rowCount, setRowCount] = useState(0);
+  const [currency, setCurrency] = useState(getStoredCurrencyPreference());
   
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -114,6 +119,13 @@ export default function TablaRegistrosV2() {
     }
   };
 
+  const handleCurrencyChange = useCallback((nextCurrency) => {
+    if (!nextCurrency) return;
+    persistCurrencyPreference(nextCurrency);
+    setCurrency(nextCurrency);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  }, []);
+
   const cargarMovimientos = useCallback(async () => {
     setLoading(true);
     try {
@@ -130,7 +142,8 @@ export default function TablaRegistrosV2() {
         page: paginationModel.page,
         size: paginationModel.pageSize,
         sortBy: "fechaEmision",
-        sortDir: "desc"
+        sortDir: "desc",
+        moneda: currency,
       };
 
       console.log("📡 Obteniendo movimientos para usuario:", usuarioSub, "página:", paginationModel.page, "tamaño:", paginationModel.pageSize);
@@ -157,7 +170,7 @@ export default function TablaRegistrosV2() {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel]);
+  }, [currency, paginationModel]);
 
   const initializedRef = useRef(false);
 
@@ -741,7 +754,18 @@ export default function TablaRegistrosV2() {
   }, [isMobile, usuarioRol]);
 
   return (
-    <Box sx={{ width: "100%", p: 3 }}>
+    <Box
+      sx={{
+        width: "100%",
+        px: { xs: 2, md: 3 },
+        pt: { xs: 1.5, md: 2 },
+      }}
+    >
+      <CurrencyTabs
+        value={currency}
+        onChange={handleCurrencyChange}
+        sx={{ justifyContent: "center", mb: 1.5 }}
+      />
       <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 2, fontWeight: 600, color: 'text.primary' }}>
         Movimientos Financieros
       </Typography>

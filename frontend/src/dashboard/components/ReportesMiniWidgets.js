@@ -9,7 +9,12 @@ import Alert from "@mui/material/Alert";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import API_CONFIG from "../../config/api-config";
 
-const MiniChart = ({ title, ingresos = 0, egresos = 0, loading, error }) => (
+const currencyFormatter = (value, currency) =>
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: currency || "ARS" }).format(
+    value || 0
+  );
+
+const MiniChart = ({ title, ingresos = 0, egresos = 0, loading, error, currency }) => (
   <Card variant="outlined" sx={{ height: "100%" }}>
     <CardHeader titleTypographyProps={{ variant: "subtitle2" }} title={title} />
     <CardContent sx={{ height: 180 }}>
@@ -23,7 +28,7 @@ const MiniChart = ({ title, ingresos = 0, egresos = 0, loading, error }) => (
                     margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
             <XAxis dataKey="name" hide />
             <YAxis hide />
-            <Tooltip formatter={(v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(v)} />
+            <Tooltip formatter={(v) => currencyFormatter(v, currency)} />
             <Bar dataKey="Ingresos" fill="#2e7d32" barSize={24} />
             <Bar dataKey="Egresos" fill="#c62828" barSize={24} />
           </BarChart>
@@ -33,7 +38,7 @@ const MiniChart = ({ title, ingresos = 0, egresos = 0, loading, error }) => (
   </Card>
 );
 
-export default function ReportesMiniWidgets() {
+export default function ReportesMiniWidgets({ currency = "ARS" }) {
   const [state, setState] = React.useState({
     resumen: { ingresos: 0, egresos: 0, loading: true, error: null },
     cashflow: { ingresos: 0, egresos: 0, loading: true, error: null },
@@ -58,16 +63,20 @@ export default function ReportesMiniWidgets() {
     const qResumen = new URLSearchParams();
     qResumen.set('anio', year);
     qResumen.set('mes', month);
+    if (currency) qResumen.set('moneda', currency);
     const pResumen = fetch(`${baseUrl}/resumen?${qResumen.toString()}`, { headers })
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(json => {
         const ingresos = (json?.detalleIngresos ?? []).reduce((a, it) => a + (it.total || 0), 0);
         const egresos = (json?.detalleEgresos ?? []).reduce((a, it) => a + (it.total || 0), 0);
         return { ingresos, egresos };
-      });
+    });
 
     // Cashflow anual: filtrar registros del último mes y sumar
-    const pCash = fetch(`${baseUrl}/cashflow?anio=${year}`, { headers })
+    const cashParams = new URLSearchParams();
+    cashParams.set('anio', year);
+    if (currency) cashParams.set('moneda', currency);
+    const pCash = fetch(`${baseUrl}/cashflow?${cashParams.toString()}`, { headers })
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(arr => {
         const registros = Array.isArray(arr) ? arr : [];
@@ -81,6 +90,7 @@ export default function ReportesMiniWidgets() {
     // P&L: usar arrays mensuales e índice del mes
     const qPyl = new URLSearchParams();
     qPyl.set('anio', year);
+    if (currency) qPyl.set('moneda', currency);
     const pPyl = fetch(`${baseUrl}/pyl?${qPyl.toString()}`, { headers })
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(json => {
@@ -107,7 +117,7 @@ export default function ReportesMiniWidgets() {
     pPyl
       .then(({ ingresos, egresos }) => setState(s => ({ ...s, pyl: { ingresos, egresos, loading: false, error: null } })))
       .catch(err => setState(s => ({ ...s, pyl: { ingresos: 0, egresos: 0, loading: false, error: String(err) } })));
-  }, []);
+  }, [currency]);
 
   return (
     <Card variant="outlined" sx={{ height: "100%" }}>
@@ -115,17 +125,16 @@ export default function ReportesMiniWidgets() {
       <CardContent>
         <Grid container spacing={2}>
           <Grid item xs={12} md={4}>
-            <MiniChart title="Resumen mensual" {...state.resumen} />
+            <MiniChart title="Resumen mensual" currency={currency} {...state.resumen} />
           </Grid>
           <Grid item xs={12} md={4}>
-            <MiniChart title="Cash Flow" {...state.cashflow} />
+            <MiniChart title="Cash Flow" currency={currency} {...state.cashflow} />
           </Grid>
           <Grid item xs={12} md={4}>
-            <MiniChart title="P&L (devengado)" {...state.pyl} />
+            <MiniChart title="P&L (devengado)" currency={currency} {...state.pyl} />
           </Grid>
         </Grid>
       </CardContent>
     </Card>
   );
 }
-

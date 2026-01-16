@@ -146,7 +146,6 @@ export default function CargaVistaFinal() {
         normalizados[clave] = valor;
       }
     });
-    normalizados.moneda = "ARS";
     const merged = { ...formData, ...normalizados };
 
     const transcript =

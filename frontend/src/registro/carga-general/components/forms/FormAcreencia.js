@@ -8,6 +8,8 @@ import CustomSelect from "../../../../shared-components/CustomSelect";
 import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
 import dayjs from "dayjs";
 
+const CURRENCY_OPTIONS = ["ARS", "USD"];
+
 export default function FormAcreencia({
   formData,
   setFormData,
@@ -44,11 +46,13 @@ export default function FormAcreencia({
         </Box>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Moneda</FormLabel>
-          <OutlinedInput
+          <CustomSelect
             value={formData.moneda || "ARS"}
-            size="small"
-            fullWidth
-            disabled
+            onChange={(valor) =>
+              setFormData((p) => ({ ...p, moneda: valor || "ARS" }))
+            }
+            options={CURRENCY_OPTIONS}
+            width="100%"
           />
         </Box>
       </Box>
@@ -199,4 +203,3 @@ export default function FormAcreencia({
     </Box>
   );
 }
-

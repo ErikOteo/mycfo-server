@@ -102,11 +102,19 @@ public class ResumenService {
     }
 
     public ResumenMensualDTO obtenerResumenMensual(int anio, int mes, List<String> categoriasFiltro, String userSub) {
+        return obtenerResumenMensual(anio, mes, categoriasFiltro, userSub, null);
+    }
+
+    public ResumenMensualDTO obtenerResumenMensual(int anio, int mes, List<String> categoriasFiltro, String userSub, String moneda) {
         LocalDate desde = LocalDate.of(anio, mes, 1);
         LocalDate hasta = desde.withDayOfMonth(desde.lengthOfMonth());
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
                 "&fechaHasta=" + hasta +
                 "&tipos=Ingreso&tipos=Egreso&page=0&size=1000&sortBy=fechaEmision&sortDir=asc";
+
+        if (moneda != null && !moneda.isBlank()) {
+            url = url + "&moneda=" + moneda;
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.add("X-Usuario-Sub", userSub);

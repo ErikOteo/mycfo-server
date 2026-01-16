@@ -37,6 +37,8 @@ import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import API_CONFIG from "../../../config/api-config";
 import LoadingSpinner from "../../../shared-components/LoadingSpinner";
+import CurrencyTabs, { usePreferredCurrency } from "../../../shared-components/CurrencyTabs";
+import { matchesCurrencyFilter } from "../utils/currencyTag";
 
 
 
@@ -155,6 +157,7 @@ export default function MainGrid() {
     message: "",
     action: null,
   });
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
   const [deletingId, setDeletingId] = React.useState(null);
   const [menuState, setMenuState] = React.useState({
     anchorEl: null,
@@ -232,6 +235,13 @@ export default function MainGrid() {
       size: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : PAGE_SIZE,
     };
   }, []);
+  const applyCurrencyFilter = React.useCallback((pageData) => {
+    if (!pageData || !Array.isArray(pageData.content)) return pageData;
+    const filtered = pageData.content.filter((p) => matchesCurrencyFilter(p?.nombre, currency));
+    const totalElements = filtered.length;
+    const totalPages = pageData.size ? Math.ceil(totalElements / pageData.size) : 0;
+    return { ...pageData, content: filtered, totalElements, totalPages };
+  }, [currency]);
   const fetchPresupuestos = React.useCallback(
     async (statusValue, pageValue) => {
       setLoadingAll(true);
@@ -245,10 +255,11 @@ export default function MainGrid() {
         params.set("page", String(effectivePage));
         params.set("size", String(effectiveSize));
         params.set("sort", DEFAULT_SORT);
+        if (currency) params.set("moneda", currency);
         const res = await http.get(
           `${baseURL}/api/presupuestos?${params.toString()}`,
         );
-        const pageData = normalizePage(res.data);
+        const pageData = applyCurrencyFilter(normalizePage(res.data));
         if (
           !shouldExpand &&
           pageValue > 0 &&
@@ -274,7 +285,7 @@ export default function MainGrid() {
         setLoadingAll(false);
       }
     },
-    [baseURL, mergeYearOptions, normalizePage, query],
+    [baseURL, mergeYearOptions, normalizePage, query, currency, applyCurrencyFilter],
   );
   const fetchSearchPresupuestos = React.useCallback(
     async (searchParamsString, statusValue, pageValue) => {
@@ -285,10 +296,11 @@ export default function MainGrid() {
         params.set("page", String(Math.max(pageValue, 0)));
         params.set("size", String(PAGE_SIZE));
         params.set("sort", DEFAULT_SORT);
+        if (currency) params.set("moneda", currency);
         const res = await http.get(
           `${baseURL}/api/presupuestos?${params.toString()}`,
         );
-        const pageData = normalizePage(res.data);
+        const pageData = applyCurrencyFilter(normalizePage(res.data));
         if (
           pageValue > 0 &&
           pageData.totalPages > 0 &&
@@ -310,12 +322,22 @@ export default function MainGrid() {
         setLoadingSearch(false);
       }
     },
-    [baseURL, mergeYearOptions, normalizePage],
+    [baseURL, mergeYearOptions, normalizePage, currency, applyCurrencyFilter],
   );
   React.useEffect(() => {
     fetchPresupuestos(statusFilter, pageIndex);
     cargarRolUsuario();
   }, [fetchPresupuestos, statusFilter, pageIndex, cargarRolUsuario]);
+  const handleCurrencyChange = (next) => {
+    if (!next) return;
+    setCurrency(next);
+    setPageIndex(0);
+    setHasActiveSearch(false);
+    setSearchPage(null);
+    setSearchPageIndex(0);
+    setSearchError("");
+    searchParamsRef.current = "";
+  };
   const handleStatusChange = (event, newValue) => {
     if (newValue === statusFilter) return;
     setStatusFilter(newValue);
@@ -666,6 +688,7 @@ export default function MainGrid() {
 
   return (
     <Box sx={{ width: "100%", p: 3 }}>
+      <CurrencyTabs value={currency} onChange={handleCurrencyChange} sx={{ justifyContent: 'center', mb: 1.5 }} />
       <Typography variant="h4" gutterBottom>
         Presupuestos
       </Typography>

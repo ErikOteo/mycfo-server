@@ -29,6 +29,9 @@ import PendingIcon from "@mui/icons-material/Pending";
 import MovimientoCard from "./components/MovimientoCard";
 import DocumentoCard from "./components/DocumentoCard";
 import conciliacionApi from "./api/conciliacionApi";
+import CurrencyTabs, {
+  usePreferredCurrency,
+} from "../shared-components/CurrencyTabs";
 
 export default function ConciliacionPanel() {
   const theme = useTheme();
@@ -47,6 +50,7 @@ export default function ConciliacionPanel() {
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [totalElementos, setTotalElementos] = useState(0);
   const [tamanioPagina, setTamanioPagina] = useState(isMobile ? 1 : 10);
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
 
   // Filtros
   const [filtroEstado, setFiltroEstado] = useState("sin-conciliar"); // 'todos', 'sin-conciliar', 'conciliados'
@@ -57,7 +61,7 @@ export default function ConciliacionPanel() {
 
   useEffect(() => {
     setPaginaActual(0);
-  }, [filtroEstado, filtroTipo, filtroBusqueda]);
+  }, [filtroEstado, filtroTipo, filtroBusqueda, currency]);
 
   useEffect(() => {
     const nuevoTamanio = isMobile ? 1 : 10;
@@ -75,14 +79,16 @@ export default function ConciliacionPanel() {
           paginaActual, 
           tamanioPagina, 
           'fechaEmision', 
-          'desc'
+          'desc',
+          currency
         );
       } else {
         response = await conciliacionApi.obtenerTodosLosMovimientos(
           paginaActual, 
           tamanioPagina, 
           'fechaEmision', 
-          'desc'
+          'desc',
+          currency
         );
       }
       
@@ -96,16 +102,16 @@ export default function ConciliacionPanel() {
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado, paginaActual, tamanioPagina]);
+  }, [currency, filtroEstado, paginaActual, tamanioPagina]);
 
   const cargarEstadisticas = useCallback(async () => {
     try {
-      const stats = await conciliacionApi.obtenerEstadisticas();
+      const stats = await conciliacionApi.obtenerEstadisticas(currency);
       setEstadisticas(stats);
     } catch (err) {
       console.error("Error cargando estadísticas:", err);
     }
-  }, []);
+  }, [currency]);
 
   const cargarDatos = useCallback(async () => {
     await Promise.all([cargarMovimientos(), cargarEstadisticas()]);
@@ -124,7 +130,7 @@ export default function ConciliacionPanel() {
   const cargarSugerencias = async (movimientoId) => {
     setLoadingSugerencias(true);
     try {
-      const response = await conciliacionApi.obtenerSugerencias(movimientoId);
+      const response = await conciliacionApi.obtenerSugerencias(movimientoId, currency);
       setSugerencias(response.sugerencias || []);
       setPaginaSugerencias(1);
     } catch (err) {
@@ -231,19 +237,30 @@ export default function ConciliacionPanel() {
     setPaginaActual(nuevaPagina - 1); // Convertir a 0-based para el backend
   };
 
+  const handleCurrencyChange = (next) => {
+    if (!next) return;
+    setCurrency(next);
+    setMovimientoSeleccionado(null);
+    setSugerencias([]);
+    setPaginaActual(0);
+  };
+
   return (
     <Box
       sx={{
         width: "100%",
         maxWidth: { sm: "100%", md: "1700px" },
         mx: "auto",
-        p: 3,
+        px: { xs: 2, md: 3 },
+        pt: { xs: 1.5, md: 2 },
+        pb: 3,
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
         gap: 2,
       }}
     >
+      <CurrencyTabs value={currency} onChange={handleCurrencyChange} sx={{ justifyContent: "center", mb: 1.5 }} />
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Typography
@@ -251,12 +268,12 @@ export default function ConciliacionPanel() {
           gutterBottom
           sx={{ fontWeight: 600, color: 'text.primary' }}
         >
-          Conciliación de Movimientos
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.primary' }}>
-          Vincula tus movimientos bancarios con documentos comerciales
-        </Typography>
-      </Box>
+        Conciliación de Movimientos
+      </Typography>
+      <Typography variant="body2" sx={{ color: 'text.primary' }}>
+        Vincula tus movimientos bancarios con documentos comerciales
+      </Typography>
+    </Box>
 
       {/* Estadísticas */}
       {estadisticas && (

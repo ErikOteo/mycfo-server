@@ -42,11 +42,19 @@ public class CashflowService {
     }
 
     public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub) {
+        return obtenerRegistrosPorAnio(anio, userSub, null);
+    }
+
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String moneda) {
         LocalDate desde = LocalDate.of(anio, 1, 1);
         LocalDate hasta = LocalDate.of(anio, 12, 31);
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
                 "&fechaHasta=" + hasta +
                 "&tipos=Ingreso&tipos=Egreso&page=0&size=1000&sortBy=fechaEmision&sortDir=asc";
+
+        if (moneda != null && !moneda.isBlank()) {
+            url = url + "&moneda=" + moneda;
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.add("X-Usuario-Sub", userSub);

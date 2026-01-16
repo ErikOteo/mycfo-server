@@ -17,6 +17,7 @@ export const fetchDashboardSummary = async ({
   months = 12,
   limitMovements = 6,
   limitInvoices = 6,
+  currency,
 } = {}) => {
   const usuarioSub = getSessionUserSub();
   if (!usuarioSub) {
@@ -42,6 +43,10 @@ export const fetchDashboardSummary = async ({
 
   if (limitInvoices) {
     params.set("limiteFacturas", String(limitInvoices));
+  }
+
+  if (currency) {
+    params.set("moneda", currency);
   }
 
   const url = `${API_CONFIG.REGISTRO}/movimientos/resumen/dashboard${

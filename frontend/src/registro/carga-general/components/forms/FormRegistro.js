@@ -8,6 +8,8 @@ import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
 import ConciliacionDialog from "../../../../shared-components/ConciliacionDialog";
 import dayjs from "dayjs";
 
+const CURRENCY_OPTIONS = ["ARS", "USD"];
+
 export default function FormRegistro({
   tipoDoc,
   formData,
@@ -56,11 +58,13 @@ export default function FormRegistro({
         </Box>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Moneda</FormLabel>
-          <OutlinedInput
+          <CustomSelect
             value={formData.moneda || "ARS"}
-            size="small"
-            fullWidth
-            disabled
+            onChange={(valor) =>
+              setFormData((p) => ({ ...p, moneda: valor || "ARS" }))
+            }
+            options={CURRENCY_OPTIONS}
+            width="100%"
           />
         </Box>
         <Box sx={{ flex: 1 }}>

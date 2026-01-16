@@ -13,6 +13,7 @@ import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../uti
 import dayjs from 'dayjs';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { getMovimientosPorRango } from '../../../reportes/reportes.service';
+import { detectCurrencyFromName } from '../utils/currencyTag';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, Legend
 } from 'recharts';
@@ -179,6 +180,7 @@ export default function MesDetalle() {
   const [guardPrompt, setGuardPrompt] = React.useState({ open: false, id: null, field: null, title: '', message: '', confirmLabel: '', movementIds: [] });
   const [nombreMes, setNombreMes] = React.useState('Mes desconocido');
   const [presupuestoNombre, setPresupuestoNombre] = React.useState('');
+  const [presupuestoCurrency, setPresupuestoCurrency] = React.useState('ARS');
   const [presupuestoId, setPresupuestoId] = React.useState(null);
   const [ym, setYm] = React.useState(null); // YYYY-MM
   const [mesesDisponibles, setMesesDisponibles] = React.useState([]);
@@ -321,9 +323,10 @@ export default function MesDetalle() {
     return finalLineas;
   }, []);
 
-  const cargarLineasConReales = React.useCallback(async (pid, ymStr) => {
+  const cargarLineasConReales = React.useCallback(async (pid, ymStr, currencyHint) => {
     const lineasBase = (await fetchMes(pid, ymStr, { skipStateUpdate: true })) || [];
     const ymKey = typeof ymStr === 'string' ? ymStr.slice(0, 7) : '';
+    const presupuestoCurrency = currencyHint || detectCurrencyFromName(presupuestoNombre);
     const referencia = dayjs(`${ymKey}-01`);
     if (!referencia.isValid()) {
       const sinReales = lineasBase.map((linea) => ({ ...linea, real: 0 }));
@@ -343,11 +346,13 @@ export default function MesDetalle() {
           fechaDesde,
           fechaHasta,
           tipos: 'Egreso',
+          moneda: presupuestoCurrency,
         }),
         getMovimientosPorRango({
           fechaDesde,
           fechaHasta,
           tipos: 'Ingreso',
+          moneda: presupuestoCurrency,
         }),
       ]);
       const movimientosEgreso = Array.isArray(respEgreso?.content) ? respEgreso.content : (Array.isArray(respEgreso) ? respEgreso : []);
@@ -455,7 +460,7 @@ export default function MesDetalle() {
       setSnack({ open: true, message: 'No se pudieron cargar los datos reales del mes.', severity: 'error' });
       return fallback;
     }
-  }, [fetchMes, setSnack]);
+  }, [fetchMes, presupuestoNombre, setSnack]);
 
   React.useEffect(() => {
     const cargar = async () => {
@@ -476,6 +481,8 @@ export default function MesDetalle() {
         if (!p?.id) throw new Error('Presupuesto no encontrado');
 
         setPresupuestoNombre(p.nombre);
+        const currency = detectCurrencyFromName(p.nombre);
+        setPresupuestoCurrency(currency);
         setPresupuestoId(p.id);
 
       // 2) resolver YYYY-MM desde mesNombreUrl usando /totales
@@ -499,7 +506,7 @@ export default function MesDetalle() {
       setNombreMes(formatearMes(item.mes));
 
       // 3) cargar lineas reales
-      await cargarLineasConReales(p.id, item.mes);
+      await cargarLineasConReales(p.id, item.mes, currency);
   
       } catch (err) {
         console.error(err);
@@ -520,7 +527,7 @@ export default function MesDetalle() {
     if (!targetYm || !presupuestoId) return;
     try {
       setLoading(true);
-      await cargarLineasConReales(presupuestoId, targetYm);
+      await cargarLineasConReales(presupuestoId, targetYm, presupuestoCurrency);
       setYm(targetYm);
       setNombreMes(formatearMes(targetYm));
     } catch (err) {
@@ -529,7 +536,7 @@ export default function MesDetalle() {
     } finally {
       setLoading(false);
     }
-  }, [presupuestoId, cargarLineasConReales, setSnack]);
+  }, [presupuestoId, presupuestoCurrency, cargarLineasConReales, setSnack]);
 
   // Sincronizo `edits` cuando cambian las lineas
   const lineasCompleto = React.useMemo(

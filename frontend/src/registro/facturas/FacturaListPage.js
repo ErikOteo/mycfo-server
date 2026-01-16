@@ -29,9 +29,12 @@ import {
   deleteFactura,
   updateFactura,
 } from "./api/facturasService";
-import { formatCurrencyAR } from "../../utils/formatters";
+import { formatCurrencyByCode } from "../../utils/formatters";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import API_CONFIG from "../../config/api-config";
+import CurrencyTabs, {
+  usePreferredCurrency,
+} from "../../shared-components/CurrencyTabs";
 
 const FACTURA_PAGE_SIZE = 10;
 
@@ -56,6 +59,7 @@ const FacturaListPage = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
   const [successSnackbar, setSuccessSnackbar] = useState({ open: false, message: "" });
   const [usuarioRol, setUsuarioRol] = useState(null);
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
 
   // Normaliza la fecha de emisión sin importar el formato que devuelva el backend
   const parseFechaEmision = useCallback((fecha) => {
@@ -137,6 +141,7 @@ const FacturaListPage = () => {
         page: paginationModel.page,
         size: paginationModel.pageSize,
         ...filters,
+        moneda: currency,
       });
       console.debug("[FacturaListPage] Facturas response:", response);
       
@@ -162,7 +167,7 @@ const FacturaListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, paginationModel]);
+  }, [currency, filters, paginationModel]);
 
   const cargarRolUsuario = useCallback(() => {
     const sub = sessionStorage.getItem("sub");
@@ -193,6 +198,12 @@ const FacturaListPage = () => {
     ],
     []
   );
+
+  const handleCurrencyChange = useCallback((next) => {
+    if (!next) return;
+    setCurrency(next);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  }, [setCurrency]);
 
   const initialState = useMemo(
     () => ({
@@ -435,7 +446,7 @@ const FacturaListPage = () => {
         minWidth: 140,
         renderCell: (params) =>
           params.row.montoTotal != null
-            ? formatCurrencyAR(params.row.montoTotal)
+            ? formatCurrencyByCode(params.row.montoTotal, params.row.moneda || currency)
             : "-",
       },
       {
@@ -488,10 +499,21 @@ const FacturaListPage = () => {
       },
       accionesColumn,
     ];
-  }, [isMobile, usuarioRol, formatFechaEmision, parseFechaEmision]);
+  }, [currency, isMobile, usuarioRol, formatFechaEmision, parseFechaEmision]);
 
   return (
-    <Box sx={{ width: "100%", p: 3 }}>
+    <Box
+      sx={{
+        width: "100%",
+        px: { xs: 2, md: 3 },
+        pt: { xs: 1.5, md: 2 },
+      }}
+    >
+      <CurrencyTabs
+        value={currency}
+        onChange={handleCurrencyChange}
+        sx={{ justifyContent: "center", mb: 1.5 }}
+      />
       <Typography
         variant="h4"
         component="h1"
@@ -699,5 +721,3 @@ const FacturaListPage = () => {
 };
 
 export default FacturaListPage;
-
-

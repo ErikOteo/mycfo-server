@@ -75,6 +75,17 @@ public class PresupuestoService {
         };
     }
 
+    private String normalizeMoneda(String moneda) {
+        if (moneda == null || moneda.isBlank()) {
+            return null;
+        }
+        String up = moneda.trim().toUpperCase(Locale.ROOT);
+        if (!up.equals("ARS") && !up.equals("USD")) {
+            throw new IllegalArgumentException("Moneda inválida. Use ARS o USD.");
+        }
+        return up;
+    }
+
     private void backfillOrganizacionIdsIfNeeded() {
         List<Presupuesto> pendientes = repo.findTop100ByOrganizacionIdIsNullOrderByIdAsc();
         if (pendientes.isEmpty()) {
@@ -105,7 +116,8 @@ public class PresupuestoService {
                                             LocalDate to,
                                             Long organizacionId,
                                             ListStatus status,
-                                            Pageable pageable) {
+                                            Pageable pageable,
+                                            String moneda) {
         backfillOrganizacionIdsIfNeeded();
         if (from == null || to == null) {
             throw new IllegalArgumentException("El rango debe incluir fechas 'from' y 'to'");
@@ -114,16 +126,17 @@ public class PresupuestoService {
             throw new IllegalArgumentException("'to' no puede ser anterior a 'from'");
         }
         Pageable safePageable = pageable != null ? pageable : Pageable.unpaged();
-        Page<Presupuesto> result = repo.searchByOrganizacion(organizacionId, from, to, statusKey(status), safePageable);
+        String monedaNormalized = normalizeMoneda(moneda);
+        Page<Presupuesto> result = repo.searchByOrganizacion(organizacionId, from, to, statusKey(status), monedaNormalized, safePageable);
         return result.map(this::toDto);
     }
 
     public List<PresupuestoDTO> findByRange(LocalDate from, LocalDate to, Long organizacionId) {
-        return findByRange(from, to, organizacionId, ListStatus.ACTIVE, Pageable.unpaged()).getContent();
+        return findByRange(from, to, organizacionId, ListStatus.ACTIVE, Pageable.unpaged(), null).getContent();
     }
 
     public List<PresupuestoDTO> findByRange(LocalDate from, LocalDate to, Long organizacionId, ListStatus status) {
-        return findByRange(from, to, organizacionId, status, Pageable.unpaged()).getContent();
+        return findByRange(from, to, organizacionId, status, Pageable.unpaged(), null).getContent();
     }
 
     public Optional<Presupuesto> obtenerPresupuestoActualParaDashboard(Long organizacionId, LocalDate hoy) {
@@ -186,13 +199,22 @@ public class PresupuestoService {
     }
 
     public Page<PresupuestoDTO> listByStatus(Long organizacionId, ListStatus status, Pageable pageable) {
+        return listByStatus(organizacionId, status, pageable, null);
+    }
+
+    public Page<PresupuestoDTO> listByStatus(Long organizacionId, ListStatus status, Pageable pageable, String moneda) {
         backfillOrganizacionIdsIfNeeded();
         Pageable safePageable = pageable != null ? pageable : Pageable.unpaged();
-        return selectByStatus(organizacionId, status, safePageable).map(this::toDto);
+        String monedaNormalized = normalizeMoneda(moneda);
+        return selectByStatus(organizacionId, status, safePageable, monedaNormalized).map(this::toDto);
     }
 
     public List<PresupuestoDTO> listByStatus(Long organizacionId, ListStatus status) {
-        return listByStatus(organizacionId, status, Pageable.unpaged()).getContent();
+        return listByStatus(organizacionId, status, Pageable.unpaged(), null).getContent();
+    }
+
+    public List<PresupuestoDTO> listByStatus(Long organizacionId, ListStatus status, String moneda) {
+        return listByStatus(organizacionId, status, Pageable.unpaged(), moneda).getContent();
     }
 
     public List<PresupuestoDTO> listByStatus(Long organizacionId, String status) {
@@ -207,7 +229,10 @@ public class PresupuestoService {
         return listByStatus(organizacionId, ListStatus.DELETED);
     }
 
-    private Page<Presupuesto> selectByStatus(Long organizacionId, ListStatus status, Pageable pageable) {
+    private Page<Presupuesto> selectByStatus(Long organizacionId, ListStatus status, Pageable pageable, String moneda) {
+        if (moneda != null) {
+            return repo.listByOrganizacionStatusAndMoneda(organizacionId, statusKey(status), moneda, pageable);
+        }
         return switch (status) {
             case ACTIVE -> repo.findByOrganizacionIdAndDeletedFalse(organizacionId, pageable);
             case DELETED -> repo.findByOrganizacionIdAndDeletedTrue(organizacionId, pageable);

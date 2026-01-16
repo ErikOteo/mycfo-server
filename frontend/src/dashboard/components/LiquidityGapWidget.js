@@ -10,9 +10,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import API_CONFIG from "../../config/api-config";
 import useResolvedColorTokens from "../useResolvedColorTokens";
 
-const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(v || 0);
+const formatCurrency = (value, currencyCode) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: currencyCode || "ARS",
+  }).format(value || 0);
 
-export default function LiquidityGapWidget() {
+export default function LiquidityGapWidget({ currency = "ARS" }) {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
   const [data, setData] = React.useState(null);
@@ -32,10 +36,14 @@ export default function LiquidityGapWidget() {
     if (sub) headers['X-Usuario-Sub'] = sub;
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    const cashParams = new URLSearchParams();
+    cashParams.set('anio', year);
+    if (currency) cashParams.set('moneda', currency);
+
     setLoading(true);
     setError(null);
 
-    const fetchCash = fetch(`${baseUrl}/cashflow?anio=${year}`, { headers })
+    const fetchCash = fetch(`${baseUrl}/cashflow?${cashParams.toString()}`, { headers })
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(arr => {
         const registros = Array.isArray(arr) ? arr : [];
@@ -48,6 +56,7 @@ export default function LiquidityGapWidget() {
 
     const params = new URLSearchParams();
     params.set('anio', year);
+    if (currency) params.set('moneda', currency);
     const fetchAccrual = fetch(`${baseUrl}/pyl?${params.toString()}`, { headers })
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(json => {
@@ -75,7 +84,7 @@ export default function LiquidityGapWidget() {
       })
       .catch(err => setError(String(err)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currency]);
 
   return (
     <Card variant="outlined" sx={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
@@ -103,15 +112,15 @@ export default function LiquidityGapWidget() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(v) => currency(v)} />
+                <Tooltip formatter={(v) => formatCurrency(v, currency)} />
                 <Legend />
                 <Bar dataKey="Reales" fill="#2e7d32" />
                 <Bar dataKey="Devengado" fill="#0288d1" />
               </BarChart>
             </ResponsiveContainer>
             <Stack direction="row" spacing={2} sx={{ mt: 2 }} flexWrap="wrap">
-              <ChipLike label="Gap Ingresos" value={currency((data.accrual.ingresos || 0) - (data.cash.ingresos || 0))} />
-              <ChipLike label="Gap Egresos" value={currency((data.accrual.egresos || 0) - (data.cash.egresos || 0))} />
+              <ChipLike label="Gap Ingresos" value={formatCurrency((data.accrual.ingresos || 0) - (data.cash.ingresos || 0), currency)} />
+              <ChipLike label="Gap Egresos" value={formatCurrency((data.accrual.egresos || 0) - (data.cash.egresos || 0), currency)} />
             </Stack>
           </>
         ) : null}
@@ -150,4 +159,3 @@ const ChipLike = ({ label, value }) => {
     </div>
   );
 };
-

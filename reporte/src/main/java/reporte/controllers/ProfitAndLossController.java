@@ -19,7 +19,8 @@ public class ProfitAndLossController {
      */
     @GetMapping
     public ProfitAndLossDTO obtenerProfitAndLoss(@RequestParam int anio,
+                                                 @RequestParam(required = false) String moneda,
                                                  @RequestHeader(value = "X-Usuario-Sub") String userSub) {
-        return profitAndLossService.obtenerFacturasPorAnio(anio, userSub);
+        return profitAndLossService.obtenerFacturasPorAnio(anio, userSub, moneda);
     }
 }

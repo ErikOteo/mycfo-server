@@ -14,6 +14,7 @@ import LinkOffIcon from "@mui/icons-material/LinkOff";
 import ReceiptIcon from "@mui/icons-material/Receipt";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import { formatCurrencyByCode } from "../../utils/formatters";
 
 /**
  * Card para mostrar un movimiento en el panel de conciliación
@@ -24,13 +25,9 @@ export default function MovimientoCard({
   onClick,
   onDesvincular,
 }) {
-  const formatMonto = (monto) => {
+  const formatMonto = (monto, moneda) => {
     if (!monto && monto !== 0) return "$0";
-    // Mantener el signo original (no usar Math.abs)
-    return new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-    }).format(monto);
+    return formatCurrencyByCode(monto, moneda || "ARS", { fallback: "$0" });
   };
 
   const formatFecha = (fecha) => {
@@ -131,7 +128,7 @@ export default function MovimientoCard({
                   fontWeight: "bold",
                 }}
               >
-                {formatMonto(movimiento.montoTotal)}
+                {formatMonto(movimiento.montoTotal, movimiento.moneda)}
               </Typography>
             </Stack>
 

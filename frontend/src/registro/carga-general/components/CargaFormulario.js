@@ -48,7 +48,7 @@ export default function CargaFormulario({
   React.useEffect(() => {
     setFormData((prev) => {
       const actual = prev || {};
-      if (actual.moneda === "ARS") {
+      if (actual.moneda) {
         return actual;
       }
       return { ...actual, moneda: "ARS" };
@@ -72,7 +72,7 @@ export default function CargaFormulario({
     setErrors(localErrors);
   }, [localErrors, setErrors]);
 
-  const normalizarDatos = React.useCallback(
+    const normalizarDatos = React.useCallback(
     (datos) => {
       const resultado = {};
       Object.entries(datos || {}).forEach(([clave, valor]) => {
@@ -92,7 +92,9 @@ export default function CargaFormulario({
           resultado[clave] = valor ?? "";
         }
       });
-      resultado.moneda = "ARS";
+      if (resultado.moneda === undefined || resultado.moneda === null || resultado.moneda === "") {
+        resultado.moneda = "ARS";
+      }
       return resultado;
     },
     []

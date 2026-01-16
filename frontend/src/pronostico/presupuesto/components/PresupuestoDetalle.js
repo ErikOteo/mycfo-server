@@ -24,6 +24,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import { detectCurrencyFromName } from '../utils/currencyTag';
 
 // Helper seguro para números
 const safeNumber = (v) =>
@@ -96,7 +97,7 @@ const toDateSafe = (value) => {
   return isValidDate(date) ? date : null;
 };
 
-async function getRealPorMes(meses, tipo) {
+async function getRealPorMes(meses, tipo, moneda) {
   const out = {};
 
   for (const d of meses) {
@@ -104,7 +105,7 @@ async function getRealPorMes(meses, tipo) {
     const hasta = formatDate(endOfMonth(d), 'yyyy-MM-dd');
     const mesKey = formatDate(d, 'yyyy-MM');
     try {
-      const resp = await getMovimientosPorRango({ fechaDesde: desde, fechaHasta: hasta, tipos: tipo });
+      const resp = await getMovimientosPorRango({ fechaDesde: desde, fechaHasta: hasta, tipos: tipo, moneda });
       const movimientos = Array.isArray(resp?.content) ? resp.content : (Array.isArray(resp) ? resp : []);
       const totalMes = movimientos.reduce((acc, movimiento) => {
         const monto = Math.abs(Number(movimiento?.monto ?? movimiento?.montoTotal ?? 0));
@@ -144,6 +145,7 @@ export default function PresupuestoDetalle() {
     nombre: '',
     detalleMensual: [],
   });
+  const [presupuestoCurrency, setPresupuestoCurrency] = React.useState('ARS');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
@@ -196,6 +198,8 @@ export default function PresupuestoDetalle() {
           const resHeader = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${encontrado.id}`);
           if (resHeader?.data?.nombre) nombreOficial = resHeader.data.nombre;
         } catch { /* no crítico */ }
+        const currencyDetected = detectCurrencyFromName(nombreOficial || encontrado.nombre);
+        setPresupuestoCurrency(currencyDetected);
 
         // 3) Traer TOTALES mensuales del backend nuevo
         const resTot = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${encontrado.id}/totales`);
@@ -241,7 +245,8 @@ export default function PresupuestoDetalle() {
             
             const movimientosData = await getMovimientosParaPresupuesto({ 
               fechaDesde, 
-              fechaHasta 
+              fechaHasta,
+              moneda: currencyDetected
             });
 
             // Convertir la respuesta optimizada al formato esperado
@@ -257,10 +262,33 @@ export default function PresupuestoDetalle() {
                 totalEgresos: movimientosData.resumenTotal?.totalEgresos
               });
             }
+            // Si no vino nada en datosMensuales, intentar fallback explícito
+            if (!movimientosData?.datosMensuales || movimientosData.datosMensuales.length === 0) {
+              throw new Error('Respuesta sin datosMensuales');
+            }
           }
         } catch (movError) {
           console.error('❌ Error al obtener datos reales del presupuesto:', movError);
           setError((prev) => prev ?? 'No se pudieron cargar los datos reales del presupuesto.');
+          // Fallback: calcular reales mes a mes usando el endpoint de movimientos con moneda
+          try {
+            const mesesDate = detalleMensual
+              .map((detalle) => {
+                const mesKey = (detalle?.mes || '').slice(0, 7);
+                return mesKey ? toDateSafe(`${mesKey}-01`) : null;
+              })
+              .filter(Boolean);
+            if (mesesDate.length > 0) {
+              const [ingresosFallback, egresosFallback] = await Promise.all([
+                getRealPorMes(mesesDate, 'Ingreso', currencyDetected),
+                getRealPorMes(mesesDate, 'Egreso', currencyDetected),
+              ]);
+              realesIngresoPorMes = ingresosFallback;
+              realesEgresoPorMes = egresosFallback;
+            }
+          } catch (fallbackErr) {
+            console.error('❌ Error en fallback de datos reales:', fallbackErr);
+          }
         }
 
         const detalleMensualCompleto = detalleMensual.map((detalle) => {

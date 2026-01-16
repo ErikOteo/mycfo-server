@@ -79,6 +79,10 @@ public class ProfitAndLossService {
     }
 
     public ProfitAndLossDTO obtenerFacturasPorAnio(int anio, String userSub) {
+        return obtenerFacturasPorAnio(anio, userSub, null);
+    }
+
+    public ProfitAndLossDTO obtenerFacturasPorAnio(int anio, String userSub, String moneda) {
         // Para evitar tocar otros módulos, basamos P&L en movimientos filtrados por usuario/empresa
         // y calculamos ingresos/egresos mensuales por Categoría, usando DEVENGADO (fecha del documento comercial)
         var desde = java.time.LocalDate.of(anio, 1, 1);
@@ -86,6 +90,10 @@ public class ProfitAndLossService {
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
                 "&fechaHasta=" + hasta +
                 "&tipos=Ingreso&tipos=Egreso&page=0&size=1000&sortBy=fechaEmision&sortDir=asc";
+
+        if (moneda != null && !moneda.isBlank()) {
+            url = url + "&moneda=" + moneda;
+        }
 
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -149,4 +157,3 @@ public class ProfitAndLossService {
         }
     }
 }
-

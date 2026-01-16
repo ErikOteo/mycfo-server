@@ -12,21 +12,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { useTheme, alpha } from "@mui/material/styles";
 import useResolvedColorTokens from "../useResolvedColorTokens";
-
-const formatCurrency = (value) => {
-  if (value === null || value === undefined) {
-    return "--";
-  }
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(numeric);
-};
+import { formatCurrencyByCode } from "../../utils/formatters";
 
 const numberFormatter = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 0,
@@ -77,10 +63,14 @@ const monthLabel = (raw, index) => {
   return new Intl.DateTimeFormat("es-AR", { month: "long" }).format(parsed);
 };
 
-const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage }) => {
+const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage, currency = "ARS" }) => {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const { primaryTextColor, secondaryTextColor } = useResolvedColorTokens();
+  const formatAmount = React.useCallback(
+    (value) => formatCurrencyByCode(value, currency, { fallback: "--" }),
+    [currency]
+  );
 
   if (loading) {
     return (
@@ -178,7 +168,7 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
                   Maximo
                 </Typography>
                 <Typography variant="subtitle2" fontWeight={600} sx={{ color: primaryTextColor }}>
-                  {formatCurrency(data?.max?.value)}
+                  {formatAmount(data?.max?.value)}
                 </Typography>
                 <Typography variant="caption" sx={{ color: primaryTextColor }}>
                   {data?.max?.label ?? "--"}
@@ -193,7 +183,7 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
                   Minimo
                 </Typography>
                 <Typography variant="subtitle2" fontWeight={600} sx={{ color: primaryTextColor }}>
-                  {formatCurrency(data?.min?.value)}
+                  {formatAmount(data?.min?.value)}
                 </Typography>
                 <Typography variant="caption" sx={{ color: primaryTextColor }}>
                   {data?.min?.label ?? "--"}
@@ -208,7 +198,7 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
                   Promedio
                 </Typography>
                 <Typography variant="subtitle2" fontWeight={600} sx={{ color: primaryTextColor }}>
-                  {formatCurrency(data?.average)}
+                  {formatAmount(data?.average)}
                 </Typography>
                   <Typography variant="caption" sx={{ color: primaryTextColor }}>
                     Últimos 12 meses
@@ -270,7 +260,7 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
                 />
                 <YAxis 
                   tick={{ fill: primaryTextColor, fontSize: 9 }}
-                  tickFormatter={(value) => formatCurrency(value)}
+                  tickFormatter={(value) => formatAmount(value)}
                   width={80}
                 />
                 <Tooltip 
@@ -280,7 +270,7 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
                     borderRadius: 8,
                   }}
                   labelStyle={{ color: primaryTextColor }}
-                  formatter={(value) => [formatCurrency(value), "Valor"]}
+                  formatter={(value) => [formatAmount(value), "Valor"]}
                 />
                 <Area 
                   type="monotone" 
@@ -317,10 +307,6 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
 };
 
 export default SalesTrendWidget;
-
-
-
-
 
 
 
