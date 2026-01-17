@@ -102,6 +102,7 @@ export default function ExcelHistoryTable({
       "mercado-pago": { bg: "#f3e5f5", color: "#7b1fa2", border: "#7b1fa2" },
       santander: { bg: "#e8f5e8", color: "#388e3c", border: "#388e3c" },
       galicia: { bg: "#e0f7fa", color: "#00838f", border: "#00838f" },
+      uala: { bg: "#fff3e0", color: "#f57c00", border: "#f57c00" },
     };
 
     const color = colors[tipoOrigen] || {

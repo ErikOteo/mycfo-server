@@ -68,6 +68,14 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         }
       );
 
+      console.log("[CargaMovimientos] Preview response", {
+        tipoOrigen,
+        fileName: file?.name,
+        total: response.data?.totalRegistros,
+        registros: response.data?.registros?.length,
+        sample: response.data?.registros?.slice?.(0, 5),
+      });
+
       setPreviewData(response.data.registros || []);
       setPreviewOpen(true);
     } catch (error) {
@@ -101,6 +109,13 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           },
         }
       );
+
+      console.log("[CargaMovimientos] Guardar seleccionados", {
+        tipoOrigen,
+        fileName,
+        enviados: selectedRegistros?.length,
+        resultado: response.data,
+      });
 
       setResumen(response.data);
       setPreviewOpen(false);
@@ -139,6 +154,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           <MenuItem value="modo">MODO</MenuItem>
           <MenuItem value="santander">Banco Santander</MenuItem>
           <MenuItem value="galicia">Banco Galicia</MenuItem>
+          <MenuItem value="uala">Ualá (PDF)</MenuItem>
         </Select>
       </FormControl>
       <DropzoneUploader
