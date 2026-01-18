@@ -28,7 +28,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
   const handleTipoOrigenChange = (event) => {
     const value = event.target.value;
     // Mostrar opciones pero ignorar selección para las bloqueadas
-    const bloqueados = ["santander", "modo"];
+    const bloqueados = ["modo"];
     if (bloqueados.includes(value)) return;
     setTipoOrigen(value);
   };
@@ -151,7 +151,6 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           <MenuItem value="">Seleccione una opción</MenuItem>
           <MenuItem value="mycfo">MyCFO (plantilla genérica)</MenuItem>
           <MenuItem value="mercado-pago">Mercado Pago</MenuItem>
-          <MenuItem value="modo">MODO</MenuItem>
           <MenuItem value="santander">Banco Santander</MenuItem>
           <MenuItem value="galicia">Banco Galicia</MenuItem>
           <MenuItem value="nacion">Banco Nación</MenuItem>
@@ -164,7 +163,6 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         height={120}
         sx={{ mb: 3 }}
       />
-
       <CustomButton
         width="100%"
         onClick={procesarArchivo}
