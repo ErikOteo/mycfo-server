@@ -28,7 +28,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
   const handleTipoOrigenChange = (event) => {
     const value = event.target.value;
     // Mostrar opciones pero ignorar selección para las bloqueadas
-    const bloqueados = ["santander", "modo", "galicia"];
+    const bloqueados = ["modo"];
     if (bloqueados.includes(value)) return;
     setTipoOrigen(value);
   };
@@ -68,6 +68,14 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         }
       );
 
+      console.log("[CargaMovimientos] Preview response", {
+        tipoOrigen,
+        fileName: file?.name,
+        total: response.data?.totalRegistros,
+        registros: response.data?.registros?.length,
+        sample: response.data?.registros?.slice?.(0, 5),
+      });
+
       setPreviewData(response.data.registros || []);
       setPreviewOpen(true);
     } catch (error) {
@@ -101,6 +109,13 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           },
         }
       );
+
+      console.log("[CargaMovimientos] Guardar seleccionados", {
+        tipoOrigen,
+        fileName,
+        enviados: selectedRegistros?.length,
+        resultado: response.data,
+      });
 
       setResumen(response.data);
       setPreviewOpen(false);
@@ -136,9 +151,10 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           <MenuItem value="">Seleccione una opción</MenuItem>
           <MenuItem value="mycfo">MyCFO (plantilla genérica)</MenuItem>
           <MenuItem value="mercado-pago">Mercado Pago</MenuItem>
-          <MenuItem value="modo">MODO</MenuItem>
           <MenuItem value="santander">Banco Santander</MenuItem>
           <MenuItem value="galicia">Banco Galicia</MenuItem>
+          <MenuItem value="nacion">Banco Nación</MenuItem>
+          <MenuItem value="uala">Ualá (PDF)</MenuItem>
         </Select>
       </FormControl>
       <DropzoneUploader
@@ -147,7 +163,6 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         height={120}
         sx={{ mb: 3 }}
       />
-
       <CustomButton
         width="100%"
         onClick={procesarArchivo}
