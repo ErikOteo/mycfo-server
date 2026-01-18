@@ -154,6 +154,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           <MenuItem value="modo">MODO</MenuItem>
           <MenuItem value="santander">Banco Santander</MenuItem>
           <MenuItem value="galicia">Banco Galicia</MenuItem>
+          <MenuItem value="nacion">Banco Nación</MenuItem>
           <MenuItem value="uala">Ualá (PDF)</MenuItem>
         </Select>
       </FormControl>

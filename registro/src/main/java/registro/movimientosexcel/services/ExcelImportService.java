@@ -56,6 +56,7 @@ public class ExcelImportService {
             case "mycfo": return procesarGenerico(file, usuarioSub, organizacionId);
             case "mercado-pago": return procesarMercadoPago(file, usuarioSub, organizacionId);
             case "galicia": return procesarGalicia(file, usuarioSub, organizacionId);
+            case "nacion": return procesarNacion(file, usuarioSub, organizacionId);
             case "uala": return procesarUala(file, usuarioSub, organizacionId);
             case "santander": return procesarSantander(file, usuarioSub, organizacionId);
             default: throw new IllegalArgumentException("Tipo de origen no soportado: " + tipoOrigen);
@@ -68,6 +69,7 @@ public class ExcelImportService {
             case "mycfo": return procesarGenericoParaPreview(file, organizacionId);
             case "mercado-pago": return procesarMercadoPagoParaPreview(file, organizacionId);
             case "galicia": return procesarGaliciaParaPreview(file, organizacionId);
+            case "nacion": return procesarNacionParaPreview(file, organizacionId);
             case "uala": return procesarUalaParaPreview(file, organizacionId);
             case "santander": return procesarSantanderParaPreview(file, organizacionId);
             default: throw new IllegalArgumentException("Tipo de origen no soportado: " + tipoOrigen);
@@ -640,6 +642,73 @@ public class ExcelImportService {
 
         return new ResumenCargaDTO(total, correctos, errores);
     }
+    private ResumenCargaDTO procesarNacion(MultipartFile file, String usuarioSub, Long organizacionId) {
+        int total = 0;
+        int correctos = 0;
+        List<FilaConErrorDTO> errores = new ArrayList<>();
+
+        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet hoja = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            int headerIdx = buscarFilaEncabezadosNacion(hoja, fmt);
+            if (headerIdx == -1) {
+                errores.add(new FilaConErrorDTO(0, "No se encontraron encabezados (Fecha, Descripcion, Debito/Credito)"));
+                return new ResumenCargaDTO(total, correctos, errores);
+            }
+
+            for (int i = headerIdx + 1; i <= hoja.getLastRowNum(); i++) {
+                Row fila = hoja.getRow(i);
+                if (fila == null) continue;
+
+                try {
+                    String fechaStr = fmt.formatCellValue(fila.getCell(0)).trim();
+                    String horaStr = fmt.formatCellValue(fila.getCell(1)).trim();
+                    String descripcion = fmt.formatCellValue(fila.getCell(2)).trim();
+                    String debStr = fmt.formatCellValue(fila.getCell(5)).trim();
+                    String credStr = fmt.formatCellValue(fila.getCell(6)).trim();
+
+                    if (fechaStr.isEmpty() || descripcion.isEmpty()) {
+                        continue;
+                    }
+                    if (descripcion.toLowerCase(Locale.ROOT).contains("saldo final")) break;
+
+                    double debito = parseMontoArNullable(debStr);
+                    double credito = parseMontoArNullable(credStr);
+                    if (debito == 0 && credito == 0) {
+                        continue;
+                    }
+
+                    total++;
+                    double monto = credito - Math.abs(debito);
+                    LocalDateTime fechaHora = buildFechaHoraNacion(fechaStr, horaStr);
+
+                    Movimiento mov = new Movimiento();
+                    mov.setTipo(determinarTipoMovimiento(monto));
+                    mov.setMontoTotal(monto);
+                    mov.setFechaEmision(fechaHora);
+                    mov.setDescripcion(descripcion);
+                    mov.setMedioPago(parseMedioPago("Transferencia"));
+                    mov.setMoneda(TipoMoneda.ARS);
+                    mov.setOrigenNombre("NACION");
+                    enriquecerConContexto(mov, usuarioSub, organizacionId);
+
+                    normalizarMontoMovimiento(mov);
+                    movimientoRepo.save(mov);
+                    correctos++;
+                    notifications.publishMovement(mov, 1L);
+
+                } catch (Exception ex) {
+                    errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
+                }
+            }
+
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, "Error al leer el archivo: " + e.getMessage()));
+        }
+
+        return new ResumenCargaDTO(total, correctos, errores);
+    }
 
     private PreviewDataDTO procesarGaliciaParaPreview(MultipartFile file, Long organizacionId) {
         List<RegistroPreviewDTO> registros = new ArrayList<>();
@@ -769,6 +838,51 @@ public class ExcelImportService {
         }
     }
 
+    private double parseMontoArNullable(String raw) {
+        if (raw == null || raw.isBlank()) return 0d;
+        String cleaned = raw.replace(".", "").replace(",", ".").replace("$", "").replaceAll("\\s+", "");
+        try {
+            return Double.parseDouble(cleaned);
+        } catch (NumberFormatException e) {
+            return 0d;
+        }
+    }
+
+    private int buscarFilaEncabezadosNacion(Sheet hoja, DataFormatter fmt) {
+        for (int r = 0; r <= hoja.getLastRowNum(); r++) {
+            Row fila = hoja.getRow(r);
+            if (fila == null) continue;
+            String c0 = fmt.formatCellValue(fila.getCell(0)).trim().toLowerCase(Locale.ROOT);
+            String c2 = fmt.formatCellValue(fila.getCell(2)).trim().toLowerCase(Locale.ROOT);
+            if (c0.contains("fecha") && c2.contains("descripcion")) {
+                return r;
+            }
+        }
+        return -1;
+    }
+
+    private LocalDateTime buildFechaHora(String fechaStr, String horaStr) {
+        LocalDate fecha = parseFechaUala(fechaStr); // dd MMM uuuu o dd/MM/yyyy en Uala/Nacion
+        try {
+            if (horaStr != null && !horaStr.isBlank()) {
+                java.time.LocalTime t = java.time.LocalTime.parse(horaStr.trim());
+                return LocalDateTime.of(fecha, t);
+            }
+        } catch (Exception ignore) {}
+        return fecha.atStartOfDay();
+    }
+
+    private LocalDateTime buildFechaHoraNacion(String fechaStr, String horaStr) {
+        LocalDate fecha = parseFechaNacion(fechaStr);
+        try {
+            if (horaStr != null && !horaStr.isBlank()) {
+                java.time.LocalTime t = java.time.LocalTime.parse(horaStr.trim());
+                return LocalDateTime.of(fecha, t);
+            }
+        } catch (Exception ignore) {}
+        return fecha.atStartOfDay();
+    }
+
     private double calcularMontoGalicia(double debito, double credito) {
         if (credito != 0 && debito != 0) {
             return credito - Math.abs(debito);
@@ -777,6 +891,15 @@ public class ExcelImportService {
             return credito;
         }
         return -Math.abs(debito);
+    }
+
+    private LocalDate parseFechaNacion(String rawFecha) {
+        String limpio = rawFecha.replaceAll("\\s+", " ").trim();
+        DateTimeFormatter f1 = DateTimeFormatter.ofPattern("dd/MM/uuuu");
+        DateTimeFormatter f2 = DateTimeFormatter.ofPattern("dd/MM/uu");
+        try { return LocalDate.parse(limpio, f1); } catch (Exception ignore) {}
+        try { return LocalDate.parse(limpio, f2); } catch (Exception ignore) {}
+        throw new RuntimeException("Fecha invalida: " + rawFecha);
     }
 
     private ResumenCargaDTO procesarUala(MultipartFile file, String usuarioSub, Long organizacionId) {
@@ -855,6 +978,74 @@ public class ExcelImportService {
 
         List<RegistroPreviewDTO> registrosConDuplicados = duplicateDetectionService.detectarDuplicadosEnBD(registros, organizacionId);
         return new PreviewDataDTO(registrosConDuplicados, total, registrosConDuplicados.size(), errores, "uala");
+    }
+    private PreviewDataDTO procesarNacionParaPreview(MultipartFile file, Long organizacionId) {
+        List<RegistroPreviewDTO> registros = new ArrayList<>();
+        List<FilaConErrorDTO> errores = new ArrayList<>();
+        int total = 0;
+
+        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet hoja = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            int headerIdx = buscarFilaEncabezadosNacion(hoja, fmt);
+            if (headerIdx == -1) {
+                errores.add(new FilaConErrorDTO(0, "No se encontraron encabezados (Fecha, Descripcion, Debito/Credito)"));
+                return new PreviewDataDTO(registros, total, 0, errores, "nacion");
+            }
+
+            for (int i = headerIdx + 1; i <= hoja.getLastRowNum(); i++) {
+                Row fila = hoja.getRow(i);
+                if (fila == null) continue;
+
+                try {
+                    String fechaStr = fmt.formatCellValue(fila.getCell(0)).trim();
+                    String horaStr = fmt.formatCellValue(fila.getCell(1)).trim();
+                    String descripcion = fmt.formatCellValue(fila.getCell(2)).trim();
+                    String debStr = fmt.formatCellValue(fila.getCell(5)).trim();
+                    String credStr = fmt.formatCellValue(fila.getCell(6)).trim();
+
+                    if (fechaStr.isEmpty() || descripcion.isEmpty()) {
+                        continue;
+                    }
+                    if (descripcion.toLowerCase(Locale.ROOT).contains("saldo final")) break;
+
+                    double debito = parseMontoArNullable(debStr);
+                    double credito = parseMontoArNullable(credStr);
+                    if (debito == 0 && credito == 0) {
+                        continue;
+                    }
+
+                    total++;
+                    double monto = credito - Math.abs(debito);
+                    LocalDateTime fechaHora = buildFechaHoraNacion(fechaStr, horaStr);
+                    TipoMovimiento tipoMov = determinarTipoMovimiento(monto);
+
+                    RegistroPreviewDTO preview = new RegistroPreviewDTO(
+                            i + 1,
+                            tipoMov,
+                            monto,
+                            fechaHora.toLocalDate(),
+                            descripcion,
+                            "NACION",
+                            parseMedioPago("Transferencia"),
+                            TipoMoneda.ARS
+                    );
+                    preview.setCategoriaSugerida(categorySuggestionService.sugerirCategoria(descripcion, tipoMov));
+                    verificarDuplicado(preview, registros);
+                    registros.add(preview);
+
+                } catch (Exception ex) {
+                    errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
+                }
+            }
+
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, "Error al leer el archivo: " + e.getMessage()));
+        }
+
+        List<RegistroPreviewDTO> registrosConDuplicados = duplicateDetectionService.detectarDuplicadosEnBD(registros, organizacionId);
+        return new PreviewDataDTO(registrosConDuplicados, total, registrosConDuplicados.size(), errores, "nacion");
     }
 
     private List<UalaMovimiento> extraerMovimientosUala(InputStream is) throws Exception {

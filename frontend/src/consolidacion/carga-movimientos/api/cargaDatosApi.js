@@ -53,7 +53,7 @@ export const cargarDatos = async (tipo, metodo, datos, tipoMovimiento = null) =>
  * Obtener preview de archivo Excel
  * @param {File} file - Archivo Excel
  * @param {string} tipo - "factura" o "movimiento"
- * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander", "galicia", "uala"
+ * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander", "galicia", "uala", "nacion"
  */
 export const previewExcel = async (file, tipo = 'movimiento', tipoOrigen = 'mycfo') => {
   try {
@@ -84,7 +84,7 @@ export const previewExcel = async (file, tipo = 'movimiento', tipoOrigen = 'mycf
  * Importar archivo Excel directamente
  * @param {File} file - Archivo Excel
  * @param {string} tipo - "factura" o "movimiento"
- * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander", "galicia", "uala"
+ * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander", "galicia", "uala", "nacion"
  */
 export const importarExcel = async (file, tipo = 'movimiento', tipoOrigen = 'mycfo') => {
   try {

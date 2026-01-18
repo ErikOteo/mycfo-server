@@ -103,6 +103,7 @@ export default function ExcelHistoryTable({
       santander: { bg: "#e8f5e8", color: "#388e3c", border: "#388e3c" },
       galicia: { bg: "#e0f7fa", color: "#00838f", border: "#00838f" },
       uala: { bg: "#fff3e0", color: "#f57c00", border: "#f57c00" },
+      nacion: { bg: "#f1f8e9", color: "#689f38", border: "#689f38" },
     };
 
     const color = colors[tipoOrigen] || {
