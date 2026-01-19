@@ -16,8 +16,6 @@ import axios from "axios";
 import API_CONFIG from "../../config/api-config";
 import CustomSelect from "../../shared-components/CustomSelect";
 import CustomDatePicker from "../../shared-components/CustomDatePicker";
-import CustomSingleAutoComplete from "../../shared-components/CustomSingleAutoComplete";
-import { TODAS_LAS_CATEGORIAS } from "../../shared-components/categorias";
 import dayjs from "dayjs";
 import FormIngreso from "../carga-general/components/forms/FormIngreso";
 import FormEgreso from "../carga-general/components/forms/FormEgreso";

@@ -8,8 +8,7 @@ import {
 import dayjs from "dayjs";
 import CustomSelect from "../../../../shared-components/CustomSelect";
 import CustomDateTimePicker from "../../../../shared-components/CustomDateTimePicker";
-import CustomSingleAutoComplete from "../../../../shared-components/CustomSingleAutoComplete";
-import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
+import CategoriaAutoComplete from "../../../../shared-components/CategoriaAutoComplete";
 import { sessionService } from "../../../../shared-services/sessionService";
 
 export default function FormFactura({ formData, setFormData, errors = {}, modoEdicion = true }) {
@@ -197,8 +196,7 @@ export default function FormFactura({ formData, setFormData, errors = {}, modoEd
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Categoría</FormLabel>
-          <CustomSingleAutoComplete
-            options={TODAS_LAS_CATEGORIAS}
+          <CategoriaAutoComplete
             value={formData.categoria || ""}
             onChange={(valor) => {
               if (!modoEdicion) return;

@@ -1,11 +1,9 @@
 import React, { useEffect } from "react";
 import { Box, FormLabel, FormHelperText } from "@mui/material";
 import OutlinedInput from "@mui/material/OutlinedInput";
-import CustomSingleAutoComplete from "../../../../shared-components/CustomSingleAutoComplete";
+import CategoriaAutoComplete from "../../../../shared-components/CategoriaAutoComplete";
 import CustomDatePicker from "../../../../shared-components/CustomDatePicker";
 import CustomSelect from "../../../../shared-components/CustomSelect";
-import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
-import ConciliacionDialog from "../../../../shared-components/ConciliacionDialog";
 import dayjs from "dayjs";
 
 export default function FormRegistro({
@@ -24,7 +22,7 @@ export default function FormRegistro({
     }
   }, [tipoDoc, setFormData, formData.montoTotal]);
 
-  // Establecer fecha de hoy por defecto si no hay fecha de emisión
+  // Establecer fecha de hoy por defecto si no hay fecha de emision
   useEffect(() => {
     if (!formData.fechaEmision) {
       const hoy = dayjs();
@@ -36,7 +34,7 @@ export default function FormRegistro({
     <Box
       sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}
     >
-      {/* 1️⃣ Monto total + Moneda + Medio de pago */}
+      {/* 1: Monto total + Moneda + Medio de pago */}
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
@@ -83,7 +81,7 @@ export default function FormRegistro({
         </Box>
       </Box>
 
-      {/* 2️⃣ Origen + Destino + Fecha emisión */}
+      {/* 2: Origen + Destino + Fecha emision */}
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Origen</FormLabel>
@@ -108,7 +106,7 @@ export default function FormRegistro({
           />
         </Box>
         <Box sx={{ flex: 1 }}>
-          <FormLabel>Fecha emisión *</FormLabel>
+          <FormLabel>Fecha emision *</FormLabel>
           <CustomDatePicker
             value={formData.fechaEmision ? dayjs(formData.fechaEmision) : null}
             onChange={(fecha) =>
@@ -122,20 +120,21 @@ export default function FormRegistro({
         </Box>
       </Box>
 
-      {/* 3️⃣ Categoría */}
+      {/* 3: Categoria */}
       <Box>
-        <FormLabel>Categoría</FormLabel>
-        <CustomSingleAutoComplete
-          options={TODAS_LAS_CATEGORIAS}
+        <FormLabel>Categoria</FormLabel>
+        <CategoriaAutoComplete
+          tipo={formData.tipo}
           value={formData.categoria || ""}
           onChange={(valor) => setFormData((p) => ({ ...p, categoria: valor }))}
+          error={!!errors.categoria}
+          helperText={errors.categoria}
         />
       </Box>
 
-
-      {/* 4️⃣ Descripción */}
+      {/* 4: Descripcion */}
       <Box>
-        <FormLabel>Descripción</FormLabel>
+        <FormLabel>Descripcion</FormLabel>
         <OutlinedInput
           multiline
           value={formData.descripcion || ""}
@@ -147,13 +146,17 @@ export default function FormRegistro({
         />
       </Box>
       <Box sx={{ flex: 1 }}>
-        <FormLabel>Número de documento asociado</FormLabel>
-        <CustomSingleAutoComplete
-          options={["112", "113", "114"]}
+        <FormLabel>Numero de documento asociado</FormLabel>
+        <OutlinedInput
           value={formData.numeroDocumentoAsociado || ""}
-          onChange={(valor) =>
-            setFormData((p) => ({ ...p, numeroDocumentoAsociado: valor }))
+          onChange={(e) =>
+            setFormData((p) => ({
+              ...p,
+              numeroDocumentoAsociado: e.target.value,
+            }))
           }
+          size="small"
+          fullWidth
         />
       </Box>
     </Box>
