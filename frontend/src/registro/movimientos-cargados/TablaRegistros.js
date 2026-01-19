@@ -7,7 +7,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
-import CustomSingleAutoComplete from "../../shared-components/CustomSingleAutoComplete";
+import CategoriaAutoComplete from "../../shared-components/CategoriaAutoComplete";
 import CustomDatePicker from "../../shared-components/CustomDatePicker";
 import dayjs from "dayjs";
 import { API_CONFIG } from "../../config/apiConfig";
@@ -16,6 +16,7 @@ export default function TablaRegistros() {
   const [registros, setRegistros] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [valoresEditados, setValoresEditados] = useState({});
+  const [categorias, setCategorias] = useState([]);
   const [filtros, setFiltros] = useState({
     tipo: "",
     monto: "",
@@ -36,6 +37,21 @@ export default function TablaRegistros() {
       .then((res) => res.json())
       .then((data) => setRegistros(data))
       .catch((err) => console.error("Error cargando registros:", err));
+  }, []);
+
+  useEffect(() => {
+    let activo = true;
+    const cargar = async () => {
+      try {
+        const lista = await fetchCategorias();
+        if (activo) setCategorias(lista);
+      } catch (err) {
+        console.warn("No se pudieron obtener categorias din?micas, usando vac?o", err);
+        if (activo) setCategorias([]);
+      }
+    };
+    cargar();
+    return () => { activo = false; };
   }, []);
 
   const handleEdit = (row) => {
@@ -117,7 +133,7 @@ export default function TablaRegistros() {
                 {/* Tipo */}
                 <TableCell>
                   {editandoId === row.id ? (
-                    <CustomSingleAutoComplete
+                    <CategoriaAutoComplete
                       options={tipos}
                       value={valoresEditados.tipo}
                       onChange={(v) =>
@@ -171,7 +187,7 @@ export default function TablaRegistros() {
                 {/* Categoría */}
                 <TableCell>
                   {editandoId === row.id ? (
-                    <CustomSingleAutoComplete
+                    <CategoriaAutoComplete
                       options={categorias}
                       value={valoresEditados.categoria}
                       onChange={(v) =>
@@ -225,7 +241,7 @@ export default function TablaRegistros() {
                 {/* Medio Pago */}
                 <TableCell>
                   {editandoId === row.id ? (
-                    <CustomSingleAutoComplete
+                    <CategoriaAutoComplete
                       options={mediosPago}
                       value={valoresEditados.medioPago}
                       onChange={(v) =>

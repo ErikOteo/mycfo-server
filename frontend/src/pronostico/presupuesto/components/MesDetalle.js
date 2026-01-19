@@ -10,6 +10,7 @@ import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import http from '../../../api/http';
 import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../utils/currency';
+import { fetchCategorias } from '../../../shared-services/categoriasService';
 import dayjs from 'dayjs';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { getMovimientosPorRango } from '../../../reportes/reportes.service';
@@ -200,7 +201,7 @@ export default function MesDetalle() {
   const [dlgVarios, setDlgVarios] = React.useState(false);
   const [bulkCfg, setBulkCfg] = React.useState({ accion: 'replicar', desde: '', hasta: '' });
   const [deletePrompt, setDeletePrompt] = React.useState({ open: false, id: null, categoria: '', tipo: '' });
-  const [categoriasOptions, setCategoriasOptions] = React.useState(TODAS_LAS_CATEGORIAS);
+  const [categoriasOptions, setCategoriasOptions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [usuarioRol, setUsuarioRol] = React.useState(null);
 
@@ -250,13 +251,17 @@ export default function MesDetalle() {
     let activo = true;
     const cargarCategorias = async () => {
       try {
-        const response = await http.get(`${API_CONFIG.REGISTRO}/api/categorias`);
+        const lista = await fetchCategorias();
         if (!activo) return;
-        if (Array.isArray(response?.data) && response.data.length > 0) {
-          setCategoriasOptions(response.data);
+        if (Array.isArray(lista) && lista.length > 0) {
+          setCategoriasOptions(lista);
+        } else {
+          setCategoriasOptions(TODAS_LAS_CATEGORIAS);
         }
       } catch (error) {
-        console.error('No se pudieron obtener las categorías, se usan las predefinidas', error);
+        console.error('No se pudieron obtener las categorias, se usan las predefinidas', error);
+        if (!activo) return;
+        setCategoriasOptions(TODAS_LAS_CATEGORIAS);
       }
     };
     cargarCategorias();

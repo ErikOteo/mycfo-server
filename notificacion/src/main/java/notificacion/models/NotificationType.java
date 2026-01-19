@@ -16,6 +16,7 @@ public enum NotificationType {
     BUDGET_COMPLETED,       // Presupuesto completado
     FORECAST_ALERT,         // Alerta de pronóstico
     CASH_FLOW_ALERT,        // Alerta de cash flow negativo
+    BUDGET_MISSING_CATEGORY,// Categoria sin presupuesto asignado
     
     // REPORTES Y ANÁLISIS
     REPORT_READY,           // Reporte generado
@@ -35,6 +36,7 @@ public enum NotificationType {
     ROLE_CHANGED,           // Rol modificado
     DATA_IMPORTED,          // Datos importados
     DATA_EXPORTED,          // Datos exportados
+    RECONCILIATION_STALE,   // Movimientos sin conciliar
     
     // LEGACY (mantener compatibilidad)
     KEYWORD_REMINDER,       // Recordatorio por palabra clave
