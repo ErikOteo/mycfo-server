@@ -233,7 +233,7 @@ export default function MainGrid({ status, onRefreshStatus }) {
     if (!window.confirm(`¿Facturar ${selected.length} pago(s) seleccionados?`))
       return;
     try {
-      await mpApi.billPayments(selectedPaymentIds);
+      await mpApi.billPayments(selected);
       notify("Facturación en proceso/completada");
       loadPayments();
     } catch (e) {
