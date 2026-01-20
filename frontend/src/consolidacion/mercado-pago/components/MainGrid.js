@@ -214,7 +214,7 @@ export default function MainGrid({ status, onRefreshStatus }) {
   const handleCategoryChange = async (payment, newCategory) => {
     try {
       // Llamar al backend para actualizar la categoría usando el ID del registro
-      await mpApi.updatePaymentCategory(payment.id, newCategory);
+      await mpApi.updatePaymentCategory(payment.registroId, newCategory);
 
       // Actualizar el estado local
       setRows((prevRows) =>
@@ -233,7 +233,7 @@ export default function MainGrid({ status, onRefreshStatus }) {
     if (!window.confirm(`¿Facturar ${selected.length} pago(s) seleccionados?`))
       return;
     try {
-      await mpApi.billPayments(selected);
+      await mpApi.billPayments(selectedPaymentIds);
       notify("Facturación en proceso/completada");
       loadPayments();
     } catch (e) {
