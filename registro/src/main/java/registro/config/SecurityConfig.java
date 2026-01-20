@@ -21,10 +21,11 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-            // Le decimos que use la configuración de CORS definida abajo
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(Customizer.withDefaults()) 
             .authorizeHttpRequests(auth -> auth
+                // Permitimos TODO lo de MP de forma pública para evitar bloqueos de CORS en el pre-flight
                 .requestMatchers("/api/mp/**", "/actuator/**", "/error").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
@@ -32,29 +33,23 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 👇 ESTA ES LA CLAVE PARA ARREGLAR EL CORS 403
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        
-        // 1. Orígenes permitidos (TU DOMINIO REAL)
-        configuration.setAllowedOrigins(Arrays.asList(
-            "https://mycfo.com.ar", 
-            "https://www.mycfo.com.ar", 
-            "http://localhost:3000" // Por si probás local
+        CorsConfiguration config = new CorsConfiguration();
+        // Permitimos el dominio con y sin www, y localhost
+        config.setAllowedOriginPatterns(Arrays.asList(
+            "https://mycfo.com.ar",
+            "https://*.mycfo.com.ar",
+            "http://localhost:[*]"
         ));
-        
-        // 2. Métodos permitidos
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-        
-        // 3. Cabeceras permitidas (Authorization, Content-Type, etc.)
-        configuration.setAllowedHeaders(List.of("*"));
-        
-        // 4. Permitir credenciales (Cookies/Tokens)
-        configuration.setAllowCredentials(true);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        config.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 }
