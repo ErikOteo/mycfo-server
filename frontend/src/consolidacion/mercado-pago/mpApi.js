@@ -1,124 +1,113 @@
 import API_CONFIG from "../../config/api-config";
 
-const BASE = API_CONFIG.BASE || "";
+// Base: siempre pegamos contra el proxy público (host nginx)
+const BASE = (API_CONFIG?.BASE || "").replace(/\/$/, "");
 const MP_BASE = `${BASE}/api/mp`;
-const CONFIG_KEY = "mp_config_v1";
 
-const getUsuarioSub = () => {
+const getSub = () => {
   try {
     return sessionStorage.getItem("sub") || sessionStorage.getItem("usuarioSub") || "";
-  } catch (e) {
+  } catch {
     return "";
   }
 };
 
-const headers = () => {
-  const sub = getUsuarioSub();
-  return sub ? { "X-Usuario-Sub": sub } : {};
+const buildHeaders = (extra = {}) => {
+  const sub = getSub();
+  return {
+    "Content-Type": "application/json",
+    ...(sub ? { "X-Usuario-Sub": sub } : {}),
+    ...extra,
+  };
 };
 
-const safeJson = async (resp) => {
-  const txt = await resp.text();
-  if (!txt) return null;
-  try { return JSON.parse(txt); } catch { return txt; }
-};
-
-const get = async (url, params) => {
-  const u = new URL(url);
-  if (params) Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, v);
-  });
-
-  const resp = await fetch(u.toString(), { headers: headers() });
-  if (!resp.ok) throw new Error(await resp.text());
-  return safeJson(resp);
-};
-
-const post = async (url, body) => {
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers() },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!resp.ok) throw new Error(await resp.text());
-  return safeJson(resp);
-};
-
-const put = async (url, body) => {
-  const resp = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...headers() },
-    body: JSON.stringify(body ?? {}),
-  });
-  if (!resp.ok) throw new Error(await resp.text());
-  return safeJson(resp);
+const fetchJson = async (url, opts = {}) => {
+  const resp = await fetch(url, opts);
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`MP API ${resp.status} ${resp.statusText} - ${text}`);
+  }
+  if (resp.status === 204) return null;
+  return resp.json();
 };
 
 export const mpApi = {
-  // --- compat + fix inmediato ---
-  async status() {
-    return get(`${MP_BASE}/status`);
-  },
-  async getStatus() {               // 👈 esto arregla tu error actual
-    return this.status();
+  // --- STATUS ---
+  // Nombre "nuevo" recomendado
+  getStatus: () => fetchJson(`${MP_BASE}/status`, { method: "GET", headers: buildHeaders() }),
+  // Alias por si algún lugar llama status()
+  status: () => fetchJson(`${MP_BASE}/status`, { method: "GET", headers: buildHeaders() }),
+
+  // --- OAUTH ---
+  // Backend: MpController expone /oauth/url (según tu log genera la URL de MercadoLibre)
+  startOAuth: async () => {
+    const data = await fetchJson(`${MP_BASE}/oauth/url`, { method: "GET", headers: buildHeaders() });
+    // por si el backend devuelve {url: "..."} o directamente string
+    return typeof data === "string" ? data : data?.url;
   },
 
-  async unlink() {
-    // backend devuelve 204 normalmente
-    await post(`${MP_BASE}/unlink`);
-    return true;
+  // --- UNLINK ---
+  unlink: () => fetchJson(`${MP_BASE}/unlink`, { method: "POST", headers: buildHeaders() }),
+
+  // --- PREVIEW ---
+  // Por mes (lo que usa MainGrid)
+  previewPaymentsByMonth: (payload) =>
+    fetchJson(`${MP_BASE}/preview`, { method: "POST", headers: buildHeaders(), body: JSON.stringify(payload) }),
+
+  // Por paymentId (si tu backend lo tiene así; si no, lo dejamos por compatibilidad)
+  previewPaymentById: (paymentId) =>
+    fetchJson(`${MP_BASE}/preview/${encodeURIComponent(paymentId)}`, { method: "GET", headers: buildHeaders() }),
+
+  // Alias por si algún componente llama preview() genérico
+  preview: (payload) =>
+    fetchJson(`${MP_BASE}/preview`, { method: "POST", headers: buildHeaders(), body: JSON.stringify(payload) }),
+
+  // --- IMPORT ---
+  importPaymentsByMonth: (payload) =>
+    fetchJson(`${MP_BASE}/import`, { method: "POST", headers: buildHeaders(), body: JSON.stringify(payload) }),
+
+  importPaymentById: (paymentId) =>
+    fetchJson(`${MP_BASE}/import/${encodeURIComponent(paymentId)}`, { method: "POST", headers: buildHeaders() }),
+
+  importSelectedPayments: (paymentIds) =>
+    fetchJson(`${MP_BASE}/import/selected`, {
+      method: "POST",
+      headers: buildHeaders(),
+      body: JSON.stringify({ paymentIds }),
+    }),
+
+  // --- LISTADO (IMPORTADOS) ---
+  listImportedPayments: (params) => {
+    const qs = new URLSearchParams(params || {}).toString();
+    return fetchJson(`${MP_BASE}/imported-payments${qs ? `?${qs}` : ""}`, {
+      method: "GET",
+      headers: buildHeaders(),
+    });
   },
 
-  // --- OAuth ---
-  async startOAuth(force = true) {
-    const data = await get(`${MP_BASE}/oauth/url`, { force: force ? "true" : "false" });
-    return data?.url;
-  },
+  // --- UPDATE CATEGORY ---
+  updatePaymentCategory: (paymentId, categoria) =>
+    fetchJson(`${MP_BASE}/payments/${encodeURIComponent(paymentId)}/category`, {
+      method: "PUT",
+      headers: buildHeaders(),
+      body: JSON.stringify({ categoria }),
+    }),
 
-  // --- Config (en tu backend NO existe /config; lo guardo local para que no rompa la UI) ---
-  async getConfig() {
-    try {
-      const raw = localStorage.getItem(CONFIG_KEY);
-      return raw ? JSON.parse(raw) : { mode: "month", month: null, paymentId: "" };
-    } catch {
-      return { mode: "month", month: null, paymentId: "" };
-    }
+  // --- FACTURAR ---
+  billPayments: (paymentIds) =>
+    fetchJson(`${MP_BASE}/bill`, {
+      method: "POST",
+      headers: buildHeaders(),
+      body: JSON.stringify({ paymentIds }),
+    }),
+
+  // --- CONFIG (si tu backend todavía no lo tiene, devolvemos defaults para no romper UI) ---
+  getConfig: async () => {
+    // Si después implementás /config en backend, cambiás acá a `${MP_BASE}/config`
+    return { autoBill: false, timezone: "America/Argentina/Buenos_Aires" };
   },
-  async updateConfig(cfg) {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg ?? {}));
+  updateConfig: async (cfg) => {
+    // idem: si luego existe backend, mandalo ahí
     return cfg;
-  },
-
-  // --- Preview / Import (estos endpoints EXISTEN en registro) ---
-  async previewPaymentById(paymentId) {
-    return post(`${MP_BASE}/preview`, { paymentId });
-  },
-  async previewPaymentsByMonth({ month, year }) {
-    return post(`${MP_BASE}/preview`, { month, year });
-  },
-
-  async importPaymentById(paymentId) {
-    return post(`${MP_BASE}/import`, { paymentId });
-  },
-  async importPaymentsByMonth({ month, year }) {
-    return post(`${MP_BASE}/import`, { month, year });
-  },
-  async importSelectedPayments(paymentIds) {
-    return post(`${MP_BASE}/import/selected`, Array.isArray(paymentIds) ? paymentIds : []);
-  },
-
-  // --- Listado de importados (endpoint EXISTE) ---
-  async listImportedPayments(params) {
-    return get(`${MP_BASE}/imported-payments`, params);
-  },
-
-  // --- Categoría (backend espera registroId) ---
-  async updatePaymentCategory(registroId, categoria) {
-    return put(`${MP_BASE}/payments/${registroId}/category`, { categoria });
-  },
-
-  // --- Facturar (backend espera {paymentIds:[...]} ) ---
-  async billPayments(paymentIds) {
-    return post(`${MP_BASE}/facturar`, { paymentIds: Array.isArray(paymentIds) ? paymentIds : [] });
   },
 };
