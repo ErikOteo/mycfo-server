@@ -1,113 +1,124 @@
+// /mercado-pago/mpApi.js
 import API_CONFIG from "../../config/api-config";
 
-// Base: siempre pegamos contra el proxy público (host nginx)
-const BASE = (API_CONFIG?.BASE || "").replace(/\/$/, "");
-const MP_BASE = `${BASE}/api/mp`;
+const BASE_URL = API_CONFIG.REGISTRO;
 
-const getSub = () => {
-  try {
-    return sessionStorage.getItem("sub") || sessionStorage.getItem("usuarioSub") || "";
-  } catch {
-    return "";
-  }
-};
+const USER_HEADER = "X-Usuario-Sub";
 
-const buildHeaders = (extra = {}) => {
-  const sub = getSub();
-  return {
-    "Content-Type": "application/json",
-    ...(sub ? { "X-Usuario-Sub": sub } : {}),
-    ...extra,
+async function request(path, { method = "GET", body, headers } = {}) {
+  const url = `${BASE_URL}${path}`;
+  const opts = {
+    method,
+    headers: {
+      ...(headers || {}),
+    },
   };
-};
 
-const fetchJson = async (url, opts = {}) => {
-  const resp = await fetch(url, opts);
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`MP API ${resp.status} ${resp.statusText} - ${text}`);
+  const usuarioSub = sessionStorage.getItem("sub");
+  if (usuarioSub) {
+    opts.headers[USER_HEADER] = usuarioSub;
   }
-  if (resp.status === 204) return null;
-  return resp.json();
-};
+
+  // Solo seteamos JSON si hay body
+  if (body !== undefined) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+
+  // Si NO usás cookies/sesión en el back, podés quitar esta línea:
+  // opts.credentials = "include";
+
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!res.ok) {
+    const message =
+      data?.message || data?.error || text || `HTTP ${res.status}`;
+    const err = new Error(message);
+    err.status = res.status;
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
 
 export const mpApi = {
-  // --- STATUS ---
-  // Nombre "nuevo" recomendado
-  getStatus: () => fetchJson(`${MP_BASE}/status`, { method: "GET", headers: buildHeaders() }),
-  // Alias por si algún lugar llama status()
-  status: () => fetchJson(`${MP_BASE}/status`, { method: "GET", headers: buildHeaders() }),
+  getStatus: () => request("/api/mp/status"),
 
-  // --- OAUTH ---
-  // Backend: MpController expone /oauth/url (según tu log genera la URL de MercadoLibre)
   startOAuth: async () => {
-    const data = await fetchJson(`${MP_BASE}/oauth/url`, { method: "GET", headers: buildHeaders() });
-    // por si el backend devuelve {url: "..."} o directamente string
-    return typeof data === "string" ? data : data?.url;
+    const res = await request("/api/mp/oauth/url");
+    console.log("Respuesta /oauth/url:", res);
+    const authUrl = res?.url || res?.authUrl;
+    if (!authUrl)
+      throw new Error("El backend no devolvió la URL de autorización");
+    return authUrl;
   },
 
-  // --- UNLINK ---
-  unlink: () => fetchJson(`${MP_BASE}/unlink`, { method: "POST", headers: buildHeaders() }),
+  unlink: () => request("/api/mp/unlink", { method: "POST" }),
 
-  // --- PREVIEW ---
-  // Por mes (lo que usa MainGrid)
-  previewPaymentsByMonth: (payload) =>
-    fetchJson(`${MP_BASE}/preview`, { method: "POST", headers: buildHeaders(), body: JSON.stringify(payload) }),
+  listPayments: (params = {}) => {
+    const { from, to, q, page = 0, pageSize = 20 } = params;
+    const sp = new URLSearchParams();
+    if (from) sp.set("from", from);
+    if (to) sp.set("to", to);
+    if (q) sp.set("q", q);
+    sp.set("page", page);
+    sp.set("size", pageSize);
+    sp.set("sort", "fecha,DESC");
+    return request(`/api/mp/payments?${sp.toString()}`);
+  },
 
-  // Por paymentId (si tu backend lo tiene así; si no, lo dejamos por compatibilidad)
+  // Nuevo endpoint para obtener solo los pagos importados
+  listImportedPayments: (params = {}) => {
+    const { from, to, q, page = 0, pageSize = 20 } = params;
+    const sp = new URLSearchParams();
+    if (from) sp.set("from", from);
+    if (to) sp.set("to", to);
+    if (q) sp.set("q", q);
+    sp.set("page", page);
+    sp.set("size", pageSize);
+    sp.set("sort", "fecha,DESC");
+    return request(`/api/mp/imported-payments?${sp.toString()}`);
+  },
+
+  // Métodos de preview (sin guardar)
+  previewPaymentsByMonth: ({ month, year }) =>
+    request("/api/mp/preview", { method: "POST", body: { month, year } }),
+
   previewPaymentById: (paymentId) =>
-    fetchJson(`${MP_BASE}/preview/${encodeURIComponent(paymentId)}`, { method: "GET", headers: buildHeaders() }),
+    request("/api/mp/preview", { method: "POST", body: { paymentId } }),
 
-  // Alias por si algún componente llama preview() genérico
-  preview: (payload) =>
-    fetchJson(`${MP_BASE}/preview`, { method: "POST", headers: buildHeaders(), body: JSON.stringify(payload) }),
+  previewByExternalReference: (externalReference) =>
+    request("/api/mp/preview", { method: "POST", body: { externalReference } }),
 
-  // --- IMPORT ---
-  importPaymentsByMonth: (payload) =>
-    fetchJson(`${MP_BASE}/import`, { method: "POST", headers: buildHeaders(), body: JSON.stringify(payload) }),
+  // Importar pagos seleccionados
+  importSelectedPayments: (paymentIds) =>
+    request("/api/mp/import/selected", { method: "POST", body: paymentIds }),
+
+  // Métodos de importación directa (legacy)
+  importPaymentsByMonth: ({ month, year }) =>
+    request("/api/mp/import", { method: "POST", body: { month, year } }),
 
   importPaymentById: (paymentId) =>
-    fetchJson(`${MP_BASE}/import/${encodeURIComponent(paymentId)}`, { method: "POST", headers: buildHeaders() }),
+    request("/api/mp/import", { method: "POST", body: { paymentId } }),
 
-  importSelectedPayments: (paymentIds) =>
-    fetchJson(`${MP_BASE}/import/selected`, {
-      method: "POST",
-      headers: buildHeaders(),
-      body: JSON.stringify({ paymentIds }),
-    }),
+  getConfig: () => request("/api/mp/config"),
+  updateConfig: (cfg) =>
+    request("/api/mp/config", { method: "PUT", body: cfg }),
 
-  // --- LISTADO (IMPORTADOS) ---
-  listImportedPayments: (params) => {
-    const qs = new URLSearchParams(params || {}).toString();
-    return fetchJson(`${MP_BASE}/imported-payments${qs ? `?${qs}` : ""}`, {
-      method: "GET",
-      headers: buildHeaders(),
-    });
-  },
+  billPayments: (ids) =>
+    request("/api/mp/facturar", { method: "POST", body: { paymentIds: ids } }),
 
-  // --- UPDATE CATEGORY ---
-  updatePaymentCategory: (paymentId, categoria) =>
-    fetchJson(`${MP_BASE}/payments/${encodeURIComponent(paymentId)}/category`, {
+  // Actualizar categoría de un pago
+  updatePaymentCategory: (registroId, newCategory) =>
+    request(`/api/mp/payments/${registroId}/category`, {
       method: "PUT",
-      headers: buildHeaders(),
-      body: JSON.stringify({ categoria }),
+      body: { categoria: newCategory },
     }),
-
-  // --- FACTURAR ---
-  billPayments: (paymentIds) =>
-    fetchJson(`${MP_BASE}/bill`, {
-      method: "POST",
-      headers: buildHeaders(),
-      body: JSON.stringify({ paymentIds }),
-    }),
-
-  // --- CONFIG (si tu backend todavía no lo tiene, devolvemos defaults para no romper UI) ---
-  getConfig: async () => {
-    // Si después implementás /config en backend, cambiás acá a `${MP_BASE}/config`
-    return { autoBill: false, timezone: "America/Argentina/Buenos_Aires" };
-  },
-  updateConfig: async (cfg) => {
-    // idem: si luego existe backend, mandalo ahí
-    return cfg;
-  },
 };
