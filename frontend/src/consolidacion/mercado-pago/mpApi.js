@@ -1,7 +1,8 @@
 // /mercado-pago/mpApi.js
 import API_CONFIG from "../../config/api-config";
 
-const BASE_URL = API_CONFIG.REGISTRO;
+//const BASE_URL = API_CONFIG.REGISTRO;
+const BASE_URL = API_CONFIG.BASE; // https://mycfo.com.ar
 
 const USER_HEADER = "X-Usuario-Sub";
 
