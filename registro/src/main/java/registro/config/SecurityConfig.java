@@ -18,9 +18,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(Customizer.withDefaults()) // Usa la config de WebConfig
             .authorizeHttpRequests(auth -> auth
-                // IMPORTANTE: Deja pasar a Mercado Pago y los Health Checks
                 .requestMatchers("/api/mp/**", "/actuator/**", "/error").permitAll()
-                // Todo lo demás requiere Token válido
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
