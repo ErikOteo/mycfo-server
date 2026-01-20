@@ -24,7 +24,7 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults()) 
             .authorizeHttpRequests(auth -> auth
                 // Permitimos TODO lo de MP de forma pública para evitar bloqueos de CORS en el pre-flight
-                .requestMatchers("/api/mp/**", "/actuator/**", "/error").permitAll()
+                .requestMatchers("/api/mp/**", "/api/registro/api/mp/**", "/actuator/**", "/error").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 .anyRequest().authenticated()
             )
