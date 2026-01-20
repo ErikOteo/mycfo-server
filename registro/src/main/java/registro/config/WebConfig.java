@@ -10,8 +10,17 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("*") // Permitir TODO (vital para evitar errores 403 de CORS)
+                .allowedOrigins(
+                    "https://mycfoar.netlify.app",
+                    "http://localhost:3000",
+                    "https://mycfo.com.ar"
+                )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "CONNECT")
-                .allowedHeaders("*");
+                .allowedHeaders("*")
+                .allowCredentials(true);
     }
 }
+
+
+
+            
