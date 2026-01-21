@@ -9,7 +9,6 @@ import URL_CONFIG from "../config/api-config";
 
 const http = axios.create();
 
-// Armamos una lista de bases internas (las que pasan por /api/*)
 const API_BASE_URLS = [
   URL_CONFIG.ADMINISTRACION,
   URL_CONFIG.REGISTRO,
@@ -26,12 +25,6 @@ const cognitoPoolConfig = {
 
 let refreshPromise = null;
 let hasForcedLogout = false;
-
-const isApiRequest = (url) => {
-  if (!url) return false;
-  const u = String(url);
-  return API_BASE_URLS.some((base) => base && u.startsWith(String(base)));
-};
 
 const safeSessionGet = (key) => {
   try {
@@ -122,22 +115,32 @@ const getRefreshPromise = () => {
   return refreshPromise;
 };
 
-// REQUEST: agregar auth + sub a TODA request hacia APIs internas
+// Detecta si la request va a tu backend (absoluta o relativa)
+const isInternalApiRequest = (config) => {
+  const url = config?.url ? String(config.url) : "";
+  if (!url) return false;
+
+  // Caso relativo típico del frontend
+  if (url.startsWith("/api/")) return true;
+
+  // Caso absoluto
+  return API_BASE_URLS.some((base) => base && url.startsWith(String(base)));
+};
+
+// REQUEST: meter Authorization + X-Usuario-Sub a TODA request interna
 http.interceptors.request.use((config) => {
   if (!config) return config;
-
-  const url = config.url;
-  if (!isApiRequest(url)) return config;
+  if (!isInternalApiRequest(config)) return config;
 
   const accessToken = safeSessionGet("accessToken");
   const usuarioSub = safeSessionGet("sub");
 
   config.headers = config.headers ?? {};
 
-  if (accessToken && !config.headers.Authorization) {
+  // No pisar si ya viene seteado
+  if (accessToken && !config.headers.Authorization && !config.headers.authorization) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
-
   if (usuarioSub && !config.headers["X-Usuario-Sub"]) {
     config.headers["X-Usuario-Sub"] = usuarioSub;
   }
@@ -145,16 +148,15 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// RESPONSE: si 401 en API interna, refrescar token y reintentar 1 vez
+// RESPONSE: si 401 en API interna, refrescar y reintentar 1 vez
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
     const { config, response } = error || {};
     if (!config || !response) return Promise.reject(error);
 
-    const url = config.url;
     const is401 = response.status === 401;
-    if (!is401 || !isApiRequest(url)) return Promise.reject(error);
+    if (!is401 || !isInternalApiRequest(config)) return Promise.reject(error);
 
     if (config.__isRetryRequest) {
       clearSessionAndRedirect();
