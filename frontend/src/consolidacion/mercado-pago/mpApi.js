@@ -42,7 +42,7 @@ async function request(path, { method = "GET", body, headers } = {}) {
   }
 
   // En prod necesitamos enviar cookies (si las hay) hacia el gateway/API
-  opts.credentials = "include";
+  //opts.credentials = "include";
 
   const res = await fetch(url, opts);
   const text = await res.text();
