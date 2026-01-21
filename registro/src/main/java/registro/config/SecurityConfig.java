@@ -2,9 +2,10 @@ package registro.config;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -43,29 +44,33 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
+    /**
+     * Bean de CORS explícito para Spring Security.
+     * - @Primary + @Qualifier: evita ambigüedad con beans internos (ej: mvcHandlerMappingIntrospector).
+     */
+    @Bean(name = "corsConfigurationSource")
+    @Primary
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Orígenes permitidos (sin wildcard si no usás credentials)
+        // Orígenes permitidos (sin wildcard porque allowCredentials=false)
         config.setAllowedOrigins(List.of(
             "https://mycfo.com.ar",
-            "https://www.mycfo.com.ar"
+            "https://www.mycfo.com.ar",
+            "http://localhost:3000",
+            "http://localhost:5173"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
-        // Headers: autorización + custom headers (x-usuario-sub, etc.)
+        // Permitimos todos los headers (Authorization + x-usuario-sub, etc.)
         config.addAllowedHeader("*");
 
-        // Si usás Bearer token (Authorization) y NO cookies, esto está bien en false
+        // Si usás Bearer token y NO cookies, dejalo en false
         config.setAllowCredentials(false);
 
         // Cache del preflight
         config.setMaxAge(3600L);
-
-        // Si querés exponer headers al front, agregá esto (opcional)
-        // config.setExposedHeaders(List.of("Location", "Content-Disposition"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
