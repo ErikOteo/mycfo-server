@@ -28,8 +28,6 @@ const dedupPreservandoPrimero = (valores) => {
   return res;
 };
 
-// Si querés mantener el header X-Usuario-Sub explícito (además del interceptor),
-// lo armamos igual; pero aunque no lo pongas, http.js ya lo agrega.
 const buildHeaders = () => {
   const headers = {};
   try {
@@ -45,7 +43,7 @@ export async function fetchCategorias({ tipo } = {}) {
   const base = basePorTipo(tipo);
 
   try {
-    // ✅ IMPORTANTE: sin "/api" extra
+    // ✅ sin "/api" extra
     const resp = await http.get(`${API_CONFIG.REGISTRO}/categorias`, {
       params: tipo ? { tipo } : undefined,
       headers: buildHeaders(),
@@ -63,10 +61,7 @@ export async function fetchCategorias({ tipo } = {}) {
 
     return dedupPreservandoPrimero([...base, ...extras]);
   } catch (err) {
-    console.warn(
-      "No se pudieron obtener categorías dinámicas, uso base fija",
-      err?.message || err
-    );
+    console.warn("No se pudieron obtener categorías dinámicas, uso base fija", err?.message || err);
     return dedupPreservandoPrimero(base);
   }
 }
@@ -76,12 +71,9 @@ export async function crearCategoria({ nombre, tipo }) {
     throw new Error("El nombre de la categoría es obligatorio");
   }
 
-  const payload = {
-    nombre: nombre.trim(),
-    tipo: tipo || null,
-  };
+  const payload = { nombre: nombre.trim(), tipo: tipo || null };
 
-  // ✅ IMPORTANTE: sin "/api" extra
+  // ✅ sin "/api" extra
   const resp = await http.post(`${API_CONFIG.REGISTRO}/categorias`, payload, {
     headers: buildHeaders(),
   });

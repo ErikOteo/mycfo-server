@@ -1,10 +1,10 @@
 import React from "react";
 import { Typography, Grid, Snackbar, Alert } from "@mui/material";
-import axios from "axios";
 import CustomButton from "../../../shared-components/CustomButton";
 import LazyFormWrapper from "./LazyFormWrapper";
 import API_CONFIG from "../../../config/api-config";
 import dayjs from "dayjs";
+import http from "../../../api/http";
 
 // Lazy loading para formularios específicos
 const FormFactura = React.lazy(() => import("./forms/FormFactura"));
@@ -14,8 +14,25 @@ const FormEgreso = React.lazy(() => import("./forms/FormEgreso"));
 const FormDeuda = React.lazy(() => import("./forms/FormDeuda"));
 const FormAcreencia = React.lazy(() => import("./forms/FormAcreencia"));
 
-// 📌 Campos obligatorios por tipo de documento
+// 📌 Campos obligatorios por tipo (normalizados a lowercase para evitar mismatches)
 const requiredFieldsMap = {
+  factura: [
+    "numeroDocumento",
+    "versionDocumento",
+    "tipoFactura",
+    "fechaEmision",
+    "montoTotal",
+    "categoria",
+    "vendedorNombre",
+    "compradorNombre",
+  ],
+  movimiento: ["montoTotal", "fechaEmision"],
+  ingreso: ["montoTotal", "fechaEmision"],
+  egreso: ["montoTotal", "fechaEmision"],
+  deuda: ["montoTotal", "fechaEmision"],
+  acreencia: ["montoTotal", "fechaEmision"],
+
+  // compat por si en algún lado llega con mayúsculas
   Factura: [
     "numeroDocumento",
     "versionDocumento",
@@ -33,6 +50,17 @@ const requiredFieldsMap = {
   Acreencia: ["montoTotal", "fechaEmision"],
 };
 
+const buildHeaders = () => {
+  const headers = {};
+  try {
+    const usuarioSub = sessionStorage.getItem("sub");
+    if (usuarioSub) headers["X-Usuario-Sub"] = usuarioSub;
+  } catch {
+    /* noop */
+  }
+  return headers;
+};
+
 export default function CargaFormulario({
   tipoDoc,
   endpoint,
@@ -42,139 +70,115 @@ export default function CargaFormulario({
   setErrors,
 }) {
   const [localErrors, setLocalErrors] = React.useState(errors);
-  const [snackbar, setSnackbar] = React.useState({ open: false, severity: "info", message: "" });
-  const [successSnackbar, setSuccessSnackbar] = React.useState({ open: false, message: "" });
+  const [snackbar, setSnackbar] = React.useState({
+    open: false,
+    severity: "info",
+    message: "",
+  });
+  const [successSnackbar, setSuccessSnackbar] = React.useState({
+    open: false,
+    message: "",
+  });
 
   React.useEffect(() => {
     setFormData((prev) => {
       const actual = prev || {};
-      if (actual.moneda === "ARS") {
-        return actual;
-      }
+      if (actual.moneda === "ARS") return actual;
       return { ...actual, moneda: "ARS" };
     });
   }, [setFormData]);
 
   React.useEffect(() => {
     if (!successSnackbar.open) return;
-    const timer = setTimeout(
-      () => setSuccessSnackbar({ open: false, message: "" }),
-      3500
-    );
+    const timer = setTimeout(() => setSuccessSnackbar({ open: false, message: "" }), 3500);
     return () => clearTimeout(timer);
   }, [successSnackbar.open]);
 
-  React.useEffect(() => {
-    setLocalErrors(errors);
-  }, [errors]);
+  React.useEffect(() => setLocalErrors(errors), [errors]);
+  React.useEffect(() => setErrors(localErrors), [localErrors, setErrors]);
 
-  React.useEffect(() => {
-    setErrors(localErrors);
-  }, [localErrors, setErrors]);
-
-  const normalizarDatos = React.useCallback(
-    (datos) => {
-      const resultado = {};
-      Object.entries(datos || {}).forEach(([clave, valor]) => {
-        if (dayjs.isDayjs(valor)) {
-          // Para fechaEmision y cualquier campo de fecha/hora, conservar también la hora
-          const formato = clave === "fechaEmision" ? "YYYY-MM-DDTHH:mm:ss" : "YYYY-MM-DD";
-          resultado[clave] = valor.format(formato);
-        } else if (Array.isArray(valor)) {
-          resultado[clave] = valor.map((item) =>
-            dayjs.isDayjs(item)
-              ? item.format("YYYY-MM-DD")
-              : item ?? ""
-          );
-        } else if (valor && typeof valor === "object") {
-          resultado[clave] = valor;
-        } else {
-          resultado[clave] = valor ?? "";
-        }
-      });
-      resultado.moneda = "ARS";
-      return resultado;
-    },
-    []
-  );
+  const normalizarDatos = React.useCallback((datos) => {
+    const resultado = {};
+    Object.entries(datos || {}).forEach(([clave, valor]) => {
+      if (dayjs.isDayjs(valor)) {
+        const formato = clave === "fechaEmision" ? "YYYY-MM-DDTHH:mm:ss" : "YYYY-MM-DD";
+        resultado[clave] = valor.format(formato);
+      } else if (Array.isArray(valor)) {
+        resultado[clave] = valor.map((item) =>
+          dayjs.isDayjs(item) ? item.format("YYYY-MM-DD") : item ?? ""
+        );
+      } else if (valor && typeof valor === "object") {
+        resultado[clave] = valor;
+      } else {
+        resultado[clave] = valor ?? "";
+      }
+    });
+    resultado.moneda = "ARS";
+    return resultado;
+  }, []);
 
   const handleSubmit = async () => {
+    const tipoKey = (tipoDoc || "").toString().trim();
+    const tipoKeyLower = tipoKey.toLowerCase();
+
     // ✅ Validación dinámica
     const newErrors = {};
-    const requiredFields = requiredFieldsMap[tipoDoc] || [];
+    const requiredFields = requiredFieldsMap[tipoKeyLower] || requiredFieldsMap[tipoKey] || [];
 
     requiredFields.forEach((field) => {
-      if (!formData[field]) {
-        newErrors[field] = "Campo obligatorio";
-      }
+      if (!formData?.[field]) newErrors[field] = "Campo obligatorio";
     });
 
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
       alert("⚠️ Por favor completa todos los campos obligatorios");
-      return; // 🚫 No enviar si hay errores
+      return;
     }
 
     try {
-      // Obtener sub del usuario (REQUERIDO)
       const usuarioSub = sessionStorage.getItem("sub");
-      
       if (!usuarioSub) {
         alert("❌ Error: No se encontró el usuario en la sesión. Por favor, inicia sesión nuevamente.");
         return;
       }
-      
-      // Configurar headers - SOLO necesitamos X-Usuario-Sub
-      const headers = {
-        "X-Usuario-Sub": usuarioSub
-      };
 
       const datosParaEnviar = normalizarDatos(formData);
 
-      // Preparar payload para el endpoint unificado /api/carga-datos
+      // Preparar payload para el endpoint unificado
       let payload;
-      let tipoMovimiento = null;
 
-      // Determinar tipo y tipoMovimiento
-      if (["ingreso", "egreso", "deuda", "acreencia"].includes(tipoDoc.toLowerCase())) {
-        // Es un movimiento
-        tipoMovimiento = tipoDoc.charAt(0).toUpperCase() + tipoDoc.slice(1); // Ingreso, Egreso, Deuda, Acreencia
-        
+      if (["ingreso", "egreso", "deuda", "acreencia"].includes(tipoKeyLower)) {
+        const tipoMovimiento = tipoKeyLower.charAt(0).toUpperCase() + tipoKeyLower.slice(1); // Ingreso/Egreso/...
         payload = {
           tipo: "movimiento",
           metodo: "formulario",
           datos: datosParaEnviar,
-          tipoMovimiento: tipoMovimiento
+          tipoMovimiento,
         };
-      } else if (tipoDoc.toLowerCase() === "factura") {
-        // Es una factura
-        payload = {
-          tipo: "factura",
-          metodo: "formulario",
-          datos: datosParaEnviar
-        };
+      } else if (tipoKeyLower === "factura") {
+        payload = { tipo: "factura", metodo: "formulario", datos: datosParaEnviar };
       } else {
-        // Movimiento genérico
-        payload = {
-          tipo: "movimiento",
-          metodo: "formulario",
-          datos: datosParaEnviar
-        };
+        payload = { tipo: "movimiento", metodo: "formulario", datos: datosParaEnviar };
       }
-      
+
       console.log("📤 Enviando datos:", payload);
-      console.log("🔐 Headers:", headers);
-      
-      // Usar endpoint unificado
-      const ENDPOINT_UNIFICADO = `${API_CONFIG.REGISTRO}/api/carga-datos`;
-      const response = await axios.post(ENDPOINT_UNIFICADO, payload, { headers });
+
+      // ✅ IMPORTANTE: sin "/api" extra
+      const ENDPOINT_UNIFICADO = `${API_CONFIG.REGISTRO}/carga-datos`;
+
+      // ✅ IMPORTANTE: usar http (interceptor mete Authorization + refresh)
+      const response = await http.post(ENDPOINT_UNIFICADO, payload, {
+        headers: buildHeaders(),
+      });
 
       console.log("✅ Respuesta del servidor:", response.data);
-      setSuccessSnackbar({ open: true, message: response.data.mensaje || "Datos guardados exitosamente" });
+      setSuccessSnackbar({
+        open: true,
+        message: response.data?.mensaje || "Datos guardados exitosamente",
+      });
       setFormData({});
       setLocalErrors({});
-
     } catch (err) {
       console.error("❌ Error en envío:", err);
       const mensaje = err.response?.data?.mensaje || err.message || "Error desconocido";
@@ -187,11 +191,7 @@ export default function CargaFormulario({
       case "factura":
         return (
           <LazyFormWrapper>
-            <FormFactura
-              formData={formData}
-              setFormData={setFormData}
-              errors={localErrors}
-            />
+            <FormFactura formData={formData} setFormData={setFormData} errors={localErrors} />
           </LazyFormWrapper>
         );
       case "movimiento":
@@ -208,41 +208,25 @@ export default function CargaFormulario({
       case "ingreso":
         return (
           <LazyFormWrapper>
-            <FormIngreso
-              formData={formData}
-              setFormData={setFormData}
-              errors={localErrors}
-            />
+            <FormIngreso formData={formData} setFormData={setFormData} errors={localErrors} />
           </LazyFormWrapper>
         );
       case "egreso":
         return (
           <LazyFormWrapper>
-            <FormEgreso
-              formData={formData}
-              setFormData={setFormData}
-              errors={localErrors}
-            />
+            <FormEgreso formData={formData} setFormData={setFormData} errors={localErrors} />
           </LazyFormWrapper>
         );
       case "deuda":
         return (
           <LazyFormWrapper>
-            <FormDeuda
-              formData={formData}
-              setFormData={setFormData}
-              errors={localErrors}
-            />
+            <FormDeuda formData={formData} setFormData={setFormData} errors={localErrors} />
           </LazyFormWrapper>
         );
       case "acreencia":
         return (
           <LazyFormWrapper>
-            <FormAcreencia
-              formData={formData}
-              setFormData={setFormData}
-              errors={localErrors}
-            />
+            <FormAcreencia formData={formData} setFormData={setFormData} errors={localErrors} />
           </LazyFormWrapper>
         );
       default:
@@ -252,15 +236,10 @@ export default function CargaFormulario({
 
   return (
     <Grid sx={{ mt: 3, width: "100%" }}>
-      
-
       {renderFormulario()}
 
-      <CustomButton
-        label={`Enviar ${tipoDoc}`}
-        width="100%"
-        onClick={handleSubmit}
-      />
+      <CustomButton label={`Enviar ${tipoDoc}`} width="100%" onClick={handleSubmit} />
+
       {successSnackbar.open && (
         <Alert
           severity="success"
@@ -271,6 +250,7 @@ export default function CargaFormulario({
           {successSnackbar.message}
         </Alert>
       )}
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
