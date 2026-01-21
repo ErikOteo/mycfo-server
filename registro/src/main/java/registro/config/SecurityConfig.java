@@ -43,7 +43,11 @@ public class SecurityConfig {
             "http://localhost:[*]"
         ));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        config.setAllowedHeaders(Arrays.asList(
+        "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
+        "Access-Control-Request-Method", "Access-Control-Request-Headers",
+        "X-Usuario-Sub"
+        ));
         config.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
