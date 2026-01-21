@@ -145,6 +145,11 @@ services:
       - MERCADOPAGO_FRONTEND_URL=${MERCADOPAGO_FRONTEND_URL}
       # Encriptación de datos sensibles
       - APP_ENCRYPT_SECRET=${APP_ENCRYPT_SECRET}
+       # --- Cognito / JWT para que Spring cree el JwtDecoder ---
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
 
   reporte:
     container_name: reporte
