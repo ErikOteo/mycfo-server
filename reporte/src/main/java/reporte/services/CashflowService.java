@@ -64,8 +64,8 @@ public class CashflowService {
                     new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {}
             );
         } catch (HttpClientErrorException e) {
-            HttpStatus status = e.getStatusCode();
-            if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+            var status = e.getStatusCode();
+            if (status.value() == HttpStatus.UNAUTHORIZED.value() || status.value() == HttpStatus.FORBIDDEN.value()) {
                 throw new ResponseStatusException(status, "No autorizado al consultar movimientos en Registro", e);
             }
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error consultando movimientos en Registro", e);
