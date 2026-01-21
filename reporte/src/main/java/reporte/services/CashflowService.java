@@ -5,9 +5,12 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 import reporte.dtos.RegistroDTO;
 
 import java.time.LocalDate;
@@ -41,7 +44,7 @@ public class CashflowService {
                 .collect(Collectors.toList());
     }
 
-    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub) {
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String authorization) {
         LocalDate desde = LocalDate.of(anio, 1, 1);
         LocalDate hasta = LocalDate.of(anio, 12, 31);
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
@@ -50,12 +53,23 @@ public class CashflowService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.add("X-Usuario-Sub", userSub);
-        ResponseEntity<reporte.dtos.PageResponse<RegistroDTO>> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
-                new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {}
-        );
+        headers.add("Authorization", authorization);
+
+        ResponseEntity<reporte.dtos.PageResponse<RegistroDTO>> response;
+        try {
+            response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {}
+            );
+        } catch (HttpClientErrorException e) {
+            HttpStatus status = e.getStatusCode();
+            if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+                throw new ResponseStatusException(status, "No autorizado al consultar movimientos en Registro", e);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error consultando movimientos en Registro", e);
+        }
 
         List<RegistroDTO> lista = Optional.ofNullable(response.getBody())
                 .map(reporte.dtos.PageResponse::getContent)
