@@ -44,7 +44,7 @@ export async function fetchCategorias({ tipo } = {}) {
 
   try {
     // ✅ sin "/api" extra
-    const resp = await http.get(`${API_CONFIG.REGISTRO}/categorias`, {
+    const resp = await http.get(`${API_CONFIG.REGISTRO}/api/categorias`, {
       params: tipo ? { tipo } : undefined,
       headers: buildHeaders(),
     });
@@ -74,7 +74,7 @@ export async function crearCategoria({ nombre, tipo }) {
   const payload = { nombre: nombre.trim(), tipo: tipo || null };
 
   // ✅ sin "/api" extra
-  const resp = await http.post(`${API_CONFIG.REGISTRO}/categorias`, payload, {
+  const resp = await http.post(`${API_CONFIG.REGISTRO}/api/categorias`, payload, {
     headers: buildHeaders(),
   });
 
