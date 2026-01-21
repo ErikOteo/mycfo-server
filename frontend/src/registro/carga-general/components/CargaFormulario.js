@@ -165,7 +165,7 @@ export default function CargaFormulario({
       console.log("📤 Enviando datos:", payload);
 
       // ✅ IMPORTANTE: sin "/api" extra
-      const ENDPOINT_UNIFICADO = `${API_CONFIG.REGISTRO}/carga-datos`;
+      const ENDPOINT_UNIFICADO = `${API_CONFIG.REGISTRO}/api/carga-datos`;
 
       // ✅ IMPORTANTE: usar http (interceptor mete Authorization + refresh)
       const response = await http.post(ENDPOINT_UNIFICADO, payload, {
