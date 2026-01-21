@@ -18,13 +18,13 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, CorsConfigurationSource corsSource) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-            .cors(Customizer.withDefaults()) 
+            .cors(cors -> cors.configurationSource(corsSource)) // <- CLAVE)) 
             .authorizeHttpRequests(auth -> auth
                 // Permitimos TODO lo de MP de forma pública para evitar bloqueos de CORS en el pre-flight
-                .requestMatchers("/api/mp/**", "/api/registro/api/mp/**", "/actuator/**", "/error").permitAll()
+                .requestMatchers("/api/mp/**", "/actuator/**", "/error").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 .anyRequest().authenticated()
             )
@@ -36,20 +36,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Permitimos el dominio con y sin www, y localhost
-        config.setAllowedOriginPatterns(Arrays.asList(
-            "https://mycfo.com.ar",
-            "https://*.mycfo.com.ar",
-            "http://localhost:[*]"
-        ));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setAllowedHeaders(Arrays.asList(
-        "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
-        "Access-Control-Request-Method", "Access-Control-Request-Headers",
-        "X-Usuario-Sub"
-        ));
-        config.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
-        config.setAllowCredentials(true);
+        config.setAllowedOrigins(List.of("https://mycfo.com.ar", "https://www.mycfo.com.ar"));
+        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
+        config.addAllowedHeader("*"); // <- CLAVE (cubre x-usuario-sub, authorization, etc.)
+        config.setAllowCredentials(false); // <- recomendado si usás Bearer token (no cookies)
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
