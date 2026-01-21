@@ -19,6 +19,12 @@ async function request(path, { method = "GET", body, headers } = {}) {
     opts.headers[USER_HEADER] = usuarioSub;
   }
 
+  // ✅ MINIMO CAMBIO: enviar Authorization Bearer si existe
+  const accessToken = sessionStorage.getItem("accessToken");
+  if (accessToken) {
+    opts.headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+
   // Solo seteamos JSON si hay body
   if (body !== undefined) {
     opts.headers["Content-Type"] = "application/json";
