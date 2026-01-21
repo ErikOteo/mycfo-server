@@ -9,6 +9,16 @@ import URL_CONFIG from "../config/api-config";
 
 const http = axios.create();
 
+// Armamos una lista de bases internas (las que pasan por /api/*)
+const API_BASE_URLS = [
+  URL_CONFIG.ADMINISTRACION,
+  URL_CONFIG.REGISTRO,
+  URL_CONFIG.REPORTE,
+  URL_CONFIG.IA,
+  URL_CONFIG.PRONOSTICO,
+  URL_CONFIG.FORECAST,
+].filter(Boolean);
+
 const cognitoPoolConfig = {
   UserPoolId: process.env.REACT_APP_COGNITO_USER_POOL_ID,
   ClientId: process.env.REACT_APP_COGNITO_CLIENT_ID,
@@ -17,25 +27,10 @@ const cognitoPoolConfig = {
 let refreshPromise = null;
 let hasForcedLogout = false;
 
-/**
- * Devuelve true si la request apunta a cualquiera de los backends conocidos
- * o si es una URL relativa del estilo "/api/...".
- * Esto evita que solo Pronostico reciba Authorization y Registro quede sin token (401).
- */
-const isBackendRequest = (url) => {
+const isApiRequest = (url) => {
   if (!url) return false;
-
   const u = String(url);
-
-  // URLs relativas (muy comunes si armás paths tipo "/api/registro/...")
-  if (u.startsWith("/api/")) return true;
-
-  // URLs absolutas a cualquiera de los servicios configurados
-  const bases = Object.values(URL_CONFIG || {})
-    .filter(Boolean)
-    .map((v) => String(v));
-
-  return bases.some((base) => u.startsWith(base));
+  return API_BASE_URLS.some((base) => base && u.startsWith(String(base)));
 };
 
 const safeSessionGet = (key) => {
@@ -78,21 +73,11 @@ const clearSessionAndRedirect = () => {
 
 const buildCognitoUser = () => {
   const username = safeSessionGet("email") || safeSessionGet("username");
-
-  if (
-    !username ||
-    !cognitoPoolConfig.UserPoolId ||
-    !cognitoPoolConfig.ClientId
-  ) {
+  if (!username || !cognitoPoolConfig.UserPoolId || !cognitoPoolConfig.ClientId) {
     return null;
   }
-
   const pool = new CognitoUserPool(cognitoPoolConfig);
-
-  return new CognitoUser({
-    Username: username,
-    Pool: pool,
-  });
+  return new CognitoUser({ Username: username, Pool: pool });
 };
 
 const refreshTokens = () => {
@@ -103,16 +88,11 @@ const refreshTokens = () => {
     return Promise.reject(new Error("No hay datos para renovar la sesión."));
   }
 
-  const refreshToken = new CognitoRefreshToken({
-    RefreshToken: refreshTokenValue,
-  });
+  const refreshToken = new CognitoRefreshToken({ RefreshToken: refreshTokenValue });
 
   return new Promise((resolve, reject) => {
     cognitoUser.refreshSession(refreshToken, (err, session) => {
-      if (err) {
-        reject(err);
-        return;
-      }
+      if (err) return reject(err);
 
       const nextAccessToken = session.getAccessToken().getJwtToken();
       const nextIdToken = session.getIdToken().getJwtToken();
@@ -120,10 +100,7 @@ const refreshTokens = () => {
 
       safeSessionSet("accessToken", nextAccessToken);
       safeSessionSet("idToken", nextIdToken);
-
-      if (nextRefreshToken) {
-        safeSessionSet("refreshToken", nextRefreshToken);
-      }
+      if (nextRefreshToken) safeSessionSet("refreshToken", nextRefreshToken);
 
       resolve(nextAccessToken);
     });
@@ -145,38 +122,40 @@ const getRefreshPromise = () => {
   return refreshPromise;
 };
 
-// REQUEST: agrega Authorization + X-Usuario-Sub para cualquier backend del sistema
+// REQUEST: agregar auth + sub a TODA request hacia APIs internas
 http.interceptors.request.use((config) => {
-  if (!isBackendRequest(config.url)) return config;
+  if (!config) return config;
 
-  const accessToken = safeSessionGet("accessToken") || sessionStorage.getItem("accessToken");
-  const usuarioSub = safeSessionGet("sub") || sessionStorage.getItem("sub");
+  const url = config.url;
+  if (!isApiRequest(url)) return config;
+
+  const accessToken = safeSessionGet("accessToken");
+  const usuarioSub = safeSessionGet("sub");
 
   config.headers = config.headers ?? {};
 
-  if (accessToken) {
+  if (accessToken && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  if (usuarioSub) {
+  if (usuarioSub && !config.headers["X-Usuario-Sub"]) {
     config.headers["X-Usuario-Sub"] = usuarioSub;
   }
 
   return config;
 });
 
-// RESPONSE: si hay 401 en backend → intenta refresh una vez y reintenta
+// RESPONSE: si 401 en API interna, refrescar token y reintentar 1 vez
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const { config, response } = error;
+    const { config, response } = error || {};
+    if (!config || !response) return Promise.reject(error);
 
-    // Si no es 401 o no es llamada a backend, lo dejamos pasar tal cual
-    if (!config || !response || response.status !== 401 || !isBackendRequest(config.url)) {
-      return Promise.reject(error);
-    }
+    const url = config.url;
+    const is401 = response.status === 401;
+    if (!is401 || !isApiRequest(url)) return Promise.reject(error);
 
-    // Evitar loops infinitos
     if (config.__isRetryRequest) {
       clearSessionAndRedirect();
       return Promise.reject(error);
@@ -184,21 +163,21 @@ http.interceptors.response.use(
 
     try {
       const newAccessToken = await getRefreshPromise();
-      if (!newAccessToken) {
-        throw new Error("No se obtuvo un token renovado.");
-      }
+      if (!newAccessToken) throw new Error("No se obtuvo un token renovado.");
 
       config.__isRetryRequest = true;
       config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${newAccessToken}`;
 
-      // Reintenta la request original ya con token renovado
+      const usuarioSub = safeSessionGet("sub");
+      if (usuarioSub) config.headers["X-Usuario-Sub"] = usuarioSub;
+
       return http(config);
     } catch (refreshError) {
       clearSessionAndRedirect();
       return Promise.reject(refreshError);
     }
-  },
+  }
 );
 
 export default http;
