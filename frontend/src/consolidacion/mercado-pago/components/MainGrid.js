@@ -214,7 +214,7 @@ export default function MainGrid({ status, onRefreshStatus }) {
   const handleCategoryChange = async (payment, newCategory) => {
     try {
       // Llamar al backend para actualizar la categoría usando el ID del registro
-      await mpApi.updatePaymentCategory(payment.registroId, newCategory);
+      await mpApi.updatePaymentCategory(payment.id, newCategory);
 
       // Actualizar el estado local
       setRows((prevRows) =>
