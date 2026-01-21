@@ -1,4 +1,4 @@
-import axios from "axios";
+import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
 
 const API_BASE_URL = `${API_CONFIG.REGISTRO}/api/conciliacion`;
@@ -10,22 +10,29 @@ export const conciliacionApi = {
   /**
    * Obtiene movimientos sin conciliar con paginación
    */
-  obtenerMovimientosSinConciliar: async (page = 0, size = 10, sortBy = 'fechaEmision', sortDir = 'desc') => {
-    const response = await axios.get(
-      `${API_BASE_URL}/movimientos/sin-conciliar`,
-      {
-        params: { page, size, sortBy, sortDir }
-      }
-    );
+  obtenerMovimientosSinConciliar: async (
+    page = 0,
+    size = 10,
+    sortBy = "fechaEmision",
+    sortDir = "desc"
+  ) => {
+    const response = await http.get(`${API_BASE_URL}/movimientos/sin-conciliar`, {
+      params: { page, size, sortBy, sortDir },
+    });
     return response.data;
   },
 
   /**
    * Obtiene todos los movimientos (conciliados y sin conciliar) con paginación
    */
-  obtenerTodosLosMovimientos: async (page = 0, size = 10, sortBy = 'fechaEmision', sortDir = 'desc') => {
-    const response = await axios.get(`${API_BASE_URL}/movimientos`, {
-      params: { page, size, sortBy, sortDir }
+  obtenerTodosLosMovimientos: async (
+    page = 0,
+    size = 10,
+    sortBy = "fechaEmision",
+    sortDir = "desc"
+  ) => {
+    const response = await http.get(`${API_BASE_URL}/movimientos`, {
+      params: { page, size, sortBy, sortDir },
     });
     return response.data;
   },
@@ -34,7 +41,7 @@ export const conciliacionApi = {
    * Obtiene sugerencias de documentos para un movimiento
    */
   obtenerSugerencias: async (movimientoId) => {
-    const response = await axios.get(
+    const response = await http.get(
       `${API_BASE_URL}/movimientos/${movimientoId}/sugerencias`
     );
     return response.data;
@@ -44,7 +51,7 @@ export const conciliacionApi = {
    * Vincula un movimiento con un documento
    */
   vincularMovimiento: async (movimientoId, documentoId) => {
-    const response = await axios.post(`${API_BASE_URL}/vincular`, {
+    const response = await http.post(`${API_BASE_URL}/vincular`, {
       movimientoId,
       documentoId,
     });
@@ -55,9 +62,7 @@ export const conciliacionApi = {
    * Desvincula un movimiento de su documento
    */
   desvincularMovimiento: async (movimientoId) => {
-    const response = await axios.post(
-      `${API_BASE_URL}/desvincular/${movimientoId}`
-    );
+    const response = await http.post(`${API_BASE_URL}/desvincular/${movimientoId}`);
     return response.data;
   },
 
@@ -65,7 +70,7 @@ export const conciliacionApi = {
    * Obtiene estadísticas de conciliación
    */
   obtenerEstadisticas: async () => {
-    const response = await axios.get(`${API_BASE_URL}/estadisticas`);
+    const response = await http.get(`${API_BASE_URL}/estadisticas`);
     return response.data;
   },
 };
