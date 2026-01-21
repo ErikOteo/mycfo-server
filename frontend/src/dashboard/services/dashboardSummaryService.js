@@ -1,9 +1,8 @@
+import http from "../api/http"; // ajustá el path según tu estructura
 import API_CONFIG from "../../config/api-config";
 
 const getSessionUserSub = () => {
-  if (typeof window === "undefined") {
-    return null;
-  }
+  if (typeof window === "undefined") return null;
   try {
     return window.sessionStorage.getItem("sub");
   } catch (err) {
@@ -26,50 +25,36 @@ export const fetchDashboardSummary = async ({
   const params = new URLSearchParams();
 
   if (period) {
-    const [year, month] = period.split("-");
-    if (year && month) {
-      params.set("fecha", `${year}-${month}-01`);
-    }
+    const [year, month] = String(period).split("-");
+    if (year && month) params.set("fecha", `${year}-${month}-01`);
   }
 
-  if (months) {
-    params.set("meses", String(months));
-  }
+  if (months) params.set("meses", String(months));
+  if (limitMovements) params.set("limiteMovimientos", String(limitMovements));
+  if (limitInvoices) params.set("limiteFacturas", String(limitInvoices));
 
-  if (limitMovements) {
-    params.set("limiteMovimientos", String(limitMovements));
-  }
+  const url = `${API_CONFIG.REGISTRO}/movimientos/resumen/dashboard`;
 
-  if (limitInvoices) {
-    params.set("limiteFacturas", String(limitInvoices));
-  }
-
-  const url = `${API_CONFIG.REGISTRO}/movimientos/resumen/dashboard${
-    params.toString() ? `?${params.toString()}` : ""
-  }`;
-
-  const response = await fetch(url, {
-    headers: {
-      "X-Usuario-Sub": usuarioSub,
-    },
-    credentials: "include",
-  });
-
-  let payload = null;
   try {
-    payload = await response.json();
-  } catch (err) {
-    // ignoramos errores de parseo si la respuesta no es JSON
-  }
+    const { data } = await http.get(url, {
+      params: Object.fromEntries(params.entries()),
+      headers: {
+        // por si tu interceptor no lo agrega siempre, lo forzamos acá también
+        "X-Usuario-Sub": usuarioSub,
+      },
+    });
 
-  if (!response.ok) {
+    return data;
+  } catch (err) {
+    const status = err?.response?.status;
+    const payload = err?.response?.data;
+
     const message =
       (payload && (payload.mensaje || payload.error || payload.message)) ||
-      `No pudimos obtener el resumen de dashboard (código ${response.status}).`;
+      `No pudimos obtener el resumen de dashboard (código ${status ?? "?"}).`;
+
     const error = new Error(message);
-    error.status = response.status;
+    error.status = status;
     throw error;
   }
-
-  return payload;
 };
