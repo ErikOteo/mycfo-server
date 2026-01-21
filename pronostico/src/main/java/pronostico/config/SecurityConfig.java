@@ -42,13 +42,15 @@ public class SecurityConfig {
         cfg.setAllowedOriginPatterns(List.of(
                 "https://mycfoar.netlify.app",
                 "http://localhost:3000",
-                "https://*.netlify.app"
+                "https://*.netlify.app",
+                "https://mycfo.com.ar",
+                "https://www.mycfo.com.ar"
         ));
 
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Authorization", "X-Total-Count"));
-        cfg.setAllowCredentials(false);
+        cfg.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
