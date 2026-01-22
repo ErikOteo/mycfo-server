@@ -27,6 +27,9 @@ export default function EditableCategory({
   const [editValue, setEditValue] = React.useState(value);
   const [options, setOptions] = React.useState(TODAS_LAS_CATEGORIAS);
   const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+  const inputRef = React.useRef(null);
+  const crearOpcion = React.useMemo(() => ({ label: "+ Crear categoria", __createOption: true }), []);
 
   React.useEffect(() => {
     setEditValue(value);
@@ -71,9 +74,11 @@ export default function EditableCategory({
       <Autocomplete
         size="small"
         value={editValue}
-        options={options}
+        options={[crearOpcion, ...options]}
+        inputValue={inputValue}
+        onInputChange={(_e, newInput) => setInputValue(newInput)}
         filterOptions={(opts, params) => {
-          const filtered = filter(opts, params);
+          const filtered = filter(opts.filter((o) => !o.__createOption), params);
           const { inputValue } = params;
           const trimmed = (inputValue || "").trim();
           const exists = opts.some(
@@ -85,9 +90,15 @@ export default function EditableCategory({
               label: `Crear "${trimmed}"`,
             });
           }
-          return filtered;
+          return [crearOpcion, ...filtered];
         }}
         onChange={async (_event, newValue) => {
+          if (newValue && newValue.__createOption) {
+            setEditValue("");
+            setInputValue("");
+            setTimeout(() => { inputRef.current?.querySelector("input")?.focus(); }, 0);
+            return;
+          }
           if (!newValue) return;
           if (typeof newValue === "string") {
             const nombre = newValue.trim();
@@ -117,6 +128,7 @@ export default function EditableCategory({
         }}
         autoHighlight
         openOnFocus
+        freeSolo
         sx={{
           minWidth: 150,
           "& .MuiOutlinedInput-root": {
@@ -128,6 +140,7 @@ export default function EditableCategory({
           <TextField
             {...params}
             autoFocus
+            inputRef={inputRef}
             placeholder="Seleccionar categoría"
             variant="outlined"
             InputProps={{

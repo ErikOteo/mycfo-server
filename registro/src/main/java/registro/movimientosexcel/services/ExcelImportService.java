@@ -1,5 +1,6 @@
 package registro.movimientosexcel.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.ss.usermodel.*;
@@ -49,10 +50,13 @@ public class ExcelImportService {
     
     @Autowired
     private AdministracionService administracionService;
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ResumenCargaDTO procesarArchivo(MultipartFile file, String tipoOrigen, String usuarioSub) {
+    public ResumenCargaDTO procesarArchivo(MultipartFile file, String tipoOrigen, String usuarioSub, String configJson) {
         Long organizacionId = obtenerOrganizacionId(usuarioSub);
         switch (tipoOrigen.toLowerCase()) {
+            case "excel-libre": return procesarExcelLibre(file, usuarioSub, organizacionId, configJson);
             case "mycfo": return procesarGenerico(file, usuarioSub, organizacionId);
             case "mercado-pago": return procesarMercadoPago(file, usuarioSub, organizacionId);
             case "galicia": return procesarGalicia(file, usuarioSub, organizacionId);
@@ -63,9 +67,10 @@ public class ExcelImportService {
         }
     }
     
-    public PreviewDataDTO procesarArchivoParaPreview(MultipartFile file, String tipoOrigen, String usuarioSub) {
+    public PreviewDataDTO procesarArchivoParaPreview(MultipartFile file, String tipoOrigen, String usuarioSub, String configJson) {
         Long organizacionId = obtenerOrganizacionId(usuarioSub);
         switch (tipoOrigen.toLowerCase()) {
+            case "excel-libre": return procesarExcelLibreParaPreview(file, organizacionId, configJson);
             case "mycfo": return procesarGenericoParaPreview(file, organizacionId);
             case "mercado-pago": return procesarMercadoPagoParaPreview(file, organizacionId);
             case "galicia": return procesarGaliciaParaPreview(file, organizacionId);
@@ -340,6 +345,82 @@ public class ExcelImportService {
         movimiento.setFechaActualizacion(LocalDateTime.now());
     }
 
+    /**
+     * Importación definitiva usando el mapeo genérico.
+     */
+    private ResumenCargaDTO procesarExcelLibre(MultipartFile file, String usuarioSub, Long organizacionId, String configJson) {
+        int total = 0;
+        int correctos = 0;
+        List<FilaConErrorDTO> errores = new ArrayList<>();
+
+        ExcelLibreConfigDTO config;
+        try {
+            config = parseExcelLibreConfig(configJson);
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, e.getMessage()));
+            return new ResumenCargaDTO(total, correctos, errores);
+        }
+
+        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet hoja = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+            Map<String, Integer> idx = config.getColumnMap();
+            int startRow = Math.max(0, (config.getDataStartRow() != null ? config.getDataStartRow() - 1 : 1));
+
+            for (int i = startRow; i <= hoja.getLastRowNum(); i++) {
+                Row fila = hoja.getRow(i);
+                if (fila == null) continue;
+
+                try {
+                    String rawFecha = getCellValue(fila, idx.get("fecha"), fmt);
+                    String rawDesc = getCellValue(fila, idx.get("descripcion"), fmt);
+                    String rawMonto = getCellValue(fila, idx.get("monto"), fmt);
+
+                    if (rawFecha.isEmpty() && rawDesc.isEmpty() && rawMonto.isEmpty()) {
+                        continue;
+                    }
+                    total++;
+
+                    LocalDate fecha = parseFechaGenerica(fila.getCell(idx.get("fecha")), rawFecha, config.getDateFormat());
+                    Double monto = parseMontoGenerico(rawMonto, config.getDecimalSeparator());
+
+                    String rawTipo = getCellValue(fila, idx.get("tipo"), fmt);
+                    TipoMovimiento tipo = parseTipoMovimiento(rawTipo, monto);
+
+                    String categoria = getCellValue(fila, idx.get("categoria"), fmt);
+                    String monedaStr = getCellValue(fila, idx.get("moneda"), fmt);
+                    String medioPagoStr = getCellValue(fila, idx.get("mediopago"), fmt);
+                    String origenStr = getCellValue(fila, idx.get("origen"), fmt);
+
+                    Movimiento mov = new Movimiento();
+                    mov.setFechaEmision(fecha.atStartOfDay());
+                    mov.setDescripcion(rawDesc);
+                    mov.setMontoTotal(monto);
+                    mov.setTipo(tipo);
+                    mov.setMoneda(parseMoneda(monedaStr));
+                    mov.setMedioPago(parseMedioPago(medioPagoStr));
+                    mov.setCategoria(categoria != null && !categoria.isEmpty() ? categoria : null);
+                    mov.setOrigenNombre(origenStr == null || origenStr.isEmpty() ? "EXCEL_LIBRE" : origenStr);
+
+                    enriquecerConContexto(mov, usuarioSub, organizacionId);
+                    normalizarMontoMovimiento(mov);
+
+                    movimientoRepo.save(mov);
+                    correctos++;
+                    notifications.publishMovement(mov, 1L);
+
+                } catch (Exception ex) {
+                    errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
+                }
+            }
+
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, "Error al leer el archivo: " + e.getMessage()));
+        }
+
+        return new ResumenCargaDTO(total, correctos, errores);
+    }
+
     private ResumenCargaDTO procesarSantander(MultipartFile file, String usuarioSub, Long organizacionId) {
         int total = 0;
         int correctos = 0;
@@ -492,6 +573,93 @@ public class ExcelImportService {
         List<RegistroPreviewDTO> registrosConDuplicados = duplicateDetectionService.detectarDuplicadosEnBD(registros, organizacionId);
         
         return new PreviewDataDTO(registrosConDuplicados, total, registrosConDuplicados.size(), errores, "mycfo");
+    }
+    
+    /**
+     * Parser genérico configurable (Excel libre).
+     * Requiere mapeo de columnas (fecha, descripcion, monto) y permite opcionales.
+     */
+    private PreviewDataDTO procesarExcelLibreParaPreview(MultipartFile file, Long organizacionId, String configJson) {
+        List<RegistroPreviewDTO> registros = new ArrayList<>();
+        List<FilaConErrorDTO> errores = new ArrayList<>();
+        int total = 0;
+
+        ExcelLibreConfigDTO config;
+        try {
+            config = parseExcelLibreConfig(configJson);
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, e.getMessage()));
+            return new PreviewDataDTO(new ArrayList<>(), total, 0, errores, "excel-libre");
+        }
+
+        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            Sheet hoja = workbook.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
+
+            int startRow = Math.max(0, (config.getDataStartRow() != null ? config.getDataStartRow() - 1 : 1));
+            Map<String, Integer> idx = config.getColumnMap();
+
+            for (int i = startRow; i <= hoja.getLastRowNum(); i++) {
+                Row fila = hoja.getRow(i);
+                if (fila == null) continue;
+
+                try {
+                    String rawFecha = getCellValue(fila, idx.get("fecha"), fmt);
+                    String rawDesc = getCellValue(fila, idx.get("descripcion"), fmt);
+                    String rawMonto = getCellValue(fila, idx.get("monto"), fmt);
+
+                    if (rawFecha.isEmpty() && rawDesc.isEmpty() && rawMonto.isEmpty()) {
+                        continue;
+                    }
+                    total++;
+
+                    if (rawFecha.isEmpty() || rawDesc.isEmpty() || rawMonto.isEmpty()) {
+                        throw new RuntimeException("Faltan datos obligatorios (fecha, descripción o monto).");
+                    }
+
+                    LocalDate fecha = parseFechaGenerica(fila.getCell(idx.get("fecha")), rawFecha, config.getDateFormat());
+                    Double monto = parseMontoGenerico(rawMonto, config.getDecimalSeparator());
+                    TipoMovimiento tipo = determinarTipoMovimiento(monto);
+
+                    String categoria = getCellValue(fila, idx.get("categoria"), fmt);
+                    String monedaStr = getCellValue(fila, idx.get("moneda"), fmt);
+                    String medioPagoStr = getCellValue(fila, idx.get("mediopago"), fmt);
+                    String origenStr = getCellValue(fila, idx.get("origen"), fmt);
+
+                    TipoMoneda moneda = parseMoneda(monedaStr);
+                    TipoMedioPago medioPago = parseMedioPago(medioPagoStr);
+
+                    RegistroPreviewDTO preview = new RegistroPreviewDTO(
+                            i + 1,
+                            tipo,
+                            monto,
+                            fecha,
+                            rawDesc,
+                            origenStr == null || origenStr.isEmpty() ? "EXCEL_LIBRE" : origenStr,
+                            medioPago,
+                            moneda
+                    );
+
+                    if (categoria != null && !categoria.isEmpty()) {
+                        preview.setCategoriaSugerida(categoria);
+                    } else {
+                        preview.setCategoriaSugerida(categorySuggestionService.sugerirCategoria(rawDesc, tipo));
+                    }
+
+                    verificarDuplicado(preview, registros);
+                    registros.add(preview);
+
+                } catch (Exception ex) {
+                    errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
+                }
+            }
+
+        } catch (Exception e) {
+            errores.add(new FilaConErrorDTO(0, "Error al leer el archivo: " + e.getMessage()));
+        }
+
+        List<RegistroPreviewDTO> registrosConDuplicados = duplicateDetectionService.detectarDuplicadosEnBD(registros, organizacionId);
+        return new PreviewDataDTO(registrosConDuplicados, total, registrosConDuplicados.size(), errores, "excel-libre");
     }
     
     private PreviewDataDTO procesarMercadoPagoParaPreview(MultipartFile file, Long organizacionId) {
@@ -674,6 +842,100 @@ public class ExcelImportService {
     private TipoMovimiento determinarTipoMovimiento(Double monto) {
         if (monto == null) return TipoMovimiento.Ingreso;
         return monto >= 0 ? TipoMovimiento.Ingreso : TipoMovimiento.Egreso;
+    }
+
+    private TipoMovimiento parseTipoMovimiento(String rawTipo, Double monto) {
+        if (rawTipo != null && !rawTipo.isBlank()) {
+            try {
+                return TipoMovimiento.valueOf(rawTipo.trim());
+            } catch (Exception ignore) {
+                // fallback a inferencia
+            }
+        }
+        return determinarTipoMovimiento(monto);
+    }
+
+    private TipoMoneda parseMoneda(String rawMoneda) {
+        if (rawMoneda == null || rawMoneda.isBlank()) {
+            return TipoMoneda.ARS;
+        }
+        String normalized = rawMoneda.trim().toUpperCase(Locale.ROOT);
+        try {
+            return TipoMoneda.valueOf(normalized);
+        } catch (Exception e) {
+            return TipoMoneda.ARS;
+        }
+    }
+
+    private ExcelLibreConfigDTO parseExcelLibreConfig(String json) {
+        if (json == null || json.isBlank()) {
+            throw new IllegalArgumentException("Se requiere el mapeo de columnas (config) para excel-libre.");
+        }
+        try {
+            ExcelLibreConfigDTO config = objectMapper.readValue(json, ExcelLibreConfigDTO.class);
+            if (config.getColumnMap() == null ||
+                !config.getColumnMap().containsKey("fecha") ||
+                !config.getColumnMap().containsKey("descripcion") ||
+                !config.getColumnMap().containsKey("monto")) {
+                throw new IllegalArgumentException("El mapeo debe incluir columnas para fecha, descripcion y monto.");
+            }
+            return config;
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Config de excel-libre invalida: " + e.getMessage());
+        }
+    }
+
+    private String getCellValue(Row fila, Integer colIdx, DataFormatter fmt) {
+        if (fila == null || colIdx == null) return "";
+        Cell cell = fila.getCell(colIdx);
+        return cell == null ? "" : fmt.formatCellValue(cell).trim();
+    }
+
+    private LocalDate parseFechaGenerica(Cell cell, String raw, String formato) {
+        if (cell != null && cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+            return cell.getLocalDateTimeCellValue().toLocalDate();
+        }
+        if (raw == null || raw.isBlank()) {
+            throw new RuntimeException("Fecha vacia.");
+        }
+        List<String> patrones = new ArrayList<>();
+        if (formato != null && !formato.isBlank()) {
+            patrones.add(formato);
+        }
+        patrones.addAll(Arrays.asList("dd/MM/uuuu", "dd-MM-uuuu", "uuuu-MM-dd", "MM/dd/uuuu"));
+        for (String p : patrones) {
+            try {
+                return LocalDate.parse(raw.trim(), DateTimeFormatter.ofPattern(p));
+            } catch (Exception ignore) {}
+        }
+        throw new RuntimeException("Formato de fecha invalido: " + raw);
+    }
+
+    private Double parseMontoGenerico(String rawMonto, String decimalSeparator) {
+        if (rawMonto == null || rawMonto.isBlank()) {
+            throw new RuntimeException("Monto vacio.");
+        }
+        String normalized = cleanDecimal(rawMonto, decimalSeparator);
+        try {
+            return Double.parseDouble(normalized);
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Monto invalido: " + rawMonto);
+        }
+    }
+
+    private String cleanDecimal(String raw, String decimalSeparator) {
+        String s = raw.replace("$", "").replaceAll("\\s+", "");
+        if (decimalSeparator != null && decimalSeparator.equals(",")) {
+            s = s.replace(".", "");
+            s = s.replace(",", ".");
+        } else if (s.contains(",") && !s.contains(".")) {
+            s = s.replace(",", ".");
+        } else {
+            s = s.replace(",", "");
+        }
+        return s;
     }
     
     /**
