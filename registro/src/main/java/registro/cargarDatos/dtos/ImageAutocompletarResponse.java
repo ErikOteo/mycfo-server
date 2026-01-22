@@ -8,9 +8,8 @@ import java.util.Map;
 
 @Data
 @Builder
-public class AudioAutocompletarResponse {
-    private String transcript;
+public class ImageAutocompletarResponse {
+    private String rawText;
     private Map<String, Object> campos;
     private List<String> warnings;
 }
-

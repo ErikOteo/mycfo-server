@@ -11,7 +11,7 @@ export default function FormIngreso({
   setFormData,
   errors = {},
 }) {
-  // Establecer fecha de hoy por defecto si no hay fecha de emisiЧn
+  // Establecer fecha de hoy por defecto si no hay fecha de emisión
   useEffect(() => {
     if (!formData.fechaEmision) {
       const hoy = dayjs();
@@ -72,7 +72,7 @@ export default function FormIngreso({
       {/* 2: Fecha emision (con hora) */}
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
-          <FormLabel>Fecha emisiЧn *</FormLabel>
+          <FormLabel>Fecha emisión *</FormLabel>
           <CustomDateTimePicker
             value={formData.fechaEmision ? dayjs(formData.fechaEmision) : null}
             onChange={(fecha) =>
