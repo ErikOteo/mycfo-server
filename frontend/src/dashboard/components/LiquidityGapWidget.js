@@ -93,7 +93,7 @@ export default function LiquidityGapWidget() {
           <Alert severity="error">{error}</Alert>
         ) : data ? (
           <>
-            <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <BarChart data={data.dataset} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                 <XAxis dataKey="name" />
