@@ -36,7 +36,7 @@ public class InsightsService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public Map<String, Object> generarInsights(String userSub, Integer anio, Integer mes) {
+    public Map<String, Object> generarInsights(String userSub, String authorization, Integer anio, Integer mes) {
         LocalDate now = LocalDate.now();
         int year = (anio != null) ? anio : now.getYear();
         int month = (mes != null) ? mes : now.getMonthValue();
@@ -57,6 +57,7 @@ public class InsightsService {
         try {
             var headers = new HttpHeaders();
             headers.add("X-Usuario-Sub", userSub);
+            headers.add("Authorization", authorization);
 
             // P&L (devengado)
             String pylUrl = reporteUrl + "/pyl?anio=" + year;
@@ -475,4 +476,3 @@ public class InsightsService {
         return sanitized.trim();
     }
 }
-
