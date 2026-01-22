@@ -104,7 +104,7 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
         },
       });
       console.log("Respuesta completa del audio:", response.data);
-      const { campos, transcript, warnings } = response.data || {};
+      const { campos, transcript, rawText, warnings } = response.data || {};
       if (warnings?.length) {
         console.warn("Advertencias al procesar audio:", warnings);
       }
@@ -118,9 +118,10 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
       });
 
       if (!camposDetectados) {
+        const fallbackTranscript = transcript || rawText;
         const warningPayload = {
           message: "No se pudo interpretar el audio. Por favor grabalo nuevamente procurando mayor claridad.",
-          transcript: transcript || "Sin transcripción disponible.",
+          transcript: fallbackTranscript || "Sin transcripción disponible.",
         };
         setParseWarning(warningPayload);
         console.warn("Procesamiento de audio sin campos detectados.", { transcript, warnings });

@@ -185,6 +185,7 @@ export default function CargaGeneral() {
     const merged = { ...formData, ...normalizados };
     const transcript =
       respuesta.transcript ||
+      respuesta.rawText ||
       respuesta.texto ||
       respuesta.text ||
       respuesta.rawTranscript ||

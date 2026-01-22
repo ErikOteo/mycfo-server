@@ -10,7 +10,7 @@ import java.util.Map;
 @Builder
 public class AudioAutocompletarResponse {
     private String transcript;
-    private Map<String, String> campos;
+    private Map<String, Object> campos;
     private List<String> warnings;
 }
 
