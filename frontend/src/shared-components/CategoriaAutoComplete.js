@@ -21,6 +21,12 @@ export default function CategoriaAutoComplete({
   const [options, setOptions] = React.useState([]);
   const [inputValue, setInputValue] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const inputRef = React.useRef(null);
+  const crearOpcion = React.useMemo(
+    () => ({ label: "➕ Crear categoría", __createOption: true }),
+    []
+  );
 
   const cargar = React.useCallback(async () => {
     setLoading(true);
@@ -49,6 +55,15 @@ export default function CategoriaAutoComplete({
   };
 
   const handleChange = (_event, newValue) => {
+    if (newValue && newValue.__createOption) {
+      // Mantener abierto y enfocar para que el usuario escriba la nueva categoría
+      setInputValue("");
+      setOpen(true);
+      setTimeout(() => {
+        inputRef.current?.querySelector("input")?.focus();
+      }, 0);
+      return;
+    }
     if (typeof newValue === "string") {
       // Usuario tipea y presiona Enter
       const normalizada = newValue.trim();
@@ -76,14 +91,20 @@ export default function CategoriaAutoComplete({
       clearOnBlur
       selectOnFocus
       handleHomeEndKeys
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
       disabled={disabled}
       value={value || ""}
       onChange={handleChange}
       inputValue={inputValue}
       onInputChange={(_e, newInput) => setInputValue(newInput)}
-      options={options}
+      options={[crearOpcion, ...options]}
       filterOptions={(opts, params) => {
-        const filtered = filter(opts, params);
+        const filtered = filter(
+          opts.filter((o) => !o.__createOption),
+          params
+        );
         const { inputValue: current } = params;
         const normalizada = (current || "").trim();
         if (normalizada) {
@@ -97,12 +118,13 @@ export default function CategoriaAutoComplete({
             });
           }
         }
-        return filtered;
+        return [crearOpcion, ...filtered];
       }}
       getOptionLabel={(option) => {
         // Option typed by user
         if (typeof option === "string") return option;
         if (option?.inputValue) return option.inputValue;
+        if (option?.__createOption) return option.label;
         return option?.label || "";
       }}
       renderInput={(params) => (
@@ -113,6 +135,7 @@ export default function CategoriaAutoComplete({
           size="small"
           error={error}
           helperText={helperText}
+          inputRef={inputRef}
           InputProps={{
             ...params.InputProps,
             endAdornment: (
