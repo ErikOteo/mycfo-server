@@ -24,7 +24,7 @@ export default function CategoriaAutoComplete({
   const [open, setOpen] = React.useState(false);
   const inputRef = React.useRef(null);
   const crearOpcion = React.useMemo(
-    () => ({ label: "➕ Crear categoría", __createOption: true }),
+    () => ({ label: "+ Crear categoria", __createOption: true }),
     []
   );
 
