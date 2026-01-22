@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   administracion:
     container_name: administracion
@@ -111,6 +113,11 @@ services:
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
       - FORECAST_URL=http://forecast:8088
+      # Cognito / JWT (para validar tokens)
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
 
   registro:
     container_name: registro
@@ -145,6 +152,11 @@ services:
       - MERCADOPAGO_FRONTEND_URL=${MERCADOPAGO_FRONTEND_URL}
       # Encriptación de datos sensibles
       - APP_ENCRYPT_SECRET=${APP_ENCRYPT_SECRET}
+      # Cognito / JWT (para validar tokens)
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
 
   reporte:
     container_name: reporte
@@ -169,6 +181,11 @@ services:
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
+      # Cognito / JWT (para validar tokens)
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
 
   forecast:
     container_name: forecast
@@ -201,8 +218,8 @@ services:
     build:
       context: ./frontend
       args:
-        # --- AQUÍ ESTÁN LOS CAMBIOS CLAVE PARA HTTPS ---
         REACT_APP_BASE_URL: https://mycfo.com.ar
+        REACT_APP_API_URL: https://mycfo.com.ar/api
         REACT_APP_URL_ADMINISTRACION: https://mycfo.com.ar/api/administracion
         REACT_APP_URL_IA: https://mycfo.com.ar/api/ia
         REACT_APP_URL_NOTIFICACION: https://mycfo.com.ar/api/notificacion
@@ -210,7 +227,7 @@ services:
         REACT_APP_URL_REGISTRO: https://mycfo.com.ar/api/registro
         REACT_APP_URL_REPORTE: https://mycfo.com.ar/api/reporte
         REACT_APP_WEBSOCKET_URL: https://mycfo.com.ar/api/notificacion/ws
-        # AWS args se mantienen igual
+        # AWS args (desde .env o fijos)
         REACT_APP_COGNITO_USER_POOL_ID: sa-east-1_lTMNrWW7R
         REACT_APP_COGNITO_CLIENT_ID: 3ksssqtg3r49rf6js1t1177hrd
         REACT_APP_AWS_REGION: sa-east-1
@@ -219,6 +236,11 @@ services:
     depends_on:
       - administracion
       - registro
+      - reporte
+      - pronostico
+      - notificacion
+      - ia
+      - forecast
     networks:
       - mycfo_network
 

@@ -19,7 +19,8 @@ public class CashflowController {
 
     @GetMapping
     public List<RegistroDTO> obtenerCashflow(@RequestParam int anio,
-                                             @RequestHeader(value = "X-Usuario-Sub") String userSub) {
-        return cashflowService.obtenerRegistrosPorAnio(anio, userSub);
+                                             @RequestHeader(value = "X-Usuario-Sub") String userSub,
+                                             @RequestHeader(value = "Authorization") String authorization) {
+        return cashflowService.obtenerRegistrosPorAnio(anio, userSub, authorization);
     }
 }

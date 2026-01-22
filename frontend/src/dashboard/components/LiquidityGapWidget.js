@@ -8,6 +8,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import API_CONFIG from "../../config/api-config";
+import http from "../../api/http";
 import useResolvedColorTokens from "../useResolvedColorTokens";
 
 const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(v || 0);
@@ -26,18 +27,12 @@ export default function LiquidityGapWidget() {
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1..12
 
-    const headers = {};
-    const sub = sessionStorage.getItem('sub');
-    const token = sessionStorage.getItem('accessToken');
-    if (sub) headers['X-Usuario-Sub'] = sub;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     setLoading(true);
     setError(null);
 
-    const fetchCash = fetch(`${baseUrl}/cashflow?anio=${year}`, { headers })
-      .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-      .then(arr => {
+    const fetchCash = http
+      .get(`${baseUrl}/cashflow`, { params: { anio: year } })
+      .then(({ data: arr }) => {
         const registros = Array.isArray(arr) ? arr : [];
         const ingresos = registros.filter(r => r.tipo === 'Ingreso' && new Date(r.fechaEmision).getMonth() + 1 === month)
           .reduce((a, r) => a + (r.montoTotal || 0), 0);
@@ -48,9 +43,9 @@ export default function LiquidityGapWidget() {
 
     const params = new URLSearchParams();
     params.set('anio', year);
-    const fetchAccrual = fetch(`${baseUrl}/pyl?${params.toString()}`, { headers })
-      .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-      .then(json => {
+    const fetchAccrual = http
+      .get(`${baseUrl}/pyl?${params.toString()}`)
+      .then(({ data: json }) => {
         const idx = month - 1;
         const ingresos = (json?.ingresosMensuales ?? [])[idx] || 0;
         const egresos = (json?.egresosMensuales ?? [])[idx] || 0;
@@ -98,7 +93,7 @@ export default function LiquidityGapWidget() {
           <Alert severity="error">{error}</Alert>
         ) : data ? (
           <>
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <BarChart data={data.dataset} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                 <XAxis dataKey="name" />

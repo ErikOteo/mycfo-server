@@ -248,7 +248,7 @@ const SalesTrendWidget = ({ data, loading = false, error = null, emptyMessage })
           }}
         >
           {hasData ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <AreaChart
                 data={chartData}
                 margin={{ top: 10, right: 10, left: 0, bottom: 10 }}

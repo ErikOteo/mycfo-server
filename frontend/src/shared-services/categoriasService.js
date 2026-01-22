@@ -1,4 +1,4 @@
-import axios from "axios";
+import http from "../api/http";
 import API_CONFIG from "../config/api-config";
 import {
   CATEGORIAS_EGRESO,
@@ -32,9 +32,7 @@ const buildHeaders = () => {
   const headers = {};
   try {
     const usuarioSub = sessionStorage.getItem("sub");
-    if (usuarioSub) {
-      headers["X-Usuario-Sub"] = usuarioSub;
-    }
+    if (usuarioSub) headers["X-Usuario-Sub"] = usuarioSub;
   } catch {
     /* noop */
   }
@@ -43,11 +41,14 @@ const buildHeaders = () => {
 
 export async function fetchCategorias({ tipo } = {}) {
   const base = basePorTipo(tipo);
+
   try {
-    const resp = await axios.get(`${API_CONFIG.REGISTRO}/api/categorias`, {
+    // ✅ sin "/api" extra
+    const resp = await http.get(`${API_CONFIG.REGISTRO}/api/categorias`, {
       params: tipo ? { tipo } : undefined,
       headers: buildHeaders(),
     });
+
     const extras = Array.isArray(resp.data)
       ? resp.data
           .map((c) => {
@@ -57,6 +58,7 @@ export async function fetchCategorias({ tipo } = {}) {
           })
           .filter(Boolean)
       : [];
+
     return dedupPreservandoPrimero([...base, ...extras]);
   } catch (err) {
     console.warn("No se pudieron obtener categorías dinámicas, uso base fija", err?.message || err);
@@ -68,13 +70,13 @@ export async function crearCategoria({ nombre, tipo }) {
   if (!nombre || !nombre.trim()) {
     throw new Error("El nombre de la categoría es obligatorio");
   }
-  const payload = {
-    nombre: nombre.trim(),
-    tipo: tipo || null,
-  };
-  const resp = await axios.post(`${API_CONFIG.REGISTRO}/api/categorias`, payload, {
+
+  const payload = { nombre: nombre.trim(), tipo: tipo || null };
+
+  // ✅ sin "/api" extra
+  const resp = await http.post(`${API_CONFIG.REGISTRO}/api/categorias`, payload, {
     headers: buildHeaders(),
   });
-  // API devuelve la entidad creada; devolvemos el nombre para el autocomplete
+
   return resp.data?.nombre || payload.nombre;
 }
