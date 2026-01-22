@@ -13,7 +13,7 @@ import ExcelPreviewDialog from "./components/ExcelPreviewDialog";
 import ExcelLibreMapper from "./components/ExcelLibreMapper";
 import DropzoneUploader from "./../../shared-components/DropzoneUploader";
 import CustomButton from "./../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
 
 export default function CargaMovimientos({ onCargaCompletada }) {
@@ -92,7 +92,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         formData.append("config", JSON.stringify(excelLibreConfig));
       }
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_CONFIG.REGISTRO}/api/preview-excel`,
         formData,
         {
