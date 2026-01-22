@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Box, Paper, IconButton, Alert, CircularProgress, Typography } from "@mui/material";
 import { Mic, Close, Delete } from "@mui/icons-material";
 import CustomButton from "../../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../../api/http";
 import { styled, keyframes } from "@mui/material/styles";
 
 const pulse = keyframes`
@@ -97,9 +97,9 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
     setAudioFile(null);
 
     try {
-      const response = await axios.post(endpoint, fd, {
+      const response = await http.post(endpoint, fd, {
         headers: {
-          "Content-Type": "multipart/form-data",
+          // http.js agrega Authorization; dejamos X-Usuario-Sub explícito
           "X-Usuario-Sub": usuarioSub,
         },
       });
