@@ -34,9 +34,10 @@ public class ExcelImportController {
     public ResponseEntity<ResumenCargaDTO> importarExcel(
             @RequestParam("file") MultipartFile file,
             @RequestParam("tipoOrigen") String tipoOrigen,
+            @RequestParam(value = "config", required = false) String configJson,
             @RequestHeader("X-Usuario-Sub") String usuarioSub) {
 
-        ResumenCargaDTO resultado = excelImportService.procesarArchivo(file, tipoOrigen, usuarioSub);
+        ResumenCargaDTO resultado = excelImportService.procesarArchivo(file, tipoOrigen, usuarioSub, configJson);
         return ResponseEntity.ok(resultado);
     }
     
@@ -44,9 +45,10 @@ public class ExcelImportController {
     public ResponseEntity<PreviewDataDTO> previewExcel(
             @RequestParam("file") MultipartFile file,
             @RequestParam("tipoOrigen") String tipoOrigen,
+            @RequestParam(value = "config", required = false) String configJson,
             @RequestHeader("X-Usuario-Sub") String usuarioSub) {
 
-        PreviewDataDTO resultado = excelImportService.procesarArchivoParaPreview(file, tipoOrigen, usuarioSub);
+        PreviewDataDTO resultado = excelImportService.procesarArchivoParaPreview(file, tipoOrigen, usuarioSub, configJson);
         return ResponseEntity.ok(resultado);
     }
     
