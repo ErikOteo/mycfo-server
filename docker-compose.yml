@@ -157,6 +157,13 @@ services:
       - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
       - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
+      # Vertex AI (carga por imagen)
+      - VERTEX_PROJECT_ID=mycfo-484102
+      - VERTEX_LOCATION=us-central1
+      - VERTEX_MODEL=gemini-2.5-flash
+      - VERTEX_CREDENTIALS_PATH=/secrets/mycfo-google.json
+    volumes:
+      - /home/azureuser/mycfo-secrets/mycfo-google.json:/secrets/mycfo-google.json:ro
 
   reporte:
     container_name: reporte
