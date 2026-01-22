@@ -39,20 +39,21 @@ public class RegistroService {
             String url = registroUrl + "/movimientos/empresa/" + organizacionId + "/mensuales";
             log.info("Llamando a registro para obtener movimientos mensuales de empresa: {}", organizacionId);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.AUTHORIZATION, authorization);
-            headers.add("X-Usuario-Sub", usuarioSub);
-
-            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
             @SuppressWarnings("unchecked")
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    requestEntity,
-                    Map.class
-            );
-            
+            ResponseEntity<Map> response;
+
+            // Si tenemos token y usuario, reenviamos headers; de lo contrario, intentamos sin headers
+            if (authorization != null && !authorization.isBlank()) {
+                HttpHeaders headers = new HttpHeaders();
+                headers.add(HttpHeaders.AUTHORIZATION, authorization);
+                headers.add("X-Usuario-Sub", usuarioSub);
+
+                HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+                response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, Map.class);
+            } else {
+                response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
+            }
+
             log.info("Movimientos mensuales obtenidos correctamente");
             return response.getBody() != null ? response.getBody() : new HashMap<>();
             

@@ -48,6 +48,11 @@ public class ForecastService {
      * Genera un nuevo forecast basado en la configuración
      */
     @Transactional
+    public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor) {
+        return generarForecast(forecastConfigId, creadoPor, null);
+    }
+
+    @Transactional
     public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor, String authorization) {
         var config = forecastConfigRepository.findById(forecastConfigId)
                 .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, 
