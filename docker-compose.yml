@@ -157,6 +157,9 @@ services:
       - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
       - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
+      # Tamaño máximo de upload (imágenes / audio)
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=15MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=15MB
       # Vertex AI (carga por imagen)
       - VERTEX_PROJECT_ID=mycfo-484102
       - VERTEX_LOCATION=us-central1
