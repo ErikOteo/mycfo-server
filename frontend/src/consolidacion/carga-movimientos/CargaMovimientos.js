@@ -97,7 +97,6 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         formData,
         {
           headers: {
-            "Content-Type": "multipart/form-data",
             "X-Usuario-Sub": usuarioSub,
           },
         },
@@ -134,7 +133,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         tipoOrigen: tipoOrigen,
       };
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_CONFIG.REGISTRO}/api/guardar-seleccionados`,
         requestData,
         {
