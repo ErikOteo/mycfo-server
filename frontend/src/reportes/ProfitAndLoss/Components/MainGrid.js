@@ -21,6 +21,7 @@ export default function MainGrid() {
     });
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
+    const [logoDataUrl, setLogoDataUrl] = React.useState(null);
     const chartRef = React.useRef(null);
 
     const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
@@ -61,6 +62,22 @@ export default function MainGrid() {
             });
     }, [selectedYear]);
 
+    // Cargar logo para la carátula
+    React.useEffect(() => {
+        const loadLogo = async () => {
+            try {
+                const res = await fetch('/logo512.png');
+                const blob = await res.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => setLogoDataUrl(reader.result);
+                reader.readAsDataURL(blob);
+            } catch {
+                setLogoDataUrl(null);
+            }
+        };
+        loadLogo();
+    }, []);
+
     const normalizeCategoria = (c) => {
         const s = (c ?? '').toString().trim();
         return s.length ? s : 'Sin categoria';
@@ -84,16 +101,33 @@ export default function MainGrid() {
             ["Resultado del Ejercicio", "", { v: resultado, t: 'n' }]
         ];
 
+        const ingresosHeaderRow = 2;
+        const egresosHeaderRow = 4 + detalleIngresos.length;
+        const resultadoRow = 6 + detalleIngresos.length + detalleEgresos.length;
+
         const colsConfig = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
         const mergesConfig = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
-            { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
-            { s: { r: 2 + detalleIngresos.length + 1, c: 0 }, e: { r: 2 + detalleIngresos.length + 1, c: 1 } },
-            { s: { r: 2 + detalleIngresos.length + 1 + detalleEgresos.length + 2, c: 0 }, e: { r: 2 + detalleIngresos.length + 1 + detalleEgresos.length + 2, c: 1 } },
+            { s: { r: ingresosHeaderRow, c: 0 }, e: { r: ingresosHeaderRow, c: 1 } },
+            { s: { r: egresosHeaderRow, c: 0 }, e: { r: egresosHeaderRow, c: 1 } },
+            { s: { r: resultadoRow, c: 0 }, e: { r: resultadoRow, c: 1 } },
         ];
         const currencyColumns = ['C'];
 
-        exportToExcel(excelData, `estado-de-resultados-${selectedYear}`, "Estado de Resultados", colsConfig, mergesConfig, currencyColumns);
+        exportToExcel(
+            excelData,
+            `estado-de-resultados-${selectedYear}`,
+            "Estado de Resultados",
+            colsConfig,
+            mergesConfig,
+            currencyColumns,
+            {
+                headerRows: [0, ingresosHeaderRow, egresosHeaderRow],
+                totalRows: [resultadoRow],
+                zebra: true,
+                freezePane: { rowSplit: 2, colSplit: 1 },
+            }
+        );
     };
 
     const handleExportPdf = async () => {
@@ -128,10 +162,24 @@ export default function MainGrid() {
             body.push(["Resultado del Ejercicio", "", currency(resultado)]);
 
             await exportPdfReport({
-                title: `Estado de Resultados (${selectedYear})`,
+                title: `Estado de Resultados`,
+                subtitle: `Periodo ${selectedYear}`,
                 charts: [{ element: chartElement }],
                 table: { head, body },
                 fileName: `estado-de-resultados-${selectedYear}`,
+                cover: {
+                    show: true,
+                    subtitle: `Periodo ${selectedYear}`,
+                    logo: logoDataUrl,
+                    meta: [
+                        { label: "Generado", value: new Date().toLocaleDateString('es-AR') },
+                    ],
+                    kpis: [
+                        { label: "Ingresos", value: currency(totalIngresos) },
+                        { label: "Egresos", value: currency(totalEgresos) },
+                        { label: "Resultado", value: currency(resultado) },
+                    ],
+                },
             });
         } catch (e) {
             console.error("Error al exportar PDF de P&L:", e);

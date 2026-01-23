@@ -22,6 +22,7 @@ export default function MainGrid() {
     const chartRefEgresos = React.useRef(null);
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
+    const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
     const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
 
@@ -59,6 +60,22 @@ export default function MainGrid() {
             });
     }, [selectedYear, selectedMonth, selectedCategoria]);
 
+    // Cargar logo para la carátula del PDF
+    React.useEffect(() => {
+        const loadLogo = async () => {
+            try {
+                const res = await fetch('/logo512.png');
+                const blob = await res.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => setLogoDataUrl(reader.result);
+                reader.readAsDataURL(blob);
+            } catch {
+                setLogoDataUrl(null);
+            }
+        };
+        loadLogo();
+    }, []);
+
     const getNombreMes = (mesIndex) => {
         if (mesIndex === '' || mesIndex === null || mesIndex === undefined) return '';
         const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -74,7 +91,11 @@ export default function MainGrid() {
             [],
         ];
 
+        let ingresosHeaderRow = null;
+        let egresosHeaderRow = null;
+
         if (detalleIngresos.length > 0) {
+            ingresosHeaderRow = excelData.length;
             const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
             excelData.push(["Ingresos", "", { v: totalIngresos, t: 'n' }]);
             detalleIngresos.forEach(item => {
@@ -84,6 +105,7 @@ export default function MainGrid() {
 
         if (detalleEgresos.length > 0) {
             excelData.push([]);
+            egresosHeaderRow = excelData.length;
             const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
             excelData.push(["Egresos", "", { v: totalEgresos, t: 'n' }]);
             detalleEgresos.forEach(item => {
@@ -94,12 +116,33 @@ export default function MainGrid() {
         const colsConfig = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
         const mergesConfig = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
-            { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
-            { s: { r: 2 + detalleIngresos.length + 1, c: 0 }, e: { r: 2 + detalleIngresos.length + 1, c: 1 } },
         ];
+        if (ingresosHeaderRow !== null) {
+            mergesConfig.push({ s: { r: ingresosHeaderRow, c: 0 }, e: { r: ingresosHeaderRow, c: 1 } });
+        }
+        if (egresosHeaderRow !== null) {
+            mergesConfig.push({ s: { r: egresosHeaderRow, c: 0 }, e: { r: egresosHeaderRow, c: 1 } });
+        }
         const currencyColumns = ['C'];
 
-        exportToExcel(excelData, `reporte-mensual-${mesNombre}-${selectedYear}`, "Resumen Mensual", colsConfig, mergesConfig, currencyColumns);
+        const totalRows = [];
+        if (ingresosHeaderRow !== null) totalRows.push(ingresosHeaderRow);
+        if (egresosHeaderRow !== null) totalRows.push(egresosHeaderRow);
+
+        exportToExcel(
+            excelData,
+            `reporte-mensual-${mesNombre}-${selectedYear}`,
+            "Resumen Mensual",
+            colsConfig,
+            mergesConfig,
+            currencyColumns,
+            {
+                headerRows: [0].concat(ingresosHeaderRow !== null ? [ingresosHeaderRow] : []).concat(egresosHeaderRow !== null ? [egresosHeaderRow] : []),
+                totalRows,
+                zebra: true,
+                freezePane: { rowSplit: 2, colSplit: 1 },
+            }
+        );
     };
 
     const handleExportPdf = async () => {
@@ -115,15 +158,16 @@ export default function MainGrid() {
             const head = [["Tipo", "Categoria", "Total"]];
             const body = [];
 
+            const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+            const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
+
             if (detalleIngresos.length > 0) {
-                const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
                 body.push(["Ingresos", "", currency(totalIngresos)]);
                 detalleIngresos.forEach(item => {
                     body.push(["", item.categoria ?? 'Sin categoria', currency(Number(item.total) || 0)]);
                 });
             }
             if (detalleEgresos.length > 0) {
-                const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
                 body.push(["Egresos", "", currency(totalEgresos)]);
                 detalleEgresos.forEach(item => {
                     body.push(["", item.categoria ?? 'Sin categoria', currency(Math.abs(Number(item.total) || 0))]);
@@ -131,10 +175,22 @@ export default function MainGrid() {
             }
 
             await exportPdfReport({
-                title: `Resumen Mensual - ${getNombreMes(selectedMonth)} ${selectedYear}`,
+                title: `Resumen Mensual`,
+                subtitle: `${getNombreMes(selectedMonth)} ${selectedYear}`,
                 charts: charts.map((element) => ({ element })),
                 table: { head, body },
                 fileName: `reporte-mensual-${getNombreMes(selectedMonth)}-${selectedYear}`,
+                cover: {
+                    show: true,
+                    subtitle: `${getNombreMes(selectedMonth)} ${selectedYear}`,
+                    logo: logoDataUrl,
+                    meta: [{ label: "Generado", value: new Date().toLocaleDateString('es-AR') }],
+                    kpis: [
+                        { label: "Ingresos", value: currency(totalIngresos) },
+                        { label: "Egresos", value: currency(totalEgresos) },
+                        { label: "Neto", value: currency(totalIngresos - totalEgresos) },
+                    ],
+                },
             });
         } catch (e) {
             console.error("Error al generar el PDF:", e);

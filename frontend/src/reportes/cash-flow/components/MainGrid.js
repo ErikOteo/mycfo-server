@@ -17,6 +17,7 @@ export default function MainGrid() {
     const chartRef = React.useRef(null);
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
+    const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
     const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
 
@@ -47,6 +48,22 @@ export default function MainGrid() {
                 setLoading(false);
             });
     }, [selectedYear]);
+
+    // Cargar logo para la carátula
+    React.useEffect(() => {
+        const loadLogo = async () => {
+            try {
+                const res = await fetch('/logo512.png');
+                const blob = await res.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => setLogoDataUrl(reader.result);
+                reader.readAsDataURL(blob);
+            } catch {
+                setLogoDataUrl(null);
+            }
+        };
+        loadLogo();
+    }, []);
 
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const ahora = new Date();
@@ -125,6 +142,13 @@ export default function MainGrid() {
         excelData.push(["Net Cash Flow", "", ...mesesVisibles.map((_, i) => netosMensual[i] || "")]);
         excelData.push(["Cash on hand (Fin)", "", ...mesesVisibles.map((_, i) => saldoFinalMensual[i] || "")]);
 
+        const ingresosHeaderRow = 4;
+        const egresosHeaderRow = 5 + ingresosPorCategoria.length;
+        const totalIngresosRow = 5 + ingresosPorCategoria.length + egresosPorCategoria.length;
+        const totalEgresosRow = totalIngresosRow + 1;
+        const netoRow = totalIngresosRow + 2;
+        const cashOnHandRow = totalIngresosRow + 3;
+
         const colsConfig = [
             { wch: 20 },
             { wch: 20 },
@@ -133,13 +157,26 @@ export default function MainGrid() {
 
         const mergesConfig = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: numMesesVisibles + 1 } },
-            { s: { r: 4, c: 0 }, e: { r: 4, c: numMesesVisibles + 1 } },
-            { s: { r: 5 + ingresosPorCategoria.length, c: 0 }, e: { r: 5 + ingresosPorCategoria.length, c: numMesesVisibles + 1 } },
+            { s: { r: ingresosHeaderRow, c: 0 }, e: { r: ingresosHeaderRow, c: numMesesVisibles + 1 } },
+            { s: { r: egresosHeaderRow, c: 0 }, e: { r: egresosHeaderRow, c: numMesesVisibles + 1 } },
         ];
 
         const currencyColumns = mesesVisibles.map((_, i) => String.fromCharCode(67 + i));
 
-        exportToExcel(excelData, `flujo-caja-${selectedYear}`, "Flujo de caja", colsConfig, mergesConfig, currencyColumns);
+        exportToExcel(
+            excelData,
+            `flujo-caja-${selectedYear}`,
+            "Flujo de caja",
+            colsConfig,
+            mergesConfig,
+            currencyColumns,
+            {
+                headerRows: [0, 2, ingresosHeaderRow, egresosHeaderRow],
+                totalRows: [totalIngresosRow, totalEgresosRow, netoRow, cashOnHandRow],
+                zebra: true,
+                freezePane: { rowSplit: 3, colSplit: 2 },
+            }
+        );
     };
 
     const handleExportPdf = async () => {
@@ -159,11 +196,28 @@ export default function MainGrid() {
                 currency(netosMensual[i] || 0),
             ]);
 
+            const totalIngresos = totalIngresosMensual.reduce((a, b) => a + (b || 0), 0);
+            const totalEgresos = totalEgresosMensual.reduce((a, b) => a + (b || 0), 0);
+            const neto = totalIngresos - totalEgresos;
+            const cashFinal = saldoFinalMensual[ultimoMes] ?? neto;
+
             await exportPdfReport({
-                title: `Flujo de caja anual (${selectedYear})`,
+                title: `Flujo de caja anual`,
+                subtitle: `Periodo ${selectedYear}`,
                 charts: [{ element: chartElement }],
                 table: { head, body },
                 fileName: `flujo-caja-${selectedYear}`,
+                cover: {
+                    show: true,
+                    subtitle: `Periodo ${selectedYear}`,
+                    logo: logoDataUrl,
+                    meta: [{ label: "Generado", value: new Date().toLocaleDateString('es-AR') }],
+                    kpis: [
+                        { label: "Ingresos", value: currency(totalIngresos) },
+                        { label: "Egresos", value: currency(totalEgresos) },
+                        { label: "Cash final", value: currency(cashFinal) },
+                    ],
+                },
             });
         } catch (e) {
             console.error("Error al exportar PDF de cash flow:", e);
