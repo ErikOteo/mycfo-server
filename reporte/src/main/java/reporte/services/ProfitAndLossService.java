@@ -78,7 +78,7 @@ public class ProfitAndLossService {
         return new ProfitAndLossDTO(anio, filtrados, ingresosMensuales, egresosMensuales, resultadoAnual, detalleIngresosList, detalleEgresosList);
     }
 
-    public ProfitAndLossDTO obtenerFacturasPorAnio(int anio, String userSub) {
+    public ProfitAndLossDTO obtenerFacturasPorAnio(int anio, String userSub, String authorization) {
         // Para evitar tocar otros módulos, basamos P&L en movimientos filtrados por usuario/empresa
         // y calculamos ingresos/egresos mensuales por Categoría, usando DEVENGADO (fecha del documento comercial)
         var desde = java.time.LocalDate.of(anio, 1, 1);
@@ -90,6 +90,7 @@ public class ProfitAndLossService {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.add("X-Usuario-Sub", userSub);
+            headers.add("Authorization", authorization);
             ResponseEntity<reporte.dtos.PageResponse<reporte.dtos.RegistroDTO>> res = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
