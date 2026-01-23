@@ -8,6 +8,7 @@ import { sessionService } from "../shared-services/sessionService";
 import URL_CONFIG from "../config/api-config";
 
 const http = axios.create();
+const EXP_MARGIN_SECONDS = 60; // refrescar un minuto antes de expirar
 
 const API_BASE_URLS = [
   URL_CONFIG.ADMINISTRACION,
@@ -115,6 +116,27 @@ const getRefreshPromise = () => {
   return refreshPromise;
 };
 
+const getTokenExp = (jwt) => {
+  if (!jwt || typeof jwt !== "string") return null;
+  const parts = jwt.split(".");
+  if (parts.length < 2) return null;
+
+  try {
+    const payload = JSON.parse(atob(parts[1]));
+    return payload?.exp || null;
+  } catch (e) {
+    console.warn("No se pudo decodificar el JWT:", e);
+    return null;
+  }
+};
+
+const isTokenExpiring = (jwt) => {
+  const exp = getTokenExp(jwt);
+  if (!exp) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return exp - now <= EXP_MARGIN_SECONDS;
+};
+
 // Detecta si la request va a tu backend (absoluta o relativa)
 const isInternalApiRequest = (config) => {
   const url = config?.url ? String(config.url) : "";
@@ -128,12 +150,21 @@ const isInternalApiRequest = (config) => {
 };
 
 // REQUEST: meter Authorization + X-Usuario-Sub a TODA request interna
-http.interceptors.request.use((config) => {
+http.interceptors.request.use(async (config) => {
   if (!config) return config;
   if (!isInternalApiRequest(config)) return config;
 
-  const accessToken = safeSessionGet("accessToken");
+  let accessToken = safeSessionGet("accessToken");
   const usuarioSub = safeSessionGet("sub");
+
+  if (accessToken && isTokenExpiring(accessToken)) {
+    try {
+      accessToken = await getRefreshPromise();
+    } catch (err) {
+      clearSessionAndRedirect();
+      throw err;
+    }
+  }
 
   config.headers = config.headers ?? {};
 
