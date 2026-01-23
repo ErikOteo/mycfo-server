@@ -3,8 +3,8 @@
 -- Actualizado con movimientos de Enero, Marzo, Abril, Julio, Noviembre y Diciembre
 -- ============================================================
 -- Ajustar estos valores antes de ejecutar si es necesario
-SET @ORGANIZACION_ID := 1;
-SET @USUARIO_ID   := '732c0a7a-80e1-70e6-d07b-1a1d0ee2be76';
+SET @ORGANIZACION_ID := 2;
+SET @USUARIO_ID   := '73fc2afa-c031-705e-2ed0-cad82d5e5619';
 
 USE pronostico_db;
 
