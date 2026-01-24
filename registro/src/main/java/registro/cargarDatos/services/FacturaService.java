@@ -146,11 +146,14 @@ public class FacturaService {
             java.time.LocalDate searchDate,
             org.springframework.data.domain.Pageable pageable
     ) {
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
         return facturaRepository.buscarFacturas(
                 organizacionId,
                 usuarioId,
-                fechaDesde,
-                fechaHasta,
+                desde,
+                hasta,
                 tipoFactura,
                 estadoPago,
                 search,
@@ -169,11 +172,14 @@ public class FacturaService {
             String search,
             java.time.LocalDate searchDate
     ) {
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
         return facturaRepository.buscarFacturas(
                 organizacionId,
                 usuarioId,
-                fechaDesde,
-                fechaHasta,
+                desde,
+                hasta,
                 tipoFactura,
                 estadoPago,
                 search,

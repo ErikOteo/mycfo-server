@@ -158,7 +158,18 @@ public class FacturaController {
             @RequestParam(defaultValue = "desc") String sortDir
     ) {
         try {
-            Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+            Long empresaId;
+            try {
+                empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+            } catch (RuntimeException e) {
+                // Si no se encuentra la empresa/usuario, devolvemos página vacía en vez de 400
+                org.springframework.data.domain.Sort.Direction direction = sortDir.equalsIgnoreCase("asc")
+                        ? org.springframework.data.domain.Sort.Direction.ASC
+                        : org.springframework.data.domain.Sort.Direction.DESC;
+                org.springframework.data.domain.Pageable emptyPageable = org.springframework.data.domain.PageRequest.of(
+                        page, size, org.springframework.data.domain.Sort.by(direction, sortBy));
+                return ResponseEntity.ok(org.springframework.data.domain.Page.empty(emptyPageable));
+            }
             org.springframework.data.domain.Sort.Direction direction = sortDir.equalsIgnoreCase("asc")
                     ? org.springframework.data.domain.Sort.Direction.ASC
                     : org.springframework.data.domain.Sort.Direction.DESC;

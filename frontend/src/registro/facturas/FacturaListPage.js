@@ -74,8 +74,8 @@ const FacturaListPage = () => {
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [fechaDesde, setFechaDesde] = useState(null);
-  const [fechaHasta, setFechaHasta] = useState(null);
+  const [fechaDesde, setFechaDesde] = useState(null); // Dayjs | null
+  const [fechaHasta, setFechaHasta] = useState(null); // Dayjs | null
   const searchDateISO = useMemo(() => {
     if (!searchText) return null;
     const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
@@ -207,41 +207,48 @@ const FacturaListPage = () => {
 
   const loadFacturas = useCallback(async () => {
     setLoading(true);
+    const fromDate =
+      fechaDesde && dayjs.isDayjs(fechaDesde) && fechaDesde.isValid()
+        ? fechaDesde.startOf("day")
+        : null;
+    const toDate =
+      fechaHasta && dayjs.isDayjs(fechaHasta) && fechaHasta.isValid()
+        ? fechaHasta.startOf("day")
+        : null;
+
+    // Si el rango es inválido, vaciamos la tabla sin llamar al backend
+    if (fromDate && toDate && fromDate.isAfter(toDate)) {
+      setFacturas([]);
+      setRowCount(0);
+      setLoading(false);
+      return;
+    }
+
     try {
-      console.debug(
-        "[FacturaListPage] Fetching facturas with filters:",
-        filters,
-        "pagination:",
-        paginationModel,
-      );
-      const response = await fetchFacturas({
+      const params = {
         page: paginationModel.page,
         size: paginationModel.pageSize,
         // Si es fecha, enviamos searchDate y omitimos el texto para que no combine con AND
         search: searchDateISO ? undefined : debouncedSearch || undefined,
         searchDate: searchDateISO || undefined,
-        fechaDesde: fechaDesde
-          ? dayjs(fechaDesde).format("YYYY-MM-DD")
-          : undefined,
-        fechaHasta: fechaHasta
-          ? dayjs(fechaHasta).format("YYYY-MM-DD")
-          : undefined,
+        fechaDesde: fromDate ? fromDate.format("YYYY-MM-DD") : undefined,
+        fechaHasta: toDate ? toDate.format("YYYY-MM-DD") : undefined,
         ...filters,
-      });
-      console.debug("[FacturaListPage] Facturas response:", response);
+      };
+      console.debug("[FacturaListPage] Params enviados:", params);
+      const response = await fetchFacturas(params);
 
-      // Si la respuesta es un objeto Page del backend
       if (response && typeof response === "object" && "content" in response) {
         setFacturas(Array.isArray(response.content) ? response.content : []);
         setRowCount(response.totalElements || 0);
       } else {
-        // Si es un array directo (compatibilidad)
         const data = Array.isArray(response) ? response : [];
         setFacturas(data);
         setRowCount(data.length);
       }
     } catch (error) {
       console.error("[FacturaListPage] Error fetching facturas:", error);
+      // Silencioso: tabla vacía ante error (p.ej. fecha inválida)
       setFacturas([]);
       setRowCount(0);
     } finally {
@@ -749,9 +756,15 @@ const FacturaListPage = () => {
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DatePicker
             label="Desde"
-            value={fechaDesde ? dayjs(fechaDesde) : null}
+            value={fechaDesde}
             format="DD/MM/YYYY"
-            onChange={(newValue) => setFechaDesde(newValue)}
+            onChange={(newValue) =>
+              setFechaDesde(
+                newValue && newValue.isValid()
+                  ? newValue.startOf("day")
+                  : null,
+              )
+            }
             slotProps={{
               textField: {
                 size: "small",
@@ -773,9 +786,15 @@ const FacturaListPage = () => {
           />
           <DatePicker
             label="Hasta"
-            value={fechaHasta ? dayjs(fechaHasta) : null}
+            value={fechaHasta}
             format="DD/MM/YYYY"
-            onChange={(newValue) => setFechaHasta(newValue)}
+            onChange={(newValue) =>
+              setFechaHasta(
+                newValue && newValue.isValid()
+                  ? newValue.startOf("day")
+                  : null,
+              )
+            }
             slotProps={{
               textField: {
                 size: "small",

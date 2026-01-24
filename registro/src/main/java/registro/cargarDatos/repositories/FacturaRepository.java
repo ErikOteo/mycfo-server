@@ -41,8 +41,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
             """)
     Page<Factura> buscarFacturas(@Param("organizacionId") Long organizacionId,
                                  @Param("usuarioId") String usuarioId,
-                                 @Param("desde") java.time.LocalDate desde,
-                                 @Param("hasta") java.time.LocalDate hasta,
+                                 @Param("desde") java.time.LocalDateTime desde,
+                                 @Param("hasta") java.time.LocalDateTime hasta,
                                  @Param("tipoFactura") String tipoFactura,
                                  @Param("estadoPago") registro.cargarDatos.models.EstadoPago estadoPago,
                                  @Param("search") String search,
@@ -69,8 +69,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
             """)
     List<Factura> buscarFacturas(@Param("organizacionId") Long organizacionId,
                                  @Param("usuarioId") String usuarioId,
-                                 @Param("desde") java.time.LocalDate desde,
-                                 @Param("hasta") java.time.LocalDate hasta,
+                                 @Param("desde") java.time.LocalDateTime desde,
+                                 @Param("hasta") java.time.LocalDateTime hasta,
                                  @Param("tipoFactura") String tipoFactura,
                                  @Param("estadoPago") registro.cargarDatos.models.EstadoPago estadoPago,
                                  @Param("search") String search,
