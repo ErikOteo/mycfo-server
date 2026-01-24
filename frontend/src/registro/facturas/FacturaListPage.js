@@ -16,10 +16,10 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import {
-  DataGrid,
-  GridToolbar,
-} from "@mui/x-data-grid";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -43,11 +43,14 @@ const FacturaListPage = () => {
   const [filters, setFilters] = useState({});
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  
+
   // Paginación del servidor
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
   const [rowCount, setRowCount] = useState(0);
-  
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("view"); // view | edit
   const [selectedFactura, setSelectedFactura] = useState(null);
@@ -55,20 +58,39 @@ const FacturaListPage = () => {
   const [errors, setErrors] = useState({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [facturaToDelete, setFacturaToDelete] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-  const [successSnackbar, setSuccessSnackbar] = useState({ open: false, message: "" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+  const [successSnackbar, setSuccessSnackbar] = useState({
+    open: false,
+    message: "",
+  });
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState(null);
+  const [fechaHasta, setFechaHasta] = useState(null);
+  const searchDateISO = useMemo(() => {
+    if (!searchText) return null;
+    const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
+    return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
+  }, [searchText]);
 
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedSearch(searchText.trim().toLowerCase()), 250);
+    const handler = setTimeout(
+      () => setDebouncedSearch(searchText.trim().toLowerCase()),
+      250,
+    );
     return () => clearTimeout(handler);
   }, [searchText]);
 
   useEffect(() => {
-    setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
-  }, [debouncedSearch]);
+    setPaginationModel((prev) =>
+      prev.page === 0 ? prev : { ...prev, page: 0 },
+    );
+  }, [debouncedSearch, fechaDesde, fechaHasta]);
 
   // Normaliza la fecha de emisión sin importar el formato que devuelva el backend
   const parseFechaEmision = useCallback((fecha) => {
@@ -101,7 +123,8 @@ const FacturaListPage = () => {
     if (dayjs.isDayjs(fecha)) return fecha;
 
     if (Array.isArray(fecha)) {
-      const [year, month = 1, day = 1, hour = 0, minute = 0, second = 0] = fecha;
+      const [year, month = 1, day = 1, hour = 0, minute = 0, second = 0] =
+        fecha;
       const normalizedMonth = normalizeMonth(month) ?? 1;
       const parsedFromArray = dayjs({
         year,
@@ -115,14 +138,35 @@ const FacturaListPage = () => {
     }
 
     if (typeof fecha === "object") {
-      const { date, time, year, month, monthValue, day, dayOfMonth, dayOfYear, hour, minute, second } = fecha;
+      const {
+        date,
+        time,
+        year,
+        month,
+        monthValue,
+        day,
+        dayOfMonth,
+        dayOfYear,
+        hour,
+        minute,
+        second,
+      } = fecha;
       const dateObj = date || {};
       const timeObj = time || {};
-      const finalMonth = normalizeMonth(month ?? monthValue ?? dateObj.month ?? dateObj.monthValue) ?? 1;
+      const finalMonth =
+        normalizeMonth(
+          month ?? monthValue ?? dateObj.month ?? dateObj.monthValue,
+        ) ?? 1;
       const parsedFromObject = dayjs({
         year: year ?? dateObj.year,
         month: finalMonth - 1,
-        day: day ?? dayOfMonth ?? dayOfYear ?? dateObj.day ?? dateObj.dayOfMonth ?? dateObj.dayOfYear,
+        day:
+          day ??
+          dayOfMonth ??
+          dayOfYear ??
+          dateObj.day ??
+          dateObj.dayOfMonth ??
+          dateObj.dayOfYear,
         hour: hour ?? timeObj.hour ?? 0,
         minute: minute ?? timeObj.minute ?? 0,
         second: second ?? timeObj.second ?? 0,
@@ -139,22 +183,36 @@ const FacturaListPage = () => {
       const parsed = parseFechaEmision(fecha);
       return parsed ? parsed.format("DD/MM/YYYY") : "-";
     },
-    [parseFechaEmision]
+    [parseFechaEmision],
   );
 
   const loadFacturas = useCallback(async () => {
     setLoading(true);
     try {
-      console.debug("[FacturaListPage] Fetching facturas with filters:", filters, "pagination:", paginationModel);
+      console.debug(
+        "[FacturaListPage] Fetching facturas with filters:",
+        filters,
+        "pagination:",
+        paginationModel,
+      );
       const response = await fetchFacturas({
         page: paginationModel.page,
         size: paginationModel.pageSize,
+        // Si es fecha, enviamos searchDate y omitimos el texto para que no combine con AND
+        search: searchDateISO ? undefined : debouncedSearch || undefined,
+        searchDate: searchDateISO || undefined,
+        fechaDesde: fechaDesde
+          ? dayjs(fechaDesde).format("YYYY-MM-DD")
+          : undefined,
+        fechaHasta: fechaHasta
+          ? dayjs(fechaHasta).format("YYYY-MM-DD")
+          : undefined,
         ...filters,
       });
       console.debug("[FacturaListPage] Facturas response:", response);
-      
+
       // Si la respuesta es un objeto Page del backend
-      if (response && typeof response === 'object' && 'content' in response) {
+      if (response && typeof response === "object" && "content" in response) {
         setFacturas(Array.isArray(response.content) ? response.content : []);
         setRowCount(response.totalElements || 0);
       } else {
@@ -175,7 +233,14 @@ const FacturaListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, paginationModel]);
+  }, [
+    filters,
+    paginationModel,
+    debouncedSearch,
+    searchDateISO,
+    fechaDesde,
+    fechaHasta,
+  ]);
 
   const cargarRolUsuario = useCallback(() => {
     const sub = sessionStorage.getItem("sub");
@@ -204,7 +269,7 @@ const FacturaListPage = () => {
       "vendedorNombre",
       "compradorNombre",
     ],
-    []
+    [],
   );
 
   const initialState = useMemo(
@@ -212,39 +277,10 @@ const FacturaListPage = () => {
       pagination: { paginationModel: { pageSize: FACTURA_PAGE_SIZE } },
       sorting: { sortModel: [{ field: "fechaEmision", sort: "desc" }] },
     }),
-    []
+    [],
   );
 
-  const filteredFacturas = useMemo(() => {
-    if (!debouncedSearch) return facturas;
-    const needle = debouncedSearch;
-    const normalize = (value) =>
-      (value ?? "")
-        .toString()
-        .toLowerCase();
-
-    return facturas.filter((factura) => {
-      const campos = [
-        factura.numeroDocumento,
-        factura.tipoFactura,
-        factura.moneda,
-        factura.estadoPago,
-        factura.vendedorNombre,
-        factura.compradorNombre,
-        factura.versionDocumento,
-        factura.idDocumento,
-        factura.id,
-        factura.montoTotal != null ? formatCurrencyAR(factura.montoTotal) : "",
-        formatFechaEmision(factura.fechaEmision),
-      ];
-
-      return campos.some((campo) => normalize(campo).includes(needle));
-    });
-  }, [debouncedSearch, facturas, formatFechaEmision]);
-
-  const visibleRows = debouncedSearch ? filteredFacturas : facturas;
-  const visibleRowCount = debouncedSearch ? filteredFacturas.length : rowCount;
-  const paginationMode = debouncedSearch ? "client" : "server";
+  const paginationMode = "server";
 
   const validarFormulario = () => {
     const newErrors = {};
@@ -254,7 +290,9 @@ const FacturaListPage = () => {
         value === undefined ||
         value === null ||
         value === "" ||
-        (value?.isValid && typeof value.isValid === "function" && !value.isValid())
+        (value?.isValid &&
+          typeof value.isValid === "function" &&
+          !value.isValid())
       ) {
         newErrors[field] = "Campo obligatorio";
       }
@@ -300,7 +338,10 @@ const FacturaListPage = () => {
         throw new Error("La factura seleccionada no tiene identificador.");
       }
       await updateFactura(facturaId, formData);
-      setSuccessSnackbar({ open: true, message: "Factura actualizada correctamente." });
+      setSuccessSnackbar({
+        open: true,
+        message: "Factura actualizada correctamente.",
+      });
       setDialogOpen(false);
       loadFacturas();
     } catch (error) {
@@ -308,7 +349,10 @@ const FacturaListPage = () => {
       setSnackbar({
         open: true,
         severity: "error",
-        message: error?.response?.data?.mensaje || error?.message || "No pudimos actualizar la factura.",
+        message:
+          error?.response?.data?.mensaje ||
+          error?.message ||
+          "No pudimos actualizar la factura.",
       });
     }
   };
@@ -321,7 +365,10 @@ const FacturaListPage = () => {
         throw new Error("La factura seleccionada no tiene identificador.");
       }
       await deleteFactura(facturaId);
-      setSuccessSnackbar({ open: true, message: "Factura eliminada correctamente." });
+      setSuccessSnackbar({
+        open: true,
+        message: "Factura eliminada correctamente.",
+      });
       setDeleteConfirmOpen(false);
       setFacturaToDelete(null);
       loadFacturas();
@@ -330,7 +377,10 @@ const FacturaListPage = () => {
       setSnackbar({
         open: true,
         severity: "error",
-        message: error?.response?.data?.mensaje || error?.message || "No pudimos eliminar la factura.",
+        message:
+          error?.response?.data?.mensaje ||
+          error?.message ||
+          "No pudimos eliminar la factura.",
       });
     }
   };
@@ -502,8 +552,8 @@ const FacturaListPage = () => {
               params.value === "PAGADO"
                 ? "success"
                 : params.value === "PARCIALMENTE_PAGADO"
-                ? "warning"
-                : "default"
+                  ? "warning"
+                  : "default"
             }
           />
         ),
@@ -540,7 +590,7 @@ const FacturaListPage = () => {
         variant="h4"
         component="h1"
         gutterBottom
-        sx={{ mb: 2, fontWeight: 600, color: 'text.primary' }}
+        sx={{ mb: 2, fontWeight: 600, color: "text.primary" }}
       >
         Facturas
       </Typography>
@@ -549,7 +599,7 @@ const FacturaListPage = () => {
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1,
+          gap: 1.5,
           mb: 2,
           flexWrap: "wrap",
         }}
@@ -557,31 +607,79 @@ const FacturaListPage = () => {
         <TextField
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Buscar por n\u00famero, tipo, monto, fecha o contrapartes"
+          placeholder="Buscar por número, tipo, monto, fecha o contrapartes"
           size="small"
           InputProps={{
-            startAdornment: <SearchRoundedIcon fontSize="small" sx={{ color: "text.secondary", mr: 0.5 }} />,
+            startAdornment: (
+              <SearchRoundedIcon
+                fontSize="small"
+                sx={{ color: "text.secondary", mr: 0.5 }}
+              />
+            ),
           }}
-          sx={{ minWidth: 260, maxWidth: 420 }}
+          sx={{ minWidth: 280, maxWidth: 420, flex: "1 1 280px" }}
         />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <DatePicker
+            label="Desde"
+            value={fechaDesde ? dayjs(fechaDesde) : null}
+            format="DD/MM/YYYY"
+            onChange={(newValue) => setFechaDesde(newValue)}
+            slotProps={{
+              textField: {
+                size: "small",
+                placeholder: "dd/mm/aaaa",
+                sx: { backgroundColor: "white", borderRadius: "8px" },
+              },
+            }}
+            sx={{ width: 150, flex: "0 0 140px" }}
+          />
+          <DatePicker
+            label="Hasta"
+            value={fechaHasta ? dayjs(fechaHasta) : null}
+            format="DD/MM/YYYY"
+            onChange={(newValue) => setFechaHasta(newValue)}
+            slotProps={{
+              textField: {
+                size: "small",
+                placeholder: "dd/mm/aaaa",
+                sx: { backgroundColor: "white", borderRadius: "8px" },
+              },
+            }}
+            sx={{ width: 140, flex: "0 0 140px" }}
+          />
+        </LocalizationProvider>
+        {(fechaDesde || fechaHasta) && (
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => {
+              setFechaDesde(null);
+              setFechaHasta(null);
+            }}
+            sx={{ ml: "auto" }}
+          >
+            Limpiar
+          </Button>
+        )}
       </Box>
 
       <Box sx={{ height: 700, width: "100%", mt: 0 }}>
         <DataGrid
-          rows={visibleRows}
+          rows={facturas}
           columns={columns}
           loading={loading}
           getRowId={(row) =>
-            row.id ?? row.idDocumento ?? `${row.numeroDocumento}-${row.fechaEmision}`
+            row.id ??
+            row.idDocumento ??
+            `${row.numeroDocumento}-${row.fechaEmision}`
           }
-          
-          // Paginación del servidor (cambia a cliente cuando hay busqueda local)
+          // Paginación del servidor
           paginationMode={paginationMode}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          rowCount={visibleRowCount}
+          rowCount={rowCount}
           pageSizeOptions={[10, 25, 50, 100]}
-          
           initialState={{
             sorting: { sortModel: [{ field: "fechaEmision", sort: "desc" }] },
             columns: {
@@ -590,21 +688,21 @@ const FacturaListPage = () => {
               },
             },
           }}
-          slots={{ 
+          slots={{
             toolbar: GridToolbar,
             loadingOverlay: () => (
-              <LinearProgress 
-                sx={{ 
-                  position: 'absolute',
+              <LinearProgress
+                sx={{
+                  position: "absolute",
                   top: 0,
                   left: 0,
                   right: 0,
                   zIndex: 1,
                   height: 4,
-                  borderRadius: 0
-                }} 
+                  borderRadius: 0,
+                }}
               />
-            )
+            ),
           }}
           slotProps={{
             toolbar: {
@@ -681,9 +779,10 @@ const FacturaListPage = () => {
               fontSize: "16px",
               display: "block !important",
             },
-            "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])": {
-              display: "none",
-            },
+            "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
+              {
+                display: "none",
+              },
           }}
         />
       </Box>
@@ -733,7 +832,11 @@ const FacturaListPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
-          <Button color="error" variant="contained" onClick={handleEliminarFactura}>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleEliminarFactura}
+          >
             Eliminar
           </Button>
         </DialogActions>
@@ -764,5 +867,3 @@ const FacturaListPage = () => {
 };
 
 export default FacturaListPage;
-
-

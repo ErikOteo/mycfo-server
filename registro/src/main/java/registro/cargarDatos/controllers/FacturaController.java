@@ -150,6 +150,8 @@ public class FacturaController {
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate fechaHasta,
             @RequestParam(required = false) String tipoFactura,
             @RequestParam(required = false) registro.cargarDatos.models.EstadoPago estadoPago,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate searchDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
@@ -170,6 +172,8 @@ public class FacturaController {
                     fechaHasta,
                     tipoFactura,
                     estadoPago,
+                    search,
+                    searchDate,
                     pageable
             );
             return ResponseEntity.ok(facturas);
