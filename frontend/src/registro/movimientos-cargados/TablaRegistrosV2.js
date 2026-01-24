@@ -51,6 +51,9 @@ import VerDeuda from "./components/VerDeuda";
 import VerAcreencia from "./components/VerAcreencia";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
+import ExportadorSimple from "../../shared-components/ExportadorSimple";
+import { exportToExcel } from "../../utils/exportExcelUtils";
+import { exportPdfReport } from "../../utils/exportPdfUtils";
 
 export default function TablaRegistrosV2() {
   const [movimientos, setMovimientos] = useState([]);
@@ -78,6 +81,7 @@ export default function TablaRegistrosV2() {
     message: "",
     severity: "info",
   });
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [successSnackbar, setSuccessSnackbar] = useState({
     open: false,
     message: "",
@@ -104,6 +108,21 @@ export default function TablaRegistrosV2() {
     );
     return () => clearTimeout(handler);
   }, [searchText]);
+
+  useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch("/logo512.png");
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
 
   useEffect(() => {
     // Cuando se busca, siempre arrancar desde la primera página para evitar resultados vacíos
@@ -621,6 +640,47 @@ export default function TablaRegistrosV2() {
     return "#757575";
   };
 
+  const buildExportParams = () => ({
+    page: 0,
+    size: Math.max(rowCount || movimientos.length || 500, 500),
+    sortBy: "fechaEmision",
+    sortDir: "desc",
+    search: searchDateISO ? undefined : debouncedSearch || undefined,
+    searchDate: searchDateISO || undefined,
+    fechaDesde: fechaDesde ? dayjs(fechaDesde).format("YYYY-MM-DD") : undefined,
+    fechaHasta: fechaHasta ? dayjs(fechaHasta).format("YYYY-MM-DD") : undefined,
+  });
+
+  const fetchMovimientosParaExportar = async () => {
+    const usuarioSub = sessionStorage.getItem("sub");
+    if (!usuarioSub) {
+      alert("No se encontró usuario en la sesión.");
+      return [];
+    }
+
+    const headers = { "X-Usuario-Sub": usuarioSub };
+    const params = buildExportParams();
+
+    try {
+      const response = await axios.get(`${API_BASE}/movimientos`, {
+        headers,
+        params,
+      });
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "content" in response.data
+      ) {
+        return response.data.content || [];
+      }
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("Error al exportar movimientos:", error);
+      alert("No se pudieron obtener los movimientos para exportar.");
+      return [];
+    }
+  };
+
   // Formatear fecha (solo día/mes/año)
   const formatearFecha = (fecha) => {
     if (!fecha) return "-";
@@ -900,6 +960,102 @@ export default function TablaRegistrosV2() {
     ];
   }, [isMobile, usuarioRol]);
 
+  const exportColumns = React.useMemo(
+    () => columns.filter((col) => col.field !== "acciones"),
+    [columns],
+  );
+
+  const formatValorExport = (row, field) => {
+    if (field === "montoTotal") {
+      const tipo = row.tipo || "";
+      const moneda = row.moneda || "ARS";
+      const multiplicador = tipo === "Egreso" ? -1 : 1;
+      const valor = Number(row.montoTotal || 0) * multiplicador;
+      const signo = valor < 0 ? "-" : "";
+      return `${signo}${new Intl.NumberFormat("es-AR", {
+        minimumFractionDigits: 2,
+      }).format(Math.abs(valor))} ${moneda}`;
+    }
+
+    if (field === "fechaEmision") {
+      return formatearFecha(row.fechaEmision);
+    }
+
+    const value = row[field];
+    if (value === null || value === undefined) return "-";
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
+  const handleExportExcel = async () => {
+    const registros = await fetchMovimientosParaExportar();
+    if (!registros.length) return;
+
+    const headers = exportColumns.map((c) => c.headerName);
+    const excelData = [
+      headers,
+      ...registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field))),
+    ];
+
+    const colsConfig = exportColumns.map(() => ({ wch: 18 }));
+
+    exportToExcel(
+      excelData,
+      "Movimientos",
+      "Movimientos",
+      colsConfig,
+      [],
+      [],
+      {
+        headerRows: [0],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      },
+    );
+  };
+
+  const handleExportPdf = async () => {
+    const registros = await fetchMovimientosParaExportar();
+    if (!registros.length) return;
+
+    const head = [exportColumns.map((c) => c.headerName)];
+    const body = registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field)));
+
+    const categorias = new Set(
+      registros
+        .map((r) => r.categoria)
+        .filter(Boolean),
+    );
+
+    await exportPdfReport({
+      title: "Movimientos financieros",
+      subtitle: "Exportaci?n",
+      charts: [],
+      table: { head, body },
+      fileName: "Movimientos",
+      footerOnFirstPage: false,
+      cover: {
+        show: true,
+        subtitle: "Listado actualizado",
+        logo: logoDataUrl,
+        meta: [
+          { label: "Registros", value: registros.length },
+          { label: "Columnas", value: exportColumns.length },
+          { label: "Generado", value: new Date().toLocaleDateString("es-AR") },
+        ],
+        kpis: [
+          { label: "Registros", value: registros.length.toString() },
+          { label: "Categorias", value: categorias.size.toString() },
+          { label: "Orden", value: "Fecha desc" },
+        ],
+        summary: [
+          "Incluye filtros y rango de fechas aplicados.",
+        ],
+      },
+    });
+  };
+
   return (
     <Box sx={{ width: "100%", p: 3 }}>
       <Typography
@@ -992,11 +1148,14 @@ export default function TablaRegistrosV2() {
               setFechaDesde(null);
               setFechaHasta(null);
             }}
-            sx={{ ml: "auto" }}
+            sx={{ ml: { xs: 0, md: "auto" } }}
           >
             Limpiar
           </Button>
         )}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: { xs: 0, md: "auto" } }}>
+          <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
+        </Box>
       </Box>
 
       <Box sx={{ height: 700, width: "100%" }}>
