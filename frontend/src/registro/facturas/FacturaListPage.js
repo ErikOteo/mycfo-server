@@ -34,6 +34,9 @@ import {
 import { formatCurrencyAR } from "../../utils/formatters";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import API_CONFIG from "../../config/api-config";
+import ExportadorSimple from "../../shared-components/ExportadorSimple";
+import { exportToExcel } from "../../utils/exportExcelUtils";
+import { exportPdfReport } from "../../utils/exportPdfUtils";
 
 const FACTURA_PAGE_SIZE = 10;
 
@@ -67,6 +70,7 @@ const FacturaListPage = () => {
     open: false,
     message: "",
   });
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -91,6 +95,21 @@ const FacturaListPage = () => {
       prev.page === 0 ? prev : { ...prev, page: 0 },
     );
   }, [debouncedSearch, fechaDesde, fechaHasta]);
+
+  useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch("/logo512.png");
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
 
   // Normaliza la fecha de emisión sin importar el formato que devuelva el backend
   const parseFechaEmision = useCallback((fecha) => {
@@ -235,6 +254,41 @@ const FacturaListPage = () => {
     searchDateISO,
     fechaDesde,
     fechaHasta,
+  ]);
+
+  const fetchFacturasParaExportar = useCallback(async () => {
+    try {
+      const response = await fetchFacturas({
+        page: 0,
+        size: Math.max(rowCount || facturas.length || 500, 500),
+        search: searchDateISO ? undefined : debouncedSearch || undefined,
+        searchDate: searchDateISO || undefined,
+        fechaDesde: fechaDesde
+          ? dayjs(fechaDesde).format("YYYY-MM-DD")
+          : undefined,
+        fechaHasta: fechaHasta
+          ? dayjs(fechaHasta).format("YYYY-MM-DD")
+          : undefined,
+        ...filters,
+      });
+
+      if (response && typeof response === "object" && "content" in response) {
+        return Array.isArray(response.content) ? response.content : [];
+      }
+      return Array.isArray(response) ? response : [];
+    } catch (error) {
+      console.error("Error al exportar facturas:", error);
+      alert("No se pudieron obtener las facturas para exportar.");
+      return [];
+    }
+  }, [
+    rowCount,
+    facturas.length,
+    searchDateISO,
+    debouncedSearch,
+    fechaDesde,
+    fechaHasta,
+    filters,
   ]);
 
   const cargarRolUsuario = useCallback(() => {
@@ -579,6 +633,84 @@ const FacturaListPage = () => {
     ];
   }, [isMobile, usuarioRol, formatFechaEmision, parseFechaEmision]);
 
+  const exportColumns = useMemo(
+    () => columns.filter((c) => c.field !== "acciones"),
+    [columns],
+  );
+
+  const formatValorExport = (row, field) => {
+    if (field === "fechaEmision") return formatFechaEmision(row.fechaEmision);
+    if (field === "montoTotal") {
+      return row.montoTotal != null ? formatCurrencyAR(row.montoTotal) : "-";
+    }
+    const value = row[field];
+    if (value == null) return "-";
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
+  const handleExportExcel = async () => {
+    const registros = await fetchFacturasParaExportar();
+    if (!registros.length) return;
+
+    const headers = exportColumns.map((c) => c.headerName);
+    const excelData = [
+      headers,
+      ...registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field))),
+    ];
+    const colsConfig = exportColumns.map(() => ({ wch: 18 }));
+
+    exportToExcel(
+      excelData,
+      "Facturas",
+      "Facturas",
+      colsConfig,
+      [],
+      [],
+      {
+        headerRows: [0],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      },
+    );
+  };
+
+  const handleExportPdf = async () => {
+    const registros = await fetchFacturasParaExportar();
+    if (!registros.length) return;
+
+    const head = [exportColumns.map((c) => c.headerName)];
+    const body = registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field)));
+
+    await exportPdfReport({
+      title: "Facturas",
+      subtitle: "Listado",
+      charts: [],
+      table: { head, body },
+      fileName: "Facturas",
+      footerOnFirstPage: false,
+      cover: {
+        show: true,
+        subtitle: "Resumen de facturas",
+        logo: logoDataUrl,
+        meta: [
+          { label: "Registros", value: registros.length },
+          { label: "Columnas", value: exportColumns.length },
+          { label: "Generado", value: new Date().toLocaleDateString("es-AR") },
+        ],
+        kpis: [
+          { label: "Total", value: registros.length.toString() },
+          { label: "Monedas", value: new Set(registros.map((r) => r.moneda || "ARS")).size.toString() },
+          { label: "Orden", value: "Fecha desc" },
+        ],
+        summary: [
+          "Incluye filtros aplicados y rango de fechas.",
+        ],
+      },
+    });
+  };
+
   return (
     <Box sx={{ width: "100%", p: 3 }}>
       <Typography
@@ -672,11 +804,14 @@ const FacturaListPage = () => {
               setFechaDesde(null);
               setFechaHasta(null);
             }}
-            sx={{ ml: "auto" }}
+            sx={{ ml: { xs: 0, md: "auto" } }}
           >
             Limpiar
           </Button>
         )}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: { xs: 0, md: "auto" } }}>
+          <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
+        </Box>
       </Box>
 
       <Box sx={{ height: 700, width: "100%", mt: 0 }}>
