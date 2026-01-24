@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useParams, useNavigate } from 'react-router-dom';
-import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import http from '../../../api/http';
 import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../utils/currency';
@@ -17,6 +16,8 @@ import { getMovimientosPorRango } from '../../../reportes/reportes.service';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, Legend
 } from 'recharts';
+import { exportToExcel } from '../../../utils/exportExcelUtils';
+import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -96,7 +97,7 @@ const formatearMes = (ym) => {
   return isNaN(i) ? ym : `${nombres[i-1]} ${anio}`;
 };
 
-// YYYY-MM → YYYY-MM-01
+// YYYY-MM ? YYYY-MM-01
 const ymToYmd = (ym) => `${ym}-01`;
 
 // Devuelve array de YYYY-MM entre from y to (inclusive)
@@ -185,6 +186,7 @@ export default function MesDetalle() {
   const [mesesDisponibles, setMesesDisponibles] = React.useState([]);
   const [tab, setTab] = React.useState(0);
   const [totalRealMes, setTotalRealMes] = React.useState(0);
+  const [logoDataUrl, setLogoDataUrl] = React.useState(null);
   const goToDatosBrutos = React.useCallback(() => setTab(1), [setTab]);
 
   // UI
@@ -290,6 +292,21 @@ export default function MesDetalle() {
     cargarRolUsuario();
   }, []);
 
+  React.useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch('/logo512.png');
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
+
   const esAdmin = React.useMemo(
     () => (usuarioRol || '').toUpperCase().includes('ADMIN'),
     [usuarioRol]
@@ -360,7 +377,7 @@ export default function MesDetalle() {
 
       const agruparPorCategoria = (lista) => lista.reduce((acc, movimiento) => {
         const nombreOriginal =
-          movimiento?.categoriaNombre || movimiento?.categoria || movimiento?.categoria_id_nombre || 'Sin categoría';
+          movimiento?.categoriaNombre || movimiento?.categoria || movimiento?.categoria_id_nombre || 'Sin categorÃ­a';
         const key = normCat(nombreOriginal);
         if (!key) return acc;
         const monto = Math.abs(
@@ -368,7 +385,7 @@ export default function MesDetalle() {
         ) || 0;
         if (!Number.isFinite(monto)) return acc;
         if (!acc[key]) {
-          acc[key] = { total: 0, label: nombreOriginal || 'Sin categoría', movementIds: [] };
+          acc[key] = { total: 0, label: nombreOriginal || 'Sin categorÃ­a', movementIds: [] };
         }
         acc[key].total += monto;
         const rawMovimientoId =
@@ -430,7 +447,7 @@ export default function MesDetalle() {
           if (!set.has(key)) {
             adicionales.push({
               id: `real-only-${tipoKey}-${key}`,
-              categoria: data.label || 'Sin categoría',
+              categoria: data.label || 'Sin categorÃ­a',
               tipo: normalizeTipo(tipoKey),
               montoEstimado: 0,
               real: data.total,
@@ -485,7 +502,7 @@ export default function MesDetalle() {
 
       // 2) resolver YYYY-MM desde mesNombreUrl usando /totales
       const mesNumStr = mesANumero[(mesNombreUrl || '').toLowerCase().trim()];
-      if (!mesNumStr) throw new Error('Mes no válido');
+      if (!mesNumStr) throw new Error('Mes no vÃ¡lido');
 
       const resTot = await http.get(`${baseURL}/api/presupuestos/${p.id}/totales`);
       const totales = Array.isArray(resTot.data) ? resTot.data : [];
@@ -635,7 +652,7 @@ export default function MesDetalle() {
         });
       }
       const label = GUARD_FIELD_LABELS[field] || field;
-      setSnack({ open: true, message: `Edición manual desactivada para ${label}.`, severity: 'info' });
+      setSnack({ open: true, message: `EdiciÃ³n manual desactivada para ${label}.`, severity: 'info' });
     }
   }, [lineasCompleto, setSnack]);
 
@@ -737,46 +754,109 @@ export default function MesDetalle() {
     real: safeNumber(e.real),
   }));
 
+  const ingresosPieRef = React.useRef(null);
+  const ingresosBarsRef = React.useRef(null);
+  const egresosPieRef = React.useRef(null);
+  const egresosBarsRef = React.useRef(null);
+
   // ===== Export =====
   const handleExportExcel = () => {
-    const data = [
-      ['Categoría', 'Tipo', 'Monto Estimado', 'Monto Registrado', 'Desvío'],
-      ...lineasCompleto.map((item) => [
-        item.categoria,
-        item.tipo,
-        safeNumber(item.montoEstimado),
-        safeNumber(item.real),
-        (item.tipo === 'Egreso'
-            ? safeNumber(item.montoEstimado) - safeNumber(item.real)
-            : safeNumber(item.real) - safeNumber(item.montoEstimado)),
-      ]),
+    const excelData = [
+      ["Categoria", "Tipo", "Monto Estimado", "Monto Registrado", "Desvio"],
+      ...lineasCompleto.map((item) => {
+        const estimado = Number(item.montoEstimado) || 0;
+        const real = Number(item.real) || 0;
+        const desvio = item.tipo === "Egreso" ? estimado - real : real - estimado;
+        return [item.categoria, item.tipo, estimado, real, desvio];
+      }),
+      ["", "", "", "", ""],
+      ["Resultado", "", "", "", resultado],
+      ["Cumplimiento", "", "", "", `${(cumplimiento * 100).toFixed(0)}%`],
     ];
-    data.push(['', '', '', '', '']);
-    data.push(['Resultado:', '', '', '', resultado]);
 
-    import('xlsx').then(({ utils, writeFile }) => {
-      const ws = utils.aoa_to_sheet(data, { cellStyles: true });
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, 'Detalle Mes');
-      writeFile(wb, `Mes_${nombreMes}_${Date.now()}.xlsx`, { cellStyles: true });
-    });
+    const colsConfig = [
+      { wch: 28 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+    ];
+    const mergesConfig = [];
+    const currencyColumns = ["C", "D", "E"];
+
+    exportToExcel(
+      excelData,
+      `Mes_${nombreMes}_${presupuestoNombre || ''}`,
+      "Detalle Mes",
+      colsConfig,
+      mergesConfig,
+      currencyColumns,
+      {
+        headerRows: [0],
+        totalRows: [excelData.length - 2],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      }
+    );
   };
 
-  const handleExportPdf = () => {
-    import('html2pdf.js').then((html2pdf) => {
-      const element = document.getElementById('mes-detalle-content');
-      const opt = {
-        margin: 1,
-        filename: `Mes_${nombreMes}_${Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-      };
-      html2pdf.default().from(element).set(opt).save();
-    });
+  const handleExportPdf = async () => {
+    try {
+      const tableHead = [["Categoria", "Tipo", "Estimado", "Real", "Desvio"]];
+      const tableBody = lineasCompleto.map((item) => {
+        const estimado = Number(item.montoEstimado) || 0;
+        const real = Number(item.real) || 0;
+        const desvio = item.tipo === "Egreso" ? estimado - real : real - estimado;
+        return [
+          item.categoria,
+          item.tipo,
+          formatCurrency(estimado),
+          formatCurrency(real),
+          formatCurrency(desvio),
+        ];
+      });
+      tableBody.append(["", "", "", "", ""]);
+      tableBody.append(["Resultado", "", "", "", formatCurrency(resultado)]);
+
+      const charts = [];
+      if (pieDataIngresos.length && ingresosPieRef.current) charts.push({ element: ingresosPieRef.current });
+      if (barDataIngresos.length && ingresosBarsRef.current) charts.push({ element: ingresosBarsRef.current });
+      if (pieDataEgresos.length && egresosPieRef.current) charts.push({ element: egresosPieRef.current });
+      if (barDataEgresos.length && egresosBarsRef.current) charts.push({ element: egresosBarsRef.current });
+
+      await exportPdfReport({
+        title: `Detalle de ${nombreMes}`,
+        subtitle: presupuestoNombre,
+        charts,
+        table: { head: tableHead, body: tableBody },
+        fileName: `Mes_${nombreMes}_${presupuestoNombre || ''}`,
+        footerOnFirstPage: false,
+        cover: {
+          show: true,
+          subtitle: nombreMes,
+          logo: logoDataUrl,
+          meta: [
+            { label: "Presupuesto", value: presupuestoNombre || '-' },
+            { label: "Generado", value: new Date().toLocaleDateString('es-AR') },
+          ],
+          kpis: [
+            { label: "Ingresos", value: formatCurrency(totalIngresos) },
+            { label: "Egresos", value: formatCurrency(totalEgresos) },
+            { label: "Resultado", value: formatCurrency(resultado) },
+          ],
+          summary: [
+            `Cumplimiento: ${(cumplimiento * 100).toFixed(0)}%`,
+            `Estimados sin registrar: ${vencidosEstimados}`,
+          ],
+        },
+      });
+    } catch (e) {
+      console.error('Error al exportar PDF de mes:', e);
+      alert('No se pudo generar el PDF. Intente nuevamente.');
+    }
   };
 
-  // ===== CRUD =====
+// ===== CRUD =====
   const toCamelPayload = (l) => ({
     categoria: l.categoria,
     tipo: l.tipo,
@@ -801,7 +881,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -827,7 +907,7 @@ export default function MesDetalle() {
               return { ...prev, [l.id]: { categoria: false, real: false } };
             });
             await reloadMes();
-            setSnack({ open: true, message: 'Línea actualizada', severity: 'success' });
+            setSnack({ open: true, message: 'LÃ­nea actualizada', severity: 'success' });
             return;
           } catch (e1) {
             lastErr = e1;
@@ -841,13 +921,13 @@ export default function MesDetalle() {
                   return { ...prev, [l.id]: { categoria: false, real: false } };
                 });
                 await reloadMes();
-                setSnack({ open: true, message: 'Línea actualizada', severity: 'success' });
+                setSnack({ open: true, message: 'LÃ­nea actualizada', severity: 'success' });
                 return;
               } catch (e2) {
                 lastErr = e2;
               }
             }
-            // si 404/405 seguimos probando con otra URL o método
+            // si 404/405 seguimos probando con otra URL o mÃ©todo
           }
         }
       }
@@ -879,7 +959,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -887,7 +967,7 @@ export default function MesDetalle() {
       if (!presupuestoId || !ym || !lineaId) return;
       await http.delete(`${baseURL}/api/presupuestos/${presupuestoId}/mes/${ym}/lineas/${lineaId}`);
       await reloadMes();
-      setSnack({ open: true, message: 'Línea eliminada', severity: 'success' });
+      setSnack({ open: true, message: 'LÃ­nea eliminada', severity: 'success' });
     } catch (e) {
       console.error(e);
       setSnack({ open: true, message: 'Error al eliminar', severity: 'error' });
@@ -907,14 +987,14 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
       }
       if (!presupuestoId || !ym) return;
       if (!nueva.categoria || !nueva.tipo) {
-        setSnack({ open: true, message: 'Completá Categoría y tipo', severity: 'warning' });
+        setSnack({ open: true, message: 'CompletÃ¡ CategorÃ­a y tipo', severity: 'warning' });
         return;
       }
       const payload = {
@@ -926,7 +1006,7 @@ export default function MesDetalle() {
       setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' });
       setAgregando(false);
       await reloadMes();
-      setSnack({ open: true, message: 'Línea agregada', severity: 'success' });
+      setSnack({ open: true, message: 'LÃ­nea agregada', severity: 'success' });
     } catch (e) {
       console.error(e);
       setSnack({ open: true, message: 'Error al agregar', severity: 'error' });
@@ -938,7 +1018,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -951,11 +1031,11 @@ export default function MesDetalle() {
         real: l.real === '' || l.real == null ? null : safeNumber(l.real),
       };
       await http.post(`${baseURL}/api/presupuestos/${presupuestoId}/mes/${ym}/lineas`, payload);
-      setSnack({ open: true, message: 'Línea agregada desde movimiento real.', severity: 'success' });
+      setSnack({ open: true, message: 'LÃ­nea agregada desde movimiento real.', severity: 'success' });
       await reloadMes();
     } catch (e) {
       console.error(e);
-      const msg = e?.response?.data?.message || 'Error al crear línea';
+      const msg = e?.response?.data?.message || 'Error al crear lÃ­nea';
       setSnack({ open: true, message: msg, severity: 'error' });
     }
   };
@@ -974,7 +1054,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -985,12 +1065,12 @@ export default function MesDetalle() {
 
       const { accion, desde, hasta } = bulkCfg;
       if (!desde || !hasta) {
-        setSnack({ open: true, message: 'Completá rango de meses', severity: 'warning' });
+        setSnack({ open: true, message: 'CompletÃ¡ rango de meses', severity: 'warning' });
         return;
       }
       const meses = mesesEntre(desde, hasta);
       if (meses.length === 0) {
-        setSnack({ open: true, message: 'Rango inválido', severity: 'warning' });
+        setSnack({ open: true, message: 'Rango invÃ¡lido', severity: 'warning' });
         return;
       }
 
@@ -1036,7 +1116,7 @@ export default function MesDetalle() {
       await reloadMes();
     } catch (e) {
       console.error(e);
-      setSnack({ open: true, message: 'Error en operación por múltiples meses', severity: 'error' });
+      setSnack({ open: true, message: 'Error en operaciÃ³n por mÃºltiples meses', severity: 'error' });
     }
   };
   // ===== Render =====
@@ -1115,9 +1195,6 @@ export default function MesDetalle() {
               sx={vencidosEstimados === 0 ? undefined : SIN_PRONOSTICO_CHIP_SX}
             />
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
-          </Stack>
         </Stack>
       </Paper>
 
@@ -1142,7 +1219,7 @@ export default function MesDetalle() {
         </Tabs>
       </Box>
 
-      {/* === Pestaña 0 === */}
+      {/* === PestaÃ±a 0 === */}
       {tab === 0 && (
         <>
           <Grid container spacing={3} mb={2}>
@@ -1171,21 +1248,21 @@ export default function MesDetalle() {
             <Grid item xs={12} sm={6} md={4}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: resultado >= 0 ? kpiColors.resultadoPos : kpiColors.resultadoNeg, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: resultado >= 0 ? 'info.main' : 'warning.main', mx: 'auto', mb: 1 }}>
-                  {resultado >= 0 ? '✓' : '⚠'}
+                  {resultado >= 0 ? '?' : '?'}
                 </Avatar>
                 <Typography variant="h6">Resultado</Typography>
                 <Typography variant="h4" fontWeight="bold">{formatCurrency(resultado)}</Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                  {resultado >= 0 ? 'Superávit' : 'Déficit'}
+                  {resultado >= 0 ? 'SuperÃ¡vit' : 'DÃ©ficit'}
                 </Typography>
               </Paper>
             </Grid>
           </Grid>
 
-          {/* GrÃ¡ficos */}
+          {/* GrÃƒÂ¡ficos */}
           {pieDataIngresos.length > 0 ? (
-            <Paper sx={{ p: 3, mb: 2 }}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
+            <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
+              <Typography variant="h6" gutterBottom fontWeight="600">DistribuciÃ³n de Ingresos por CategorÃ­a</Typography>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={pieDataIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
@@ -1204,8 +1281,8 @@ export default function MesDetalle() {
           )}
 
           {barDataIngresos.length > 0 && (
-            <Paper sx={{ p: 3, mb: 2 }}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Ingresos: Estimado vs Real por Categoría</Typography>
+            <Paper sx={{ p: 3, mb: 2 }} ref={ingresosBarsRef}>
+              <Typography variant="h6" gutterBottom fontWeight="600">Ingresos: Estimado vs Real por CategorÃ­a</Typography>
               <Box sx={{ mt: 2 }}>
                 {barDataIngresos.map((item, index) => {
                   const estimadoN = safeNumber(item.estimado);
@@ -1218,7 +1295,7 @@ export default function MesDetalle() {
                         <Typography variant="subtitle1" fontWeight="600">{item.name}</Typography>
                         {sinPronostico && (
                           <Tooltip
-                            title="Este movimiento no tiene un monto estimado. Hacé clic para pronosticar."
+                            title="Este movimiento no tiene un monto estimado. HacÃ© clic para pronosticar."
                             disableHoverListener={!sinPronostico}
                           >
                             <Chip
@@ -1269,8 +1346,8 @@ export default function MesDetalle() {
           )}
 
           {pieDataEgresos.length > 0 ? (
-            <Paper sx={{ p: 3, mb: 2 }}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
+            <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
+              <Typography variant="h6" gutterBottom fontWeight="600">DistribuciÃ³n de Egresos por CategorÃ­a</Typography>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={pieDataEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
@@ -1289,8 +1366,8 @@ export default function MesDetalle() {
           )}
 
           {barDataEgresos.length > 0 && (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Egresos: Estimado vs Real por Categoría</Typography>
+            <Paper sx={{ p: 3 }} ref={egresosBarsRef}>
+              <Typography variant="h6" gutterBottom fontWeight="600">Egresos: Estimado vs Real por CategorÃ­a</Typography>
               <Box sx={{ mt: 2 }}>
                 {barDataEgresos.map((item, index) => {
                   const estimadoN = safeNumber(item.estimado);
@@ -1303,7 +1380,7 @@ export default function MesDetalle() {
                         <Typography variant="subtitle1" fontWeight="600">{item.name}</Typography>
                         {sinPronostico && (
                           <Tooltip
-                            title="Este movimiento no tiene un monto estimado. Hacé clic para pronosticar."
+                            title="Este movimiento no tiene un monto estimado. HacÃ© clic para pronosticar."
                             disableHoverListener={!sinPronostico}
                           >
                             <Chip
@@ -1355,15 +1432,15 @@ export default function MesDetalle() {
         </>
       )}
 
-      {/* === PestaÃ±a 1: Tabla editable === */}
+      {/* === PestaÃƒÂ±a 1: Tabla editable === */}
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
-          {/* Agregar nueva lÃ­nea */}
+          {/* Agregar nueva lÃƒÂ­nea */}
           {esAdmin && (
           <Box sx={{ mb: 2 }}>
             {!agregando ? (
               <Button startIcon={<AddCircleOutlineIcon />} variant="contained" onClick={() => setAgregando(true)}>
-                Agregar categoría
+                Agregar categorÃ­a
               </Button>
             ) : (
               <Grid container spacing={1} alignItems="center">
@@ -1411,7 +1488,7 @@ export default function MesDetalle() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Categoría"
+                        label="CategorÃ­a"
                         size="small"
                         fullWidth
                         InputLabelProps={params.InputLabelProps}
@@ -1465,11 +1542,11 @@ export default function MesDetalle() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ fontWeight: 'bold', borderBottom: '1px solid var(--mui-palette-divider)' }}>
-                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Categoría</th>
+                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>CategorÃ­a</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Tipo</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Estimado</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Real</th>
-                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Desvío</th>
+                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>DesvÃ­o</th>
                   {esAdmin && <th style={{ padding: 12 }}>Acciones</th>}
                 </tr>
               </thead>
@@ -1513,7 +1590,7 @@ export default function MesDetalle() {
                           <Box display="flex" alignItems="center" gap={1}>
                             {esAdmin && manualEnabled ? (
                               (() => {
-                                // Oculta las categorías ya asignadas a otras líneas del mismo mes.
+                                // Oculta las categorÃ­as ya asignadas a otras lÃ­neas del mismo mes.
                                 const categoriaActual = e.categoria || '';
                                 const categoriaActualNorm = normCat(categoriaActual);
                                 const categoriasOcupadas = new Set(
@@ -1629,13 +1706,13 @@ export default function MesDetalle() {
                             />
                             {esAdmin && (
                               manualEnabled ? (
-                                <Tooltip title="Deshabilitar edición manual">
+                                <Tooltip title="Deshabilitar ediciÃ³n manual">
                                   <IconButton size="small" onClick={() => toggleManualGuard(item.id, 'categoria', false)}>
                                     <EditOffOutlinedIcon fontSize="small" color="warning" />
                                   </IconButton>
                                 </Tooltip>
                               ) : (
-                                <Tooltip title="Editar (categoría, tipo y estimado)">
+                                <Tooltip title="Editar (categorÃ­a, tipo y estimado)">
                                   <IconButton size="small" onClick={() => requestManualUnlock(item.id, 'categoria')}>
                                     <EditOutlinedIcon fontSize="small" />
                                   </IconButton>
@@ -1732,12 +1809,12 @@ export default function MesDetalle() {
         <Button variant="outlined" onClick={() => navigate(-1)}>Volver</Button>
       </Box>
 
-      {/* Confirmar edición manual */}
+      {/* Confirmar ediciÃ³n manual */}
       <Dialog open={guardPrompt.open} onClose={handleGuardCancel} maxWidth="sm" fullWidth>
-        <DialogTitle>{guardPrompt.title || 'Confirmar edición manual'}</DialogTitle>
+        <DialogTitle>{guardPrompt.title || 'Confirmar ediciÃ³n manual'}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            {guardPrompt.message || 'Esta acción habilita la edición manual.'}
+            {guardPrompt.message || 'Esta acciÃ³n habilita la ediciÃ³n manual.'}
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1752,10 +1829,10 @@ export default function MesDetalle() {
         <DialogTitle>Eliminar movimiento</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            Se eliminará la categoría <strong>{deletePrompt.categoria || 'sin nombre'}</strong> ({deletePrompt.tipo ? deletePrompt.tipo.toLowerCase() : 'movimiento'}) de este mes.
+            Se eliminarÃ¡ la categorÃ­a <strong>{deletePrompt.categoria || 'sin nombre'}</strong> ({deletePrompt.tipo ? deletePrompt.tipo.toLowerCase() : 'movimiento'}) de este mes.
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Esta acción no se puede deshacer.
+            Esta acciÃ³n no se puede deshacer.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1764,14 +1841,14 @@ export default function MesDetalle() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo Reglas rápidas (visual) */}
+      {/* DiÃ¡logo Reglas rÃ¡pidas (visual) */}
       <Dialog open={dlgReglas} onClose={() => setDlgReglas(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Reglas rápidas (simulación)</DialogTitle>
+        <DialogTitle>Reglas rÃ¡pidas (simulaciÃ³n)</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField select label="Ámbito" value={regla.ambito} onChange={(e) => setRegla((r) => ({ ...r, ambito: e.target.value }))}>
+            <TextField select label="Ã�mbito" value={regla.ambito} onChange={(e) => setRegla((r) => ({ ...r, ambito: e.target.value }))}>
               <MenuItem value="este_mes">Este mes</MenuItem>
-              <MenuItem value="hasta_fin">Desde este mes hasta fin de año</MenuItem>
+              <MenuItem value="hasta_fin">Desde este mes hasta fin de aÃ±o</MenuItem>
               <MenuItem value="rango">Rango personalizado</MenuItem>
             </TextField>
             {regla.ambito === 'rango' && (
@@ -1783,7 +1860,7 @@ export default function MesDetalle() {
             <TextField select label="Modo" value={regla.modo} onChange={(e) => setRegla((r) => ({ ...r, modo: e.target.value }))}>
               <MenuItem value="FIJO">Monto fijo</MenuItem>
               <MenuItem value="AJUSTE_PCT">% Ajuste mensual</MenuItem>
-              <MenuItem value="UNICO">Único (1 mes)</MenuItem>
+              <MenuItem value="UNICO">Ãšnico (1 mes)</MenuItem>
               <MenuItem value="CUOTAS">En cuotas</MenuItem>
             </TextField>
             <TextField
@@ -1806,9 +1883,9 @@ export default function MesDetalle() {
               <MenuItem value="Egresos">Solo egresos</MenuItem>
             </TextField>
             <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>Previsualización (conceptual)</Typography>
+              <Typography variant="subtitle2" gutterBottom>PrevisualizaciÃ³n (conceptual)</Typography>
               <Typography variant="body2" color="text.secondary">
-                Aquí mostrarías una mini-grilla con las celdas impactadas antes de confirmar.
+                AquÃ­ mostrarÃ­as una mini-grilla con las celdas impactadas antes de confirmar.
               </Typography>
             </Paper>
             <FormControlLabel control={<Switch checked={simulacion} onChange={(_, v) => setSimulacion(v)} />} label="Simular cambios (no impacta datos reales)" />
@@ -1816,28 +1893,28 @@ export default function MesDetalle() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDlgReglas(false)}>Cerrar</Button>
-          <Button variant="contained" disabled={!simulacion} onClick={() => { setDlgReglas(false); window.alert('Simulación: regla aplicada (visual).'); }}>
+          <Button variant="contained" disabled={!simulacion} onClick={() => { setDlgReglas(false); window.alert('SimulaciÃ³n: regla aplicada (visual).'); }}>
             Aplicar (visual)
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo varios meses */}
+      {/* DiÃ¡logo varios meses */}
       <Dialog open={dlgVarios} onClose={() => setDlgVarios(false)} fullWidth maxWidth="sm">
         <DialogTitle>Aplicar a varios meses</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
-            <TextField select label="Acción" value={bulkCfg.accion} onChange={(e) => setBulkCfg((s) => ({ ...s, accion: e.target.value }))}>
-              <MenuItem value="replicar">Replicar esta línea en un rango</MenuItem>
-              <MenuItem value="eliminar">Eliminar esta categoría (mismo tipo) en un rango</MenuItem>
+            <TextField select label="AcciÃ³n" value={bulkCfg.accion} onChange={(e) => setBulkCfg((s) => ({ ...s, accion: e.target.value }))}>
+              <MenuItem value="replicar">Replicar esta lÃ­nea en un rango</MenuItem>
+              <MenuItem value="eliminar">Eliminar esta categorÃ­a (mismo tipo) en un rango</MenuItem>
             </TextField>
             <Stack direction="row" spacing={2}>
               <TextField label="Desde (YYYY-MM)" value={bulkCfg.desde} onChange={(e) => setBulkCfg((s) => ({ ...s, desde: e.target.value }))} placeholder="2025-07" />
               <TextField label="Hasta (YYYY-MM)" value={bulkCfg.hasta} onChange={(e) => setBulkCfg((s) => ({ ...s, hasta: e.target.value }))} placeholder="2025-12" />
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              • Replicar: crea una línea por cada mes con los mismos valores (no deduplica).<br />
-              • Eliminar: busca por <b>categoría + tipo</b> en cada mes y borra coincidencias.
+              â€¢ Replicar: crea una lÃ­nea por cada mes con los mismos valores (no deduplica).<br />
+              â€¢ Eliminar: busca por <b>categorÃ­a + tipo</b> en cada mes y borra coincidencias.
             </Typography>
           </Stack>
         </DialogContent>
@@ -1859,3 +1936,4 @@ export default function MesDetalle() {
     </Box>
   );
 }
+
