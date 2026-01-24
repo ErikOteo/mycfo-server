@@ -12,6 +12,7 @@ import {
   Alert,
   Snackbar,
   LinearProgress,
+  TextField,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -22,6 +23,7 @@ import {
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import dayjs from "dayjs";
 import FormFactura from "../carga-general/components/forms/FormFactura";
 import {
@@ -56,6 +58,17 @@ const FacturaListPage = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
   const [successSnackbar, setSuccessSnackbar] = useState({ open: false, message: "" });
   const [usuarioRol, setUsuarioRol] = useState(null);
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchText.trim().toLowerCase()), 250);
+    return () => clearTimeout(handler);
+  }, [searchText]);
+
+  useEffect(() => {
+    setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
+  }, [debouncedSearch]);
 
   // Normaliza la fecha de emisión sin importar el formato que devuelva el backend
   const parseFechaEmision = useCallback((fecha) => {
@@ -201,6 +214,37 @@ const FacturaListPage = () => {
     }),
     []
   );
+
+  const filteredFacturas = useMemo(() => {
+    if (!debouncedSearch) return facturas;
+    const needle = debouncedSearch;
+    const normalize = (value) =>
+      (value ?? "")
+        .toString()
+        .toLowerCase();
+
+    return facturas.filter((factura) => {
+      const campos = [
+        factura.numeroDocumento,
+        factura.tipoFactura,
+        factura.moneda,
+        factura.estadoPago,
+        factura.vendedorNombre,
+        factura.compradorNombre,
+        factura.versionDocumento,
+        factura.idDocumento,
+        factura.id,
+        factura.montoTotal != null ? formatCurrencyAR(factura.montoTotal) : "",
+        formatFechaEmision(factura.fechaEmision),
+      ];
+
+      return campos.some((campo) => normalize(campo).includes(needle));
+    });
+  }, [debouncedSearch, facturas, formatFechaEmision]);
+
+  const visibleRows = debouncedSearch ? filteredFacturas : facturas;
+  const visibleRowCount = debouncedSearch ? filteredFacturas.length : rowCount;
+  const paginationMode = debouncedSearch ? "client" : "server";
 
   const validarFormulario = () => {
     const newErrors = {};
@@ -501,20 +545,41 @@ const FacturaListPage = () => {
         Facturas
       </Typography>
 
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          mb: 2,
+          flexWrap: "wrap",
+        }}
+      >
+        <TextField
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          placeholder="Buscar por n\u00famero, tipo, monto, fecha o contrapartes"
+          size="small"
+          InputProps={{
+            startAdornment: <SearchRoundedIcon fontSize="small" sx={{ color: "text.secondary", mr: 0.5 }} />,
+          }}
+          sx={{ minWidth: 260, maxWidth: 420 }}
+        />
+      </Box>
+
       <Box sx={{ height: 700, width: "100%", mt: 0 }}>
         <DataGrid
-          rows={facturas}
+          rows={visibleRows}
           columns={columns}
           loading={loading}
           getRowId={(row) =>
             row.id ?? row.idDocumento ?? `${row.numeroDocumento}-${row.fechaEmision}`
           }
           
-          // Paginación del servidor
-          paginationMode="server"
+          // Paginación del servidor (cambia a cliente cuando hay busqueda local)
+          paginationMode={paginationMode}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          rowCount={rowCount}
+          rowCount={visibleRowCount}
           pageSizeOptions={[10, 25, 50, 100]}
           
           initialState={{

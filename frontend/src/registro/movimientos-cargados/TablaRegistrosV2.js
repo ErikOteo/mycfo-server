@@ -12,6 +12,7 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import WalletIcon from "@mui/icons-material/Wallet";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import axios from "axios";
 import API_CONFIG from "../../config/api-config";
 import CustomSelect from "../../shared-components/CustomSelect";
@@ -53,6 +54,18 @@ export default function TablaRegistrosV2() {
   const navigate = useNavigate();
   const [pendingEditId, setPendingEditId] = useState(null);
   const dialogContentRef = useRef(null);
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchText.trim().toLowerCase()), 250);
+    return () => clearTimeout(handler);
+  }, [searchText]);
+
+  useEffect(() => {
+    // Cuando se busca, siempre arrancar desde la primera página para evitar resultados vacíos
+    setPaginationModel((prev) => (prev.page === 0 ? prev : { ...prev, page: 0 }));
+  }, [debouncedSearch]);
 
   const clearDeepLink = useCallback(() => {
     const hasQuery = searchParams.has("editMovementId");
@@ -509,6 +522,41 @@ export default function TablaRegistrosV2() {
     }).format(Math.abs(monto));
   };
 
+  const filteredMovimientos = useMemo(() => {
+    if (!debouncedSearch) return movimientos;
+    const needle = debouncedSearch;
+    const normalize = (value) =>
+      (value ?? "")
+        .toString()
+        .toLowerCase();
+
+    return movimientos.filter((mov) => {
+      const campos = [
+        mov.tipo,
+        mov.categoria,
+        mov.origenNombre,
+        mov.destinoNombre,
+        mov.descripcion,
+        mov.moneda,
+        mov.estado,
+        mov.medioPago,
+        mov.origenCuit,
+        mov.destinoCuit,
+        mov.origenCuenta,
+        mov.destinoCuenta,
+        mov.referencia,
+        formatearFecha(mov.fechaEmision),
+        formatearMonto(mov.montoTotal, mov.moneda),
+      ];
+
+      return campos.some((campo) => normalize(campo).includes(needle));
+    });
+  }, [debouncedSearch, movimientos]);
+
+  const visibleRows = debouncedSearch ? filteredMovimientos : movimientos;
+  const visibleRowCount = debouncedSearch ? filteredMovimientos.length : rowCount;
+  const paginationMode = debouncedSearch ? "client" : "server";
+
   // Definir columnas para DataGrid
   const columns = useMemo(() => {
     const tipoColumn = {
@@ -743,18 +791,38 @@ export default function TablaRegistrosV2() {
       <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 2, fontWeight: 600, color: 'text.primary' }}>
         Movimientos Financieros
       </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          mb: 2,
+          flexWrap: "wrap",
+        }}
+      >
+        <TextField
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          placeholder="Buscar por tipo, monto, fecha, descripcion, origen o destino"
+          size="small"
+          InputProps={{
+            startAdornment: <SearchRoundedIcon fontSize="small" sx={{ color: "text.secondary", mr: 0.5 }} />,
+          }}
+          sx={{ minWidth: 260, maxWidth: 420 }}
+        />
+      </Box>
 
       <Box sx={{ height: 700, width: "100%" }}>
         <DataGrid
-          rows={movimientos}
+          rows={visibleRows}
           columns={columns}
           loading={loading}
           
-          // Paginación del servidor
-          paginationMode="server"
+          // Paginación del servidor (cambia a cliente cuando hay busqueda local)
+          paginationMode={paginationMode}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          rowCount={rowCount}
+          rowCount={visibleRowCount}
           pageSizeOptions={[10, 25, 50, 100]}
           
           initialState={{
