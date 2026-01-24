@@ -202,9 +202,15 @@ export const exportPdfReport = async ({
       element,
       maxWidthRatio = 1,
       afterGap = 8,
+      forcePageBreakBefore = false,
+      forcePageBreakAfter = false,
       ...captureOpts
     } = chart || {};
     if (!element) continue;
+    if (forcePageBreakBefore) {
+      doc.addPage();
+      cursorY = margin;
+    }
     const imgData = await captureElementAsImage(element, captureOpts);
     const img = doc.getImageProperties(imgData);
     const availableWidth = (pageWidth - margin * 2) * maxWidthRatio;
@@ -217,6 +223,10 @@ export const exportPdfReport = async ({
     }
     doc.addImage(imgData, "PNG", margin, cursorY, drawWidth, drawHeight);
     cursorY += drawHeight + afterGap;
+    if (forcePageBreakAfter) {
+      doc.addPage();
+      cursorY = margin;
+    }
   }
 
   // Tabla

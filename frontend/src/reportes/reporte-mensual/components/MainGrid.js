@@ -177,7 +177,11 @@ export default function MainGrid() {
             await exportPdfReport({
                 title: `Resumen Mensual`,
                 subtitle: `${getNombreMes(selectedMonth)} ${selectedYear}`,
-                charts: charts.map((element) => ({ element })),
+                charts: charts.map((element, idx) => ({
+                    element,
+                    forcePageBreakBefore: false, // mantener el primer grafico en la pagina del titulo
+                    forcePageBreakAfter: true, // cada grafica en su propia pagina
+                })),
                 table: { head, body },
                 fileName: `reporte-mensual-${getNombreMes(selectedMonth)}-${selectedYear}`,
                 cover: {
