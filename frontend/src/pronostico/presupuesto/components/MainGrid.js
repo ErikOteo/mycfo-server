@@ -38,8 +38,6 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import API_CONFIG from "../../../config/api-config";
 import LoadingSpinner from "../../../shared-components/LoadingSpinner";
 
-
-
 const tableRowStyle = {
   backgroundColor: "rgba(255, 255, 255, 0.02)",
   "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.05)" },
@@ -100,19 +98,27 @@ const createEmptyPage = () => ({
   size: PAGE_SIZE,
 });
 const HeaderLabelAligned = ({ label, ghost }) => (
-  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+  <Box sx={{ position: "relative", display: "inline-flex" }}>
     <Box
       aria-hidden
       sx={{
-        visibility: 'hidden',
-        pointerEvents: 'none',
-        display: 'inline-flex',
-        whiteSpace: 'nowrap',
+        visibility: "hidden",
+        pointerEvents: "none",
+        display: "inline-flex",
+        whiteSpace: "nowrap",
       }}
     >
       {ghost}
     </Box>
-    <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', whiteSpace: 'nowrap' }}>
+    <Box
+      sx={{
+        position: "absolute",
+        inset: 0,
+        display: "grid",
+        placeItems: "center",
+        whiteSpace: "nowrap",
+      }}
+    >
       {label}
     </Box>
   </Box>
@@ -123,8 +129,8 @@ export default function MainGrid() {
   const isLightMode = theme.palette.mode === "light";
   const paletteVars = theme.vars?.palette ?? theme.palette;
   const tabsLabelColor = isLightMode
-    ? paletteVars.text?.primary ?? "#000"
-    : paletteVars.common?.white ?? "#fff";
+    ? (paletteVars.text?.primary ?? "#000")
+    : (paletteVars.common?.white ?? "#fff");
   const darkActionButtonSx = isLightMode ? undefined : { color: "#42897f" };
   const navigate = useNavigate();
   const baseURL = API_CONFIG.PRONOSTICO;
@@ -177,10 +183,10 @@ export default function MainGrid() {
   }, []);
 
   const cargarRolUsuario = React.useCallback(() => {
-    const sub = sessionStorage.getItem('sub');
+    const sub = sessionStorage.getItem("sub");
     if (!sub) return;
     fetch(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
-      headers: { 'X-Usuario-Sub': sub },
+      headers: { "X-Usuario-Sub": sub },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -188,7 +194,7 @@ export default function MainGrid() {
           setUsuarioRol(data.rol);
         }
       })
-      .catch((err) => console.error('Error cargando rol de usuario:', err));
+      .catch((err) => console.error("Error cargando rol de usuario:", err));
   }, []);
   const mergeYearOptions = React.useCallback((items) => {
     if (!Array.isArray(items) || items.length === 0) {
@@ -578,25 +584,48 @@ export default function MainGrid() {
         menuState.presupuesto.id === p.id;
       const menuId = isMenuOpenForRow ? "presupuesto-actions-menu" : undefined;
       const buttonId = `acciones-presupuesto-${p.id}`;
-      const esAdmin = (usuarioRol || '').toUpperCase().includes('ADMIN');
+      const esAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
       return (
         <TableRow key={p.id} sx={tableRowStyle}>
-          <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).nombre })}>
+          <TableCell
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).nombre,
+            })}
+          >
             {p.nombre}
           </TableCell>
-          <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).desde })}>
+          <TableCell
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).desde,
+            })}
+          >
             {monthName(p.desde)}
           </TableCell>
-          <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).hasta })}>
+          <TableCell
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).hasta,
+            })}
+          >
             {monthName(p.hasta)}
           </TableCell>
           {isDeleted && (
-            <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).eliminado })}>
+            <TableCell
+              sx={(theme) => ({
+                ...tableCellStyle(theme),
+                ...getColumnWidth(statusFilter).eliminado,
+              })}
+            >
               {formatDeletedAt(p.deletedAt)}
             </TableCell>
           )}
           <TableCell
-            sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).acciones })}
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).acciones,
+            })}
             align="right"
           >
             {isDeleted ? (
@@ -641,27 +670,38 @@ export default function MainGrid() {
     });
 
   const firstMain = React.useMemo(
-    () => (Array.isArray(presupuestosPage?.content) && presupuestosPage.content.length ? presupuestosPage.content[0] : null),
-    [presupuestosPage?.content]
+    () =>
+      Array.isArray(presupuestosPage?.content) &&
+      presupuestosPage.content.length
+        ? presupuestosPage.content[0]
+        : null,
+    [presupuestosPage?.content],
   );
 
   const firstSearchRow = React.useMemo(
-    () => (searchPage && Array.isArray(searchPage.content) && searchPage.content.length ? searchPage.content[0] : null),
-    [searchPage]
+    () =>
+      searchPage &&
+      Array.isArray(searchPage.content) &&
+      searchPage.content.length
+        ? searchPage.content[0]
+        : null,
+    [searchPage],
   );
 
   const headerGhostMain = {
-    nombre: firstMain?.nombre || 'Nombre de ejemplo',
-    desde: monthName(firstMain?.desde || '2025-01'),
-    hasta: monthName(firstMain?.hasta || '2025-12'),
-    eliminado: formatDeletedAt(firstMain?.deletedAt || '2025-10-14T20:21:43Z'),
+    nombre: firstMain?.nombre || "Nombre de ejemplo",
+    desde: monthName(firstMain?.desde || "2025-01"),
+    hasta: monthName(firstMain?.hasta || "2025-12"),
+    eliminado: formatDeletedAt(firstMain?.deletedAt || "2025-10-14T20:21:43Z"),
   };
 
   const headerGhostSearch = {
-    nombre: firstSearchRow?.nombre || 'Nombre de ejemplo',
-    desde: monthName(firstSearchRow?.desde || '2025-01'),
-    hasta: monthName(firstSearchRow?.hasta || '2025-12'),
-    eliminado: formatDeletedAt(firstSearchRow?.deletedAt || '2025-10-14T20:21:43Z'),
+    nombre: firstSearchRow?.nombre || "Nombre de ejemplo",
+    desde: monthName(firstSearchRow?.desde || "2025-01"),
+    hasta: monthName(firstSearchRow?.hasta || "2025-12"),
+    eliminado: formatDeletedAt(
+      firstSearchRow?.deletedAt || "2025-10-14T20:21:43Z",
+    ),
   };
 
   return (
@@ -694,7 +734,7 @@ export default function MainGrid() {
       </Tabs>
       <Typography
         variant="caption"
-        sx={{ display: "block", mb: 2, color: 'text.primary' }}
+        sx={{ display: "block", mb: 2, color: "text.primary" }}
       >
         {`Los presupuestos se purgan de forma definitiva a los ${retentionDays} días.`}
       </Typography>
@@ -774,7 +814,7 @@ export default function MainGrid() {
         </Button>
       </Box>
       <TextField
-        label="Buscar por nombre, mes o año"
+        label="Buscar"
         variant="outlined"
         size="small"
         value={query}
@@ -782,7 +822,7 @@ export default function MainGrid() {
         sx={{
           mt: 1,
           mb: 2,
-          width: { xs: '100%', sm: 250 },
+          width: { xs: "100%", sm: 250 },
         }}
       />
       {searchError && (
@@ -827,7 +867,10 @@ export default function MainGrid() {
                         })}
                         align="left"
                       >
-                        <HeaderLabelAligned label="Nombre" ghost={headerGhostSearch.nombre} />
+                        <HeaderLabelAligned
+                          label="Nombre"
+                          ghost={headerGhostSearch.nombre}
+                        />
                       </TableCell>
                       <TableCell
                         sx={(theme) => ({
@@ -836,7 +879,10 @@ export default function MainGrid() {
                         })}
                         align="left"
                       >
-                        <HeaderLabelAligned label="Desde" ghost={headerGhostSearch.desde} />
+                        <HeaderLabelAligned
+                          label="Desde"
+                          ghost={headerGhostSearch.desde}
+                        />
                       </TableCell>
                       <TableCell
                         sx={(theme) => ({
@@ -845,7 +891,10 @@ export default function MainGrid() {
                         })}
                         align="left"
                       >
-                        <HeaderLabelAligned label="Hasta" ghost={headerGhostSearch.hasta} />
+                        <HeaderLabelAligned
+                          label="Hasta"
+                          ghost={headerGhostSearch.hasta}
+                        />
                       </TableCell>
                       {statusFilter === "deleted" && (
                         <TableCell
@@ -855,7 +904,10 @@ export default function MainGrid() {
                           })}
                           align="left"
                         >
-                          <HeaderLabelAligned label="Eliminados" ghost={headerGhostSearch.eliminado} />
+                          <HeaderLabelAligned
+                            label="Eliminados"
+                            ghost={headerGhostSearch.eliminado}
+                          />
                         </TableCell>
                       )}
                       <TableCell
@@ -866,23 +918,42 @@ export default function MainGrid() {
                         align="right"
                       >
                         {/* Wrapper que replica el ancho del bloque de acciones */}
-                        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                        <Box
+                          sx={{ position: "relative", display: "inline-flex" }}
+                        >
                           {/* Contenido “fantasma” para medir ancho del bloque real */}
                           <Box
                             aria-hidden
                             sx={{
-                              visibility: 'hidden',
-                              pointerEvents: 'none',
-                              display: 'inline-flex',
-                              alignItems: 'center',
+                              visibility: "hidden",
+                              pointerEvents: "none",
+                              display: "inline-flex",
+                              alignItems: "center",
                               gap: 1,
                             }}
                           >
-                            <Button variant="outlined" size="small" sx={darkActionButtonSx}>Ver detalle</Button>
-                            <IconButton size="small"><MoreVertIcon fontSize="small" /></IconButton>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              sx={darkActionButtonSx}
+                            >
+                              Ver detalle
+                            </Button>
+                            <IconButton size="small">
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
                           </Box>
                           {/* Texto centrado exactamente sobre ese ancho */}
-                          <Box sx={{ position:'absolute', inset:0, display:'grid', placeItems:'center', whiteSpace:'nowrap', fontWeight: 600 }}>
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              inset: 0,
+                              display: "grid",
+                              placeItems: "center",
+                              whiteSpace: "nowrap",
+                              fontWeight: 600,
+                            }}
+                          >
                             Acciones
                           </Box>
                         </Box>
@@ -953,7 +1024,10 @@ export default function MainGrid() {
                   })}
                   align="left"
                 >
-                  <HeaderLabelAligned label="Nombre" ghost={headerGhostMain.nombre} />
+                  <HeaderLabelAligned
+                    label="Nombre"
+                    ghost={headerGhostMain.nombre}
+                  />
                 </TableCell>
                 <TableCell
                   sx={(theme) => ({
@@ -962,7 +1036,10 @@ export default function MainGrid() {
                   })}
                   align="left"
                 >
-                  <HeaderLabelAligned label="Desde" ghost={headerGhostMain.desde} />
+                  <HeaderLabelAligned
+                    label="Desde"
+                    ghost={headerGhostMain.desde}
+                  />
                 </TableCell>
                 <TableCell
                   sx={(theme) => ({
@@ -971,7 +1048,10 @@ export default function MainGrid() {
                   })}
                   align="left"
                 >
-                  <HeaderLabelAligned label="Hasta" ghost={headerGhostMain.hasta} />
+                  <HeaderLabelAligned
+                    label="Hasta"
+                    ghost={headerGhostMain.hasta}
+                  />
                 </TableCell>
                 {statusFilter === "deleted" && (
                   <TableCell
@@ -981,7 +1061,10 @@ export default function MainGrid() {
                     })}
                     align="left"
                   >
-                    <HeaderLabelAligned label="Eliminados" ghost={headerGhostMain.eliminado} />
+                    <HeaderLabelAligned
+                      label="Eliminados"
+                      ghost={headerGhostMain.eliminado}
+                    />
                   </TableCell>
                 )}
                 <TableCell
@@ -992,23 +1075,40 @@ export default function MainGrid() {
                   align="right"
                 >
                   {/* Wrapper que replica el ancho del bloque de acciones */}
-                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                  <Box sx={{ position: "relative", display: "inline-flex" }}>
                     {/* Contenido “fantasma” para medir ancho del bloque real */}
                     <Box
                       aria-hidden
                       sx={{
-                        visibility: 'hidden',
-                        pointerEvents: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
+                        visibility: "hidden",
+                        pointerEvents: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
                         gap: 1,
                       }}
                     >
-                      <Button variant="outlined" size="small" sx={darkActionButtonSx}>Ver detalle</Button>
-                      <IconButton size="small"><MoreVertIcon fontSize="small" /></IconButton>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        sx={darkActionButtonSx}
+                      >
+                        Ver detalle
+                      </Button>
+                      <IconButton size="small">
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
                     </Box>
                     {/* Texto centrado exactamente sobre ese ancho */}
-                    <Box sx={{ position:'absolute', inset:0, display:'grid', placeItems:'center', whiteSpace:'nowrap', fontWeight: 600 }}>
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "grid",
+                        placeItems: "center",
+                        whiteSpace: "nowrap",
+                        fontWeight: 600,
+                      }}
+                    >
                       Acciones
                     </Box>
                   </Box>
@@ -1016,7 +1116,8 @@ export default function MainGrid() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {visiblePresupuestos.length > 0 && renderRows(visiblePresupuestos)}
+              {visiblePresupuestos.length > 0 &&
+                renderRows(visiblePresupuestos)}
               {visiblePresupuestos.length === 0 && !listError && (
                 <TableRow>
                   <TableCell

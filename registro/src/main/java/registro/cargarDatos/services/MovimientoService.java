@@ -221,6 +221,8 @@ public class MovimientoService {
             List<TipoMovimiento> tipos,
             Boolean conciliado,
             String nombreRelacionado,
+            String search,
+            LocalDate searchDate,
             Pageable pageable
     ) {
         LocalDateTime fechaDesdeTime = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
@@ -234,6 +236,8 @@ public class MovimientoService {
                 tipos,
                 conciliado,
                 nombreRelacionado,
+                search,
+                searchDate,
                 pageable
         );
     }
@@ -250,7 +254,9 @@ public class MovimientoService {
             LocalDate fechaHasta,
             List<TipoMovimiento> tipos,
             Boolean conciliado,
-            String nombreRelacionado
+            String nombreRelacionado,
+            String search,
+            LocalDate searchDate
     ) {
         LocalDateTime fechaDesdeTime = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
         LocalDateTime fechaHastaTime = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay() : null;
@@ -264,6 +270,8 @@ public class MovimientoService {
                 tipos,
                 conciliado,
                 nombreRelacionado,
+                search,
+                searchDate,
                 Pageable.unpaged()
         );
         
@@ -280,7 +288,9 @@ public class MovimientoService {
             LocalDate fechaHasta,
             List<TipoMovimiento> tipos,
             Boolean conciliado,
-            String nombreRelacionado
+            String nombreRelacionado,
+            String search,
+            LocalDate searchDate
     ) {
         // Obtener todos los movimientos filtrados
         List<Movimiento> movimientos = obtenerTodosLosMovimientos(
@@ -290,7 +300,9 @@ public class MovimientoService {
                 fechaHasta,
                 tipos,
                 conciliado,
-                nombreRelacionado
+                nombreRelacionado,
+                search,
+                searchDate
         );
         
         // Agrupar por mes y tipo

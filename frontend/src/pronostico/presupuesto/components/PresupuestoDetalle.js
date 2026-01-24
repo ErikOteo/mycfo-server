@@ -24,6 +24,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import { exportToExcel } from '../../../utils/exportExcelUtils';
+import { exportPdfReport } from '../../../utils/exportPdfUtils';
 
 // Helper seguro para números
 const safeNumber = (v) =>
@@ -148,6 +150,7 @@ export default function PresupuestoDetalle() {
   const [error, setError] = React.useState(null);
 
   const [tab, setTab] = React.useState(0); // 0: resumen, 1: tabla
+  const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
   // Filtros UI
   const [verSoloDeficit, setVerSoloDeficit] = React.useState(false);
@@ -158,6 +161,21 @@ export default function PresupuestoDetalle() {
   // Panel lateral (KPIs clicables)
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [drawerTipo, setDrawerTipo] = React.useState('Ingresos'); // 'ingresos' | 'egresos' | 'resultado'
+
+  React.useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch('/logo512.png');
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
 
   React.useEffect(() => {
     const cargar = async () => {
@@ -372,6 +390,7 @@ export default function PresupuestoDetalle() {
       fill: superavit >= 0 ? SUPERAVIT_COLOR : DEFICIT_COLOR,
     };
   });
+  const desvioChartRef = React.useRef(null);
 
   // Navegación al detalle del mes
   const goToMes = (fila) => {
@@ -388,59 +407,137 @@ export default function PresupuestoDetalle() {
     navigate(`/presupuestos/${nombreNormalizado}/detalle/${mesNombre}`);
   };
 
-  // EXPORTS (igual)
+  // EXPORTS
   const handleExportExcel = () => {
-    const data = [
-      ['Mes', 'Ingreso Estimado', 'Ingreso Real', 'Desvío Ingresos', 'Egreso Estimado', 'Egreso Real', 'Desvío Egresos', 'Total Estimado', 'Total Real', 'Total Desvío'],
-      ...datosMensualesRaw.map((fila) => [
-        fila.mes ?? '—',
-        safeNumber(fila.ingresoEst),
-        safeNumber(fila.ingresoReal),
-        safeNumber(fila.ingresoReal) - safeNumber(fila.ingresoEst),
-        safeNumber(fila.egresoEst),
-        safeNumber(fila.egresoReal),
-        safeNumber(fila.egresoReal) - safeNumber(fila.egresoEst),
-        safeNumber(fila.totalEst),
-        safeNumber(fila.totalReal),
-        safeNumber(fila.totalReal) - safeNumber(fila.totalEst),
-      ]),
+    const excelData = [
+      ['Mes', 'Ingreso Estimado', 'Ingreso Real', 'Desvio Ingresos', 'Egreso Estimado', 'Egreso Real', 'Desvio Egresos', 'Total Estimado', 'Total Real', 'Total Desvio'],
+      ...datosMensualesRaw.map((fila) => {
+        const ingresoEst = safeNumber(fila.ingresoEst);
+        const ingresoReal = safeNumber(fila.ingresoReal);
+        const egresoEst = safeNumber(fila.egresoEst);
+        const egresoReal = safeNumber(fila.egresoReal);
+        const totalEst = safeNumber(fila.totalEst ?? (ingresoEst - egresoEst));
+        const totalReal = safeNumber(fila.totalReal ?? (ingresoReal - egresoReal));
+        return [
+          fila.mes ?? '-',
+          ingresoEst,
+          ingresoReal,
+          ingresoReal - ingresoEst,
+          egresoEst,
+          egresoReal,
+          egresoReal - egresoEst,
+          totalEst,
+          totalReal,
+          totalReal - totalEst,
+        ];
+      }),
+      [],
+      [
+        'Totales',
+        totalIngresoEst,
+        totalIngresoReal,
+        totalIngresoReal - totalIngresoEst,
+        totalEgresoEst,
+        totalEgresoReal,
+        totalEgresoReal - totalEgresoEst,
+        resultadoEstimado,
+        resultadoReal,
+        resultadoReal - resultadoEstimado,
+      ],
     ];
 
-    data.push(['', '', '', '', '', '', '', '', '', '']);
-    data.push(['Totales:', '', '', '', '', '', '', '', '', '']);
-    data.push([
-      '',
-      totalIngresoEst,
-      totalIngresoReal,
-      totalIngresoReal - totalIngresoEst,
-      totalEgresoEst,
-      totalEgresoReal,
-      totalEgresoReal - totalEgresoEst,
-      resultadoEstimado,
-      resultadoReal,
-      resultadoReal - resultadoEstimado,
-    ]);
+    const colsConfig = [
+      { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+    ];
+    const currencyColumns = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
-    import('xlsx').then(({ utils, writeFile }) => {
-      const ws = utils.aoa_to_sheet(data, { cellStyles: true });
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, 'Detalle Presupuesto');
-      writeFile(wb, `Presupuesto_${presupuesto.nombre || ''}_${presupuesto.id || ''}.xlsx`, { cellStyles: true });
-    });
+    exportToExcel(
+      excelData,
+      `Presupuesto_${presupuesto.nombre || ''}`,
+      'Detalle Presupuesto',
+      colsConfig,
+      [],
+      currencyColumns,
+      {
+        headerRows: [0],
+        totalRows: [excelData.length - 1],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      }
+    );
   };
 
-  const handleExportPdf = () => {
-    import('html2pdf.js').then((html2pdf) => {
-      const element = document.getElementById('presupuesto-detalle-content');
-      const opt = {
-        margin: 0.5,
-        filename: `Presupuesto_${presupuesto.nombre || ''}_${presupuesto.id || ''}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-      };
-      html2pdf.default().from(element).set(opt).save();
-    });
+  const handleExportPdf = async () => {
+    try {
+      const tableHead = [['Mes', 'Ingreso Estimado', 'Ingreso Real', 'Desvio Ingresos', 'Egreso Estimado', 'Egreso Real', 'Desvio Egresos', 'Total Estimado', 'Total Real', 'Total Desvio']];
+      const tableBody = datosMensualesRaw.map((fila) => {
+        const ingresoEst = safeNumber(fila.ingresoEst);
+        const ingresoReal = safeNumber(fila.ingresoReal);
+        const egresoEst = safeNumber(fila.egresoEst);
+        const egresoReal = safeNumber(fila.egresoReal);
+        const totalEst = safeNumber(fila.totalEst ?? (ingresoEst - egresoEst));
+        const totalReal = safeNumber(fila.totalReal ?? (ingresoReal - egresoReal));
+        return [
+          fila.mes ?? '-',
+          formatCurrency(ingresoEst),
+          formatCurrency(ingresoReal),
+          formatCurrency(ingresoReal - ingresoEst),
+          formatCurrency(egresoEst),
+          formatCurrency(egresoReal),
+          formatCurrency(egresoReal - egresoEst),
+          formatCurrency(totalEst),
+          formatCurrency(totalReal),
+          formatCurrency(totalReal - totalEst),
+        ];
+      });
+      tableBody.push(['', '', '', '', '', '', '', '', '', '']);
+      tableBody.push([
+        'Totales',
+        formatCurrency(totalIngresoEst),
+        formatCurrency(totalIngresoReal),
+        formatCurrency(totalIngresoReal - totalIngresoEst),
+        formatCurrency(totalEgresoEst),
+        formatCurrency(totalEgresoReal),
+        formatCurrency(totalEgresoReal - totalEgresoEst),
+        formatCurrency(resultadoEstimado),
+        formatCurrency(resultadoReal),
+        formatCurrency(resultadoReal - resultadoEstimado),
+      ]);
+
+      const charts = [];
+      if (desvioChartRef.current) charts.push({ element: desvioChartRef.current });
+
+      await exportPdfReport({
+        title: 'Detalle de Presupuesto',
+        subtitle: presupuesto.nombre,
+        charts,
+        table: { head: tableHead, body: tableBody },
+        fileName: `Presupuesto_${presupuesto.nombre || ''}`,
+        footerOnFirstPage: false,
+        cover: {
+          show: true,
+          subtitle: 'Resumen anual',
+          logo: logoDataUrl,
+          meta: [
+            { label: 'Presupuesto', value: presupuesto.nombre || '-' },
+            { label: 'Generado', value: new Date().toLocaleDateString('es-AR') },
+          ],
+          kpis: [
+            { label: 'Ingresos', value: formatCurrency(totalIngresoReal) },
+            { label: 'Egresos', value: formatCurrency(totalEgresoReal) },
+            { label: 'Resultado', value: formatCurrency(resultadoReal) },
+          ],
+          summary: [
+            `Estimado: ${formatCurrency(resultadoEstimado)}`,
+            `Cumplimiento: ${(pctCumplimientoGlobal * 100).toFixed(0)}%`,
+          ],
+        },
+      });
+    } catch (e) {
+      console.error('Error al exportar PDF de presupuesto:', e);
+      alert('No se pudo generar el PDF.');
+    }
   };
 
   // Drawer contenido: lista de meses ordenados por mayor desvío (absoluto)
@@ -759,58 +856,60 @@ export default function PresupuestoDetalle() {
             <Typography variant="h6" gutterBottom fontWeight="600">
               Tendencia del Resultado Mensual
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={desvioData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="50%" stopColor="#4caf50" stopOpacity={0.1} />
-                    <stop offset="50%" stopColor="#f44336" stopOpacity={0.1} />
-                  </linearGradient>
-                </defs>
-                <Area dataKey="superavit" fill="url(#splitColor)" stroke="none" yAxisId="left" />
-                <Line
-                  type="monotone"
-                  dataKey="superavit"
-                  stroke="#2196f3"
-                  strokeWidth={2}
-                  dot={{ r: 6, cursor: 'pointer' }}
-                  activeDot={{ r: 8 }}
-                  yAxisId="left"
-                  onClick={(_, index) => {
-                    const fila = datosMensuales[index];
-                    if (fila) goToMes(fila);
-                  }}
-                />
-                <ReferenceLine
-                  y={0}
-                  stroke="#666"
-                  strokeDasharray="3 3"
-                  label={{ value: 'Punto de equilibrio', position: 'right', fill: '#666', fontSize: 12 }}
-                />
-                <XAxis dataKey="mes" />
-                <YAxis
-                  yAxisId="left"
-                  domain={[dataMin => Math.min(dataMin, 0), dataMax => Math.max(dataMax, 0)]}
-                  tickFormatter={(value) => formatCurrency(value)}
-                  width={70}
-                />
-                <RTooltip
-                  formatter={(value) => [
-                    Number(value) >= 0
-                      ? `Superávit: ${formatCurrency(value)}`
-                      : `Déficit: ${formatCurrency(value)}`,
-                    'Resultado'
-                  ]}
-                  contentStyle={{ color: 'black' }}
-                />
-                <Legend
-                  payload={[
-                    { value: 'Resultado mensual', type: 'line', color: '#2196f3' },
-                    { value: 'Punto de equilibrio', type: 'dashedLine', color: '#666' },
-                  ]}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <Box ref={desvioChartRef}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={desvioData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="50%" stopColor="#4caf50" stopOpacity={0.1} />
+                      <stop offset="50%" stopColor="#f44336" stopOpacity={0.1} />
+                    </linearGradient>
+                  </defs>
+                  <Area dataKey="superavit" fill="url(#splitColor)" stroke="none" yAxisId="left" />
+                  <Line
+                    type="monotone"
+                    dataKey="superavit"
+                    stroke="#2196f3"
+                    strokeWidth={2}
+                    dot={{ r: 6, cursor: 'pointer' }}
+                    activeDot={{ r: 8 }}
+                    yAxisId="left"
+                    onClick={(_, index) => {
+                      const fila = datosMensuales[index];
+                      if (fila) goToMes(fila);
+                    }}
+                  />
+                  <ReferenceLine
+                    y={0}
+                    stroke="#666"
+                    strokeDasharray="3 3"
+                    label={{ value: 'Punto de equilibrio', position: 'right', fill: '#666', fontSize: 12 }}
+                  />
+                  <XAxis dataKey="mes" />
+                  <YAxis
+                    yAxisId="left"
+                    domain={[dataMin => Math.min(dataMin, 0), dataMax => Math.max(dataMax, 0)]}
+                    tickFormatter={(value) => formatCurrency(value)}
+                    width={70}
+                  />
+                  <RTooltip
+                    formatter={(value) => [
+                      Number(value) >= 0
+                        ? `Superavit: ${formatCurrency(value)}`
+                        : `Deficit: ${formatCurrency(value)}`,
+                      'Resultado'
+                    ]}
+                    contentStyle={{ color: 'black' }}
+                  />
+                  <Legend
+                    payload={[
+                      { value: 'Resultado mensual', type: 'line', color: '#2196f3' },
+                      { value: 'Punto de equilibrio', type: 'dashedLine', color: '#666' },
+                    ]}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
           </Paper>
         </>
       )}

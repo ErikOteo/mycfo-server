@@ -153,6 +153,8 @@ public class MovimientoController {
             @RequestParam(required = false) List<TipoMovimiento> tipos,
             @RequestParam(required = false) Boolean conciliado,
             @RequestParam(required = false) String nombreRelacionado,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
@@ -175,6 +177,8 @@ public class MovimientoController {
                     tipos,
                     conciliado,
                     nombreRelacionado,
+                    search,
+                    searchDate,
                     pageable
             );
             
@@ -196,7 +200,9 @@ public class MovimientoController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
             @RequestParam(required = false) List<TipoMovimiento> tipos,
             @RequestParam(required = false) Boolean conciliado,
-            @RequestParam(required = false) String nombreRelacionado) {
+            @RequestParam(required = false) String nombreRelacionado,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchDate) {
         
         try {
             // Obtener empresa del usuario
@@ -211,7 +217,9 @@ public class MovimientoController {
                     fechaHasta,
                     tipos,
                     conciliado,
-                    nombreRelacionado
+                    nombreRelacionado,
+                    search,
+                    searchDate
             );
             
             return ResponseEntity.ok(movimientos);
@@ -248,7 +256,9 @@ public class MovimientoController {
                             fechaHasta,
                             tipos,
                             conciliado,
-                            nombreRelacionado
+                            nombreRelacionado,
+                            null,
+                            null
                     );
             
             return ResponseEntity.ok(movimientosMensuales);
@@ -273,6 +283,8 @@ public class MovimientoController {
             Map<String, Map<TipoMovimiento, List<Movimiento>>> movimientosMensuales = 
                     movimientoService.obtenerMovimientosPorMes(
                             organizacionId,
+                            null,
+                            null,
                             null,
                             null,
                             null,
@@ -360,6 +372,8 @@ public class MovimientoController {
             Pageable movimientosPageable = PageRequest.of(0, limiteMovsSeguros, Sort.by(Sort.Direction.DESC, "fechaEmision"));
             Page<Movimiento> movimientosPage = movimientoService.obtenerMovimientos(
                     empresaId,
+                    null,
+                    null,
                     null,
                     null,
                     null,

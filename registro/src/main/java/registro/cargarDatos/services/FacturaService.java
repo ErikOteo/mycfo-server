@@ -142,15 +142,22 @@ public class FacturaService {
             java.time.LocalDate fechaHasta,
             String tipoFactura,
             EstadoPago estadoPago,
+            String search,
+            java.time.LocalDate searchDate,
             org.springframework.data.domain.Pageable pageable
     ) {
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
         return facturaRepository.buscarFacturas(
                 organizacionId,
                 usuarioId,
-                fechaDesde,
-                fechaHasta,
+                desde,
+                hasta,
                 tipoFactura,
                 estadoPago,
+                search,
+                searchDate,
                 pageable
         );
     }
@@ -161,15 +168,22 @@ public class FacturaService {
             java.time.LocalDate fechaDesde,
             java.time.LocalDate fechaHasta,
             String tipoFactura,
-            EstadoPago estadoPago
+            EstadoPago estadoPago,
+            String search,
+            java.time.LocalDate searchDate
     ) {
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
         return facturaRepository.buscarFacturas(
                 organizacionId,
                 usuarioId,
-                fechaDesde,
-                fechaHasta,
+                desde,
+                hasta,
                 tipoFactura,
-                estadoPago
+                estadoPago,
+                search,
+                searchDate
         );
     }
 
@@ -178,7 +192,7 @@ public class FacturaService {
             java.time.LocalDate fechaDesde,
             java.time.LocalDate fechaHasta
     ) {
-        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null).stream()
+        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null, null).stream()
                 .collect(Collectors.groupingBy(
                         factura -> java.time.YearMonth.from(factura.getFechaEmision() != null
                                 ? factura.getFechaEmision()

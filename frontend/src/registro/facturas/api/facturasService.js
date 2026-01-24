@@ -29,6 +29,8 @@ export const fetchFacturas = async ({
   fechaHasta,
   tipoFactura,
   estadoPago,
+  search,
+  searchDate,
 } = {}) => {
   const params = new URLSearchParams({
     page,
@@ -41,6 +43,8 @@ export const fetchFacturas = async ({
   if (fechaHasta) params.append("fechaHasta", fechaHasta);
   if (tipoFactura) params.append("tipoFactura", tipoFactura);
   if (estadoPago) params.append("estadoPago", estadoPago);
+  if (search) params.append("search", search);
+  if (searchDate) params.append("searchDate", searchDate);
 
   const response = await http.get(
     `${BASE_URL}/facturas/buscar?${params.toString()}`,
