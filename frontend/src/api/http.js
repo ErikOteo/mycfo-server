@@ -8,7 +8,17 @@ import { sessionService } from "../shared-services/sessionService";
 import URL_CONFIG from "../config/api-config";
 
 const http = axios.create();
-const PRONOSTICO_BASE_URL = URL_CONFIG.PRONOSTICO;
+const EXP_MARGIN_SECONDS = 60; // refrescar un minuto antes de expirar
+
+const API_BASE_URLS = [
+  URL_CONFIG.ADMINISTRACION,
+  URL_CONFIG.REGISTRO,
+  URL_CONFIG.REPORTE,
+  URL_CONFIG.IA,
+  URL_CONFIG.PRONOSTICO,
+  URL_CONFIG.FORECAST,
+].filter(Boolean);
+
 const cognitoPoolConfig = {
   UserPoolId: process.env.REACT_APP_COGNITO_USER_POOL_ID,
   ClientId: process.env.REACT_APP_COGNITO_CLIENT_ID,
@@ -16,13 +26,6 @@ const cognitoPoolConfig = {
 
 let refreshPromise = null;
 let hasForcedLogout = false;
-
-const isPronosticoRequest = (url) =>
-  Boolean(
-    url &&
-      PRONOSTICO_BASE_URL &&
-      String(url).startsWith(String(PRONOSTICO_BASE_URL)),
-  );
 
 const safeSessionGet = (key) => {
   try {
@@ -44,18 +47,19 @@ const safeSessionSet = (key, value) => {
 };
 
 const clearSessionAndRedirect = () => {
-  if (hasForcedLogout) {
-    return;
-  }
+  if (hasForcedLogout) return;
   hasForcedLogout = true;
+
   try {
     sessionStorage.clear();
   } catch {
     /* noop */
   }
+
   if (sessionService?.limpiarSesion) {
     sessionService.limpiarSesion();
   }
+
   if (typeof window !== "undefined") {
     window.location.href = "/#/signin";
   }
@@ -63,43 +67,35 @@ const clearSessionAndRedirect = () => {
 
 const buildCognitoUser = () => {
   const username = safeSessionGet("email") || safeSessionGet("username");
-  if (
-    !username ||
-    !cognitoPoolConfig.UserPoolId ||
-    !cognitoPoolConfig.ClientId
-  ) {
+  if (!username || !cognitoPoolConfig.UserPoolId || !cognitoPoolConfig.ClientId) {
     return null;
   }
   const pool = new CognitoUserPool(cognitoPoolConfig);
-  return new CognitoUser({
-    Username: username,
-    Pool: pool,
-  });
+  return new CognitoUser({ Username: username, Pool: pool });
 };
 
 const refreshTokens = () => {
   const refreshTokenValue = safeSessionGet("refreshToken");
   const cognitoUser = buildCognitoUser();
+
   if (!refreshTokenValue || !cognitoUser) {
     return Promise.reject(new Error("No hay datos para renovar la sesión."));
   }
-  const refreshToken = new CognitoRefreshToken({
-    RefreshToken: refreshTokenValue,
-  });
+
+  const refreshToken = new CognitoRefreshToken({ RefreshToken: refreshTokenValue });
+
   return new Promise((resolve, reject) => {
     cognitoUser.refreshSession(refreshToken, (err, session) => {
-      if (err) {
-        reject(err);
-        return;
-      }
+      if (err) return reject(err);
+
       const nextAccessToken = session.getAccessToken().getJwtToken();
       const nextIdToken = session.getIdToken().getJwtToken();
       const nextRefreshToken = session.getRefreshToken().getToken();
+
       safeSessionSet("accessToken", nextAccessToken);
       safeSessionSet("idToken", nextIdToken);
-      if (nextRefreshToken) {
-        safeSessionSet("refreshToken", nextRefreshToken);
-      }
+      if (nextRefreshToken) safeSessionSet("refreshToken", nextRefreshToken);
+
       resolve(nextAccessToken);
     });
   });
@@ -120,33 +116,78 @@ const getRefreshPromise = () => {
   return refreshPromise;
 };
 
-http.interceptors.request.use((config) => {
-  const accessToken = sessionStorage.getItem("accessToken");
-  if (isPronosticoRequest(config.url)) {
-    config.headers = config.headers ?? {};
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
-    }
-    const usuarioSub = sessionStorage.getItem("sub");
-    if (usuarioSub) {
-      config.headers["X-Usuario-Sub"] = usuarioSub;
+const getTokenExp = (jwt) => {
+  if (!jwt || typeof jwt !== "string") return null;
+  const parts = jwt.split(".");
+  if (parts.length < 2) return null;
+
+  try {
+    const payload = JSON.parse(atob(parts[1]));
+    return payload?.exp || null;
+  } catch (e) {
+    console.warn("No se pudo decodificar el JWT:", e);
+    return null;
+  }
+};
+
+const isTokenExpiring = (jwt) => {
+  const exp = getTokenExp(jwt);
+  if (!exp) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return exp - now <= EXP_MARGIN_SECONDS;
+};
+
+// Detecta si la request va a tu backend (absoluta o relativa)
+const isInternalApiRequest = (config) => {
+  const url = config?.url ? String(config.url) : "";
+  if (!url) return false;
+
+  // Caso relativo típico del frontend
+  if (url.startsWith("/api/")) return true;
+
+  // Caso absoluto
+  return API_BASE_URLS.some((base) => base && url.startsWith(String(base)));
+};
+
+// REQUEST: meter Authorization + X-Usuario-Sub a TODA request interna
+http.interceptors.request.use(async (config) => {
+  if (!config) return config;
+  if (!isInternalApiRequest(config)) return config;
+
+  let accessToken = safeSessionGet("accessToken");
+  const usuarioSub = safeSessionGet("sub");
+
+  if (accessToken && isTokenExpiring(accessToken)) {
+    try {
+      accessToken = await getRefreshPromise();
+    } catch (err) {
+      clearSessionAndRedirect();
+      throw err;
     }
   }
+
+  config.headers = config.headers ?? {};
+
+  // No pisar si ya viene seteado
+  if (accessToken && !config.headers.Authorization && !config.headers.authorization) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (usuarioSub && !config.headers["X-Usuario-Sub"]) {
+    config.headers["X-Usuario-Sub"] = usuarioSub;
+  }
+
   return config;
 });
 
+// RESPONSE: si 401 en API interna, refrescar y reintentar 1 vez
 http.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const { config, response } = error;
-    if (
-      !config ||
-      !response ||
-      response.status !== 401 ||
-      !isPronosticoRequest(config.url)
-    ) {
-      return Promise.reject(error);
-    }
+    const { config, response } = error || {};
+    if (!config || !response) return Promise.reject(error);
+
+    const is401 = response.status === 401;
+    if (!is401 || !isInternalApiRequest(config)) return Promise.reject(error);
 
     if (config.__isRetryRequest) {
       clearSessionAndRedirect();
@@ -155,18 +196,21 @@ http.interceptors.response.use(
 
     try {
       const newAccessToken = await getRefreshPromise();
-      if (!newAccessToken) {
-        throw new Error("No se obtuvo un token renovado.");
-      }
+      if (!newAccessToken) throw new Error("No se obtuvo un token renovado.");
+
       config.__isRetryRequest = true;
       config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${newAccessToken}`;
+
+      const usuarioSub = safeSessionGet("sub");
+      if (usuarioSub) config.headers["X-Usuario-Sub"] = usuarioSub;
+
       return http(config);
     } catch (refreshError) {
       clearSessionAndRedirect();
       return Promise.reject(refreshError);
     }
-  },
+  }
 );
 
 export default http;

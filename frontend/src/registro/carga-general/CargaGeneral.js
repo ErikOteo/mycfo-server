@@ -185,6 +185,7 @@ export default function CargaGeneral() {
     const merged = { ...formData, ...normalizados };
     const transcript =
       respuesta.transcript ||
+      respuesta.rawText ||
       respuesta.texto ||
       respuesta.text ||
       respuesta.rawTranscript ||
@@ -231,6 +232,76 @@ export default function CargaGeneral() {
     });
   };
 
+  const handleResultadoFoto = (respuesta) => {
+    if (!respuesta) return;
+    console.group("Resultado de foto");
+    console.log("Payload recibido:", respuesta);
+    const campos = respuesta.campos || {};
+    const normalizados = {};
+    const normalizarNumero = (valor) => {
+      if (valor === null || valor === undefined || valor === "") return valor;
+      const texto = String(valor).trim().replace(/\s+/g, "");
+      if (texto.includes(",") && texto.includes(".")) {
+        return texto.replace(/\./g, "").replace(",", ".");
+      }
+      if (texto.includes(",")) {
+        return texto.replace(",", ".");
+      }
+      return texto;
+    };
+    Object.entries(campos).forEach(([clave, valor]) => {
+      if (valor === null || valor === undefined || valor === "") return;
+      if (clave === "fechaEmision" || clave === "fechaVencimiento") {
+        const fecha = dayjs(valor);
+        if (fecha.isValid()) {
+          normalizados[clave] = fecha;
+        }
+      } else if (["montoTotal", "montoCuota", "tasaInteres", "cantidadCuotas", "cuotasPagadas"].includes(clave)) {
+        normalizados[clave] = normalizarNumero(valor);
+      } else {
+        normalizados[clave] = valor;
+      }
+    });
+    if (Object.keys(normalizados).length > 0 && !normalizados.moneda) {
+      normalizados.moneda = "ARS";
+    }
+    const merged = { ...formData, ...normalizados };
+
+    const camposDetectados =
+      Object.entries(normalizados).some(([campo, valor]) => {
+        if (!campo) return false;
+        if (campo.toLowerCase() === "moneda") return false;
+        if (valor === null || valor === undefined) return false;
+        return String(valor).trim() !== "";
+      });
+
+    if (!camposDetectados) {
+      console.warn(
+        "Autocompletado por foto: no se detectaron campos para completar."
+      );
+      handleFallbackManual({
+        mensaje:
+          "No pudimos interpretar la imagen. Completa los datos manualmente.",
+      });
+      console.groupEnd();
+      return;
+    }
+
+    console.table(
+      Object.entries(normalizados).map(([campo, valor]) => ({
+        campo,
+        valor,
+      }))
+    );
+    console.groupEnd();
+    const vistaPrevia = prepararVistaPrevia(merged);
+    abrirDialogoFormulario({
+      datos: merged,
+      vistaPrevia,
+      mensaje: "",
+    });
+  };
+
   const renderContenido = () => {
     if (!tipoDoc || !modoCarga)
       return (
@@ -259,7 +330,9 @@ export default function CargaGeneral() {
           <CargaImagen
             tipoDoc={tipoDoc}
             endpoint={endpoint}
+            onResultado={handleResultadoFoto}
             onFallback={handleFallbackManual}
+            dialogOpen={formDialogOpen}
           />
         );
       case "audio":
@@ -446,7 +519,7 @@ export default function CargaGeneral() {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 3 }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {dialogData && renderVistaPrevia()}
+            {dialogData && dialogTipoDoc === "factura" && renderVistaPrevia()}
             {dialogMessage && (
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 {dialogMessage}

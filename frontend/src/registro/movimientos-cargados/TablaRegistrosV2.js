@@ -55,6 +55,9 @@ import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
 
+// ✅ IMPORTANTE: usar tu cliente central con interceptors
+import http from "../../api/http";
+
 export default function TablaRegistrosV2() {
   const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -208,6 +211,8 @@ export default function TablaRegistrosV2() {
         return;
       }
 
+      // ✅ Seguimos mandando X-Usuario-Sub explícito
+      // ✅ Authorization lo agrega http.js (interceptor)
       const headers = { "X-Usuario-Sub": usuarioSub };
       const params = {
         page: paginationModel.page,
@@ -267,9 +272,7 @@ export default function TablaRegistrosV2() {
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (initializedRef.current) {
-      return;
-    }
+    if (initializedRef.current) return;
     initializedRef.current = true;
     cargarMovimientos();
     cargarRolUsuario();
@@ -353,7 +356,6 @@ export default function TablaRegistrosV2() {
     }
   }, [dialogOpen, dialogMode]);
 
-  // Función para validar campos obligatorios
   const validarCamposObligatorios = () => {
     const tipoMovimiento = selectedMovimiento?.tipo || "Movimiento";
     const requiredFields =
@@ -371,9 +373,7 @@ export default function TablaRegistrosV2() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Guardar cambios al editar
   const handleGuardarCambios = async () => {
-    // Validar campos obligatorios antes de enviar
     if (!validarCamposObligatorios()) {
       alert("⚠️ Por favor completa todos los campos obligatorios");
       return;
@@ -389,8 +389,7 @@ export default function TablaRegistrosV2() {
 
       const datosParaBackend = {
         ...formDataSinTipo,
-        tipo: selectedMovimiento.tipo, // ✅ Usar el tipo original del movimiento
-        // Preservar fecha y hora tal como se eligieron en el formulario
+        tipo: selectedMovimiento.tipo,
         fechaEmision: formData.fechaEmision
           ? formData.fechaEmision.format("YYYY-MM-DDTHH:mm:ss")
           : null,
@@ -441,8 +440,8 @@ export default function TablaRegistrosV2() {
         message: "Movimiento actualizado correctamente.",
       });
       setDialogOpen(false);
-      setErrors({}); // Limpiar errores
-      cargarMovimientos(); // Recargar datos
+      setErrors({});
+      cargarMovimientos();
     } catch (error) {
       console.error("Error actualizando movimiento:", error);
       console.error("Datos enviados:", formData);
@@ -453,13 +452,11 @@ export default function TablaRegistrosV2() {
     }
   };
 
-  // Abrir confirmación de eliminación
   const handleEliminarClick = (movimiento) => {
     setMovimientoToDelete(movimiento);
     setDeleteConfirmOpen(true);
   };
 
-  // Confirmar eliminación
   const handleConfirmarEliminacion = async () => {
     try {
       const usuarioSub = sessionStorage.getItem("sub");
@@ -474,7 +471,7 @@ export default function TablaRegistrosV2() {
       });
       setDeleteConfirmOpen(false);
       setMovimientoToDelete(null);
-      cargarMovimientos(); // Recargar datos
+      cargarMovimientos();
     } catch (error) {
       console.error("Error eliminando movimiento:", error);
       alert(
@@ -488,7 +485,7 @@ export default function TablaRegistrosV2() {
     setDialogOpen(false);
     setSelectedMovimiento(null);
     setFormData({});
-    setErrors({}); // Limpiar errores al cerrar
+    setErrors({});
   };
 
   const handleCloseSnackbar = (_event, reason) => {
@@ -496,15 +493,9 @@ export default function TablaRegistrosV2() {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  // Función para renderizar el formulario correcto según el tipo de movimiento
   const renderFormularioMovimiento = () => {
     if (!selectedMovimiento) return null;
 
-    console.log("🔍 Renderizando movimiento:", selectedMovimiento);
-    console.log("🔍 Tipo de movimiento:", selectedMovimiento.tipo);
-    console.log("🔍 Modo del diálogo:", dialogMode);
-
-    // Si es modo "view", usar componentes de visualización
     if (dialogMode === "view") {
       const tipoUpper = selectedMovimiento.tipo?.toUpperCase();
       console.log("🔍 Tipo normalizado:", tipoUpper);
@@ -537,8 +528,6 @@ export default function TablaRegistrosV2() {
       }
     }
 
-    // Si es modo "edit", usar formularios editables
-    // Convertir fechaEmision a dayjs si es necesario
     const movimientoConFechaConvertida = {
       ...selectedMovimiento,
       fechaEmision: selectedMovimiento.fechaEmision
@@ -611,7 +600,6 @@ export default function TablaRegistrosV2() {
     }
   };
 
-  // Helpers para chips estilizados
   const COLOR_INGRESO = "#2e7d32";
   const COLOR_EGRESO = "#d32f2f";
   const COLOR_DEUDA = "#1565c0";
@@ -685,12 +673,10 @@ export default function TablaRegistrosV2() {
   const formatearFecha = (fecha) => {
     if (!fecha) return "-";
     try {
-      // Formato [YYYY, MM, DD] que puede venir del backend
       if (Array.isArray(fecha)) {
         const [year, month, day] = fecha;
         return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
       }
-
       const d = dayjs(fecha);
       if (!d.isValid()) return "-";
       return d.format("DD/MM/YYYY");
@@ -699,7 +685,6 @@ export default function TablaRegistrosV2() {
     }
   };
 
-  // Formatear monto
   const formatearMonto = (monto, moneda = "ARS") => {
     if (monto === null || monto === undefined) return "$0";
     return new Intl.NumberFormat("es-AR", {
@@ -735,7 +720,7 @@ export default function TablaRegistrosV2() {
               fontWeight: 600,
               border: `1px solid ${color}`,
               fontSize: "0.8125rem",
-              height: "24px", // Altura fija para alineación
+              height: "24px",
             }}
           />
         );
@@ -765,14 +750,8 @@ export default function TablaRegistrosV2() {
                   : "#424242";
         const signo = tipo === "Egreso" && valor !== 0 ? "-" : "";
         return (
-          <Typography
-            variant="body2"
-            fontWeight={600}
-            sx={{ lineHeight: "24px", color }}
-          >
-            {`${signo}${new Intl.NumberFormat("es-AR", {
-              minimumFractionDigits: 2,
-            }).format(Math.abs(valor))} ${moneda}`}
+          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: "24px", color }}>
+            {`${signo}${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(Math.abs(valor))} ${moneda}`}
           </Typography>
         );
       },
@@ -783,13 +762,11 @@ export default function TablaRegistrosV2() {
       headerName: "Fecha",
       flex: 0.7,
       minWidth: 110,
-      renderCell: (params) => {
-        return (
-          <Typography variant="body2" sx={{ lineHeight: "24px" }}>
-            {formatearFecha(params.value)}
-          </Typography>
-        );
-      },
+      renderCell: (params) => (
+        <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+          {formatearFecha(params.value)}
+        </Typography>
+      ),
     };
 
     const estadoColumn = {
@@ -826,7 +803,7 @@ export default function TablaRegistrosV2() {
               color: getEstadoColor(),
               fontWeight: 600,
               border: `1px solid ${getEstadoColor()}`,
-              height: "24px", // Altura fija para alineación
+              height: "24px",
             }}
           />
         );
@@ -910,30 +887,15 @@ export default function TablaRegistrosV2() {
         const isAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
         return (
           <Box sx={{ display: "flex", gap: 0.5 }}>
-            <IconButton
-              size="small"
-              color="info"
-              onClick={() => handleVerMovimiento(params.row)}
-              title="Ver detalles"
-            >
+            <IconButton size="small" color="info" onClick={() => handleVerMovimiento(params.row)} title="Ver detalles">
               <VisibilityIcon fontSize="small" />
             </IconButton>
             {isAdmin && (
               <>
-                <IconButton
-                  size="small"
-                  color="primary"
-                  onClick={() => handleEditarMovimiento(params.row)}
-                  title="Editar"
-                >
+                <IconButton size="small" color="primary" onClick={() => handleEditarMovimiento(params.row)} title="Editar">
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleEliminarClick(params.row)}
-                  title="Eliminar"
-                >
+                <IconButton size="small" color="error" onClick={() => handleEliminarClick(params.row)} title="Eliminar">
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </>
@@ -943,9 +905,7 @@ export default function TablaRegistrosV2() {
       },
     };
 
-    if (isMobile) {
-      return [tipoColumn, montoColumn, accionesColumn];
-    }
+    if (isMobile) return [tipoColumn, montoColumn, accionesColumn];
 
     return [
       tipoColumn,
@@ -1171,11 +1131,7 @@ export default function TablaRegistrosV2() {
           pageSizeOptions={[10, 25, 50, 100]}
           initialState={{
             sorting: { sortModel: [{ field: "fechaEmision", sort: "desc" }] },
-            columns: {
-              columnVisibilityModel: {
-                estado: false,
-              },
-            },
+            columns: { columnVisibilityModel: { estado: false } },
           }}
           slots={{
             toolbar: GridToolbar,
@@ -1194,10 +1150,7 @@ export default function TablaRegistrosV2() {
             ),
           }}
           slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
+            toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } },
           }}
           disableRowSelectionOnClick
           autoHeight={false}
@@ -1209,9 +1162,7 @@ export default function TablaRegistrosV2() {
               display: "flex",
               alignItems: "center",
             },
-            "& .MuiDataGrid-cell:last-of-type": {
-              borderRight: "none",
-            },
+            "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" },
             "& .MuiDataGrid-columnHeaders": {
               backgroundColor: "#f5f5f5",
               fontSize: "0.95rem",
@@ -1226,26 +1177,12 @@ export default function TablaRegistrosV2() {
               justifyContent: "space-between",
               boxSizing: "border-box",
             },
-            "& .MuiDataGrid-columnHeader:first-of-type": {
-              borderLeft: "none",
-            },
-            "& .MuiDataGrid-columnHeader:last-of-type": {
-              borderRight: "none",
-            },
-            "& .MuiDataGrid-columnHeaderTitle": {
-              fontWeight: 700,
-            },
-            "& .MuiDataGrid-columnSeparator": {
-              opacity: 1,
-              visibility: "visible",
-              color: "#d5d5d5",
-            },
-            "& .MuiDataGrid-row:hover": {
-              backgroundColor: "rgba(0, 0, 0, 0.02)",
-            },
-            "& .MuiDataGrid-sortIcon": {
-              display: "none",
-            },
+            "& .MuiDataGrid-columnHeader:first-of-type": { borderLeft: "none" },
+            "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
+            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
+            "& .MuiDataGrid-columnSeparator": { opacity: 1, visibility: "visible", color: "#d5d5d5" },
+            "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(0, 0, 0, 0.02)" },
+            "& .MuiDataGrid-sortIcon": { display: "none" },
             "& .MuiDataGrid-columnHeaderTitleContainer": {
               paddingRight: "8px",
               display: "flex",
@@ -1277,13 +1214,7 @@ export default function TablaRegistrosV2() {
         />
       </Box>
 
-      {/* Dialog para VER o EDITAR - Estilo exacto del formulario original */}
-      <Dialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 600 }}>
           {dialogMode === "edit"
             ? "Editar movimiento"
@@ -1315,11 +1246,7 @@ export default function TablaRegistrosV2() {
         </DialogActions>
       </Dialog>
 
-      {/* Dialog de confirmación para ELIMINAR */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-      >
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
         <DialogTitle>⚠️ Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1343,9 +1270,7 @@ export default function TablaRegistrosV2() {
               </Typography>
             </Box>
           )}
-          <Alert severity="error" sx={{ mt: 2 }}>
-            Esta acción no se puede deshacer.
-          </Alert>
+          <Alert severity="error" sx={{ mt: 2 }}>Esta acción no se puede deshacer.</Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
@@ -1358,6 +1283,7 @@ export default function TablaRegistrosV2() {
           </Button>
         </DialogActions>
       </Dialog>
+
       <SuccessSnackbar
         open={successSnackbar.open}
         message={successSnackbar.message}

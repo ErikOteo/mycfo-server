@@ -5,6 +5,16 @@ const BASE_URL = API_CONFIG.REGISTRO;
 
 const USER_HEADER = "X-Usuario-Sub";
 
+// Lectura protegida de sessionStorage para evitar excepciones en navegadores con bloqueos
+const safeSessionGet = (key) => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch (err) {
+    console.warn("No se pudo leer sessionStorage:", err);
+    return null;
+  }
+};
+
 async function request(path, { method = "GET", body, headers } = {}) {
   const url = `${BASE_URL}${path}`;
   const opts = {
@@ -14,9 +24,15 @@ async function request(path, { method = "GET", body, headers } = {}) {
     },
   };
 
-  const usuarioSub = sessionStorage.getItem("sub");
+  const usuarioSub = safeSessionGet("sub");
   if (usuarioSub) {
     opts.headers[USER_HEADER] = usuarioSub;
+  }
+
+  // Propagamos token de sesión para entornos productivos protegidos por gateway
+  const idToken = safeSessionGet("idToken") || safeSessionGet("accessToken");
+  if (idToken) {
+    opts.headers.Authorization = `Bearer ${idToken}`;
   }
 
   // Solo seteamos JSON si hay body
@@ -25,8 +41,8 @@ async function request(path, { method = "GET", body, headers } = {}) {
     opts.body = JSON.stringify(body);
   }
 
-  // Si NO usás cookies/sesión en el back, podés quitar esta línea:
-  // opts.credentials = "include";
+  // En prod necesitamos enviar cookies (si las hay) hacia el gateway/API
+  //opts.credentials = "include";
 
   const res = await fetch(url, opts);
   const text = await res.text();

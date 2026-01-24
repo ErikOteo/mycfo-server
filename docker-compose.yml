@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   administracion:
     container_name: administracion
@@ -111,6 +113,11 @@ services:
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
       - FORECAST_URL=http://forecast:8088
+      # Cognito / JWT (para validar tokens)
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
 
   registro:
     container_name: registro
@@ -145,6 +152,21 @@ services:
       - MERCADOPAGO_FRONTEND_URL=${MERCADOPAGO_FRONTEND_URL}
       # Encriptación de datos sensibles
       - APP_ENCRYPT_SECRET=${APP_ENCRYPT_SECRET}
+      # Cognito / JWT (para validar tokens)
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
+      # Tamaño máximo de upload (imágenes / audio)
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=15MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=15MB
+      # Vertex AI (carga por imagen)
+      - VERTEX_PROJECT_ID=mycfo-484102
+      - VERTEX_LOCATION=us-central1
+      - VERTEX_MODEL=gemini-2.5-flash
+      - VERTEX_CREDENTIALS_PATH=/secrets/mycfo-google.json
+    volumes:
+      - /home/azureuser/mycfo-secrets/mycfo-google.json:/secrets/mycfo-google.json:ro
 
   reporte:
     container_name: reporte
@@ -169,6 +191,11 @@ services:
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
+      # Cognito / JWT (para validar tokens)
+      - AWS_REGION=${AWS_REGION}
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
 
   forecast:
     container_name: forecast
@@ -201,14 +228,16 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_BASE_URL: http://4.206.176.204
-        REACT_APP_URL_ADMINISTRACION: http://4.206.176.204:8081
-        REACT_APP_URL_IA: http://4.206.176.204:8083
-        REACT_APP_URL_NOTIFICACION: http://4.206.176.204:8084
-        REACT_APP_URL_PRONOSTICO: http://4.206.176.204:8085
-        REACT_APP_URL_REGISTRO: http://4.206.176.204:8086
-        REACT_APP_URL_REPORTE: http://4.206.176.204:8087
-        REACT_APP_WEBSOCKET_URL: http://4.206.176.204:8084/ws
+        REACT_APP_BASE_URL: https://mycfo.com.ar
+        REACT_APP_API_URL: https://mycfo.com.ar/api
+        REACT_APP_URL_ADMINISTRACION: https://mycfo.com.ar/api/administracion
+        REACT_APP_URL_IA: https://mycfo.com.ar/api/ia
+        REACT_APP_URL_NOTIFICACION: https://mycfo.com.ar/api/notificacion
+        REACT_APP_URL_PRONOSTICO: https://mycfo.com.ar/api/pronostico
+        REACT_APP_URL_REGISTRO: https://mycfo.com.ar/api/registro
+        REACT_APP_URL_REPORTE: https://mycfo.com.ar/api/reporte
+        REACT_APP_WEBSOCKET_URL: https://mycfo.com.ar/api/notificacion/ws
+        # AWS args (desde .env o fijos)
         REACT_APP_COGNITO_USER_POOL_ID: sa-east-1_lTMNrWW7R
         REACT_APP_COGNITO_CLIENT_ID: 3ksssqtg3r49rf6js1t1177hrd
         REACT_APP_AWS_REGION: sa-east-1
@@ -217,6 +246,11 @@ services:
     depends_on:
       - administracion
       - registro
+      - reporte
+      - pronostico
+      - notificacion
+      - ia
+      - forecast
     networks:
       - mycfo_network
 

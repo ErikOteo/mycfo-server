@@ -986,13 +986,13 @@ const Dashboard = React.memo(() => {
       // {
       //   id: "cashBalance",
       //   title: "Saldo de caja",
-      //    value: data.cashBalance,
-      //    formatter: formatCurrencyAR,
-      //    trend: mockKpiTrends.cashBalance,
-      //    trendColor: theme.palette.info.main,
-      //    secondaryLabel: "Dias de cobertura",
-      //    secondaryValue: data.cashRunwayDays,
-      //    secondaryFormatter: formatDays,
+      //   value: data.cashBalance,
+      //   formatter: formatCurrencyAR,
+      //   trend: mockKpiTrends.cashBalance,
+      //   trendColor: theme.palette.info.main,
+      //   secondaryLabel: "Dias de cobertura",
+      //   secondaryValue: data.cashRunwayDays,
+      //   secondaryFormatter: formatDays,
       // },
       // {
       //   id: "pendingReceivables",
@@ -1105,7 +1105,7 @@ const Dashboard = React.memo(() => {
           sx={{ maxWidth: { xs: "100%", md: 1600 }, mx: "auto" }}
         >
           {kpiCards.map((card) => (
-            <Grid item xs={12} sm={12} md={3} key={card.id}>
+            <Grid size={{ xs: 12, sm: 12, md: 3 }} key={card.id}>
               <KpiCard
                 title={card.title}
                 value={card.value}
@@ -1129,7 +1129,7 @@ const Dashboard = React.memo(() => {
           justifyContent="center"
           sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          <Grid item>
+          <Grid>
             <Box sx={{ width: { xs: "100%", md: 720 } }}>
               <SalesTrendWidget
                 data={
@@ -1147,7 +1147,7 @@ const Dashboard = React.memo(() => {
               />
             </Box>
           </Grid>
-          <Grid item>
+          <Grid>
             <Box sx={{ width: { xs: "100%", md: 720 } }}>
               <SalesByCategoryWidget
                 data={state.salesByCategory.data ?? []}
@@ -1166,7 +1166,7 @@ const Dashboard = React.memo(() => {
           justifyContent="center"
           sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          <Grid item>
+          <Grid>
             <Box sx={{ width: { xs: "100%", md: 720 } }}>
               <SalesTrendWidget
                 data={
@@ -1186,7 +1186,7 @@ const Dashboard = React.memo(() => {
               />
             </Box>
           </Grid>
-          <Grid item>
+          <Grid>
             <Box sx={{ width: { xs: "100%", md: 720 } }}>
               <SalesByCategoryWidget
                 data={state.expensesByCategory.data ?? []}
@@ -1209,7 +1209,7 @@ const Dashboard = React.memo(() => {
           justifyContent="center"
           sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <BudgetWidget
               companyId={company}
               period={period}
@@ -1219,11 +1219,11 @@ const Dashboard = React.memo(() => {
               onRetry={loadDashboardData}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             {/* Sección comparativa Caja vs Devengado del último mes */}
             <LiquidityGapWidget />
           </Grid>
-          <Grid item xs={12} md={4} sx={{ display: { xs: "none", md: "block" } }}>
+          <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
             <ReconciliationWidget
               data={state.reconciliation.data}
               loading={
@@ -1254,7 +1254,7 @@ const Dashboard = React.memo(() => {
             display: { xs: "none", md: "flex" },
           }}
         >
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <RecentMovementsWidget
               data={state.movements.data}
               loading={state.movements.loading && !state.movements.data}
@@ -1263,7 +1263,7 @@ const Dashboard = React.memo(() => {
               onNavigate={() => handleNavigate("/ver-movimientos")}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <RecentInvoicesWidget
               data={state.invoices?.data ?? null}
               loading={state.invoices?.loading && !state.invoices?.data}
@@ -1280,7 +1280,7 @@ const Dashboard = React.memo(() => {
           justifyContent="center"
           sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          <Grid item xs={12} md={10}>
+          <Grid size={{ xs: 12, md: 10 }}>
             <Box sx={{ width: "100%", mx: "auto" }}>
               <InsightsWidget />
             </Box>

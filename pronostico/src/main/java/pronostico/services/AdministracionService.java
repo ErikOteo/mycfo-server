@@ -30,21 +30,29 @@ public class AdministracionService {
      * @return ID de la empresa del usuario
      * @throws RuntimeException si el usuario no existe o no tiene empresa asociada
      */
-    public Long obtenerEmpresaIdPorUsuarioSub(String usuarioSub) {
+    public Long obtenerEmpresaIdPorUsuarioSub(String usuarioSub, String authorization) {
         try {
             String url = administracionUrl + "/api/empresas/usuario/" + usuarioSub + "/id";
             log.info("Llamando a administración para obtener empresa del usuario: {}", usuarioSub);
             log.debug("URL: {}", url);
-            
-            Long empresaId = restTemplate.getForObject(url, Long.class);
-            
+
+            HttpHeaders headers = new HttpHeaders();
+            if (authorization != null && !authorization.isBlank()) {
+                headers.set("Authorization", authorization);
+            }
+            headers.set("X-Usuario-Sub", usuarioSub);
+
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<Long> response = restTemplate.exchange(url, HttpMethod.GET, entity, Long.class);
+
+            Long empresaId = response.getBody();
             if (empresaId == null) {
                 throw new RuntimeException("El usuario no tiene empresa asociada");
             }
-            
+
             log.info("Empresa ID obtenida: {} para usuario: {}", empresaId, usuarioSub);
             return empresaId;
-            
+
         } catch (HttpClientErrorException.NotFound e) {
             log.error("Usuario no encontrado o sin empresa: {}", usuarioSub);
             throw new RuntimeException("Usuario no encontrado o sin empresa asociada: " + usuarioSub);
@@ -52,6 +60,11 @@ public class AdministracionService {
             log.error("Error al obtener empresa del usuario {}: {}", usuarioSub, e.getMessage());
             throw new RuntimeException("Error al comunicarse con el servicio de administración", e);
         }
+    }
+
+    // Compatibilidad hacia atrás
+    public Long obtenerEmpresaIdPorUsuarioSub(String usuarioSub) {
+        return obtenerEmpresaIdPorUsuarioSub(usuarioSub, null);
     }
 
     /**
@@ -84,4 +97,3 @@ public class AdministracionService {
         }
     }
 }
-

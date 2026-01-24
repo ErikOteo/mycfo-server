@@ -121,12 +121,13 @@ public class AudioTranscripcionService {
         Map<String, String> campos = audioParserService.parseMovimiento(transcript, tipoMovimiento);
         log.info("Campos detectados para movimiento: {}", campos);
         List<String> warnings = audioParserService.buildWarnings(campos, CAMPOS_MOVIMIENTO_OBLIGATORIOS);
+        Map<String, Object> camposResponse = new LinkedHashMap<>(campos);
         if (!warnings.isEmpty()) {
             log.warn("Warnings de parsing de movimiento: {}", warnings);
         }
         return AudioAutocompletarResponse.builder()
                 .transcript(transcript)
-                .campos(campos)
+                .campos(camposResponse)
                 .warnings(warnings)
                 .build();
     }
@@ -137,12 +138,13 @@ public class AudioTranscripcionService {
         Map<String, String> campos = audioParserService.parseFactura(transcript);
         log.info("Campos detectados para factura: {}", campos);
         List<String> warnings = audioParserService.buildWarnings(campos, CAMPOS_FACTURA_OBLIGATORIOS);
+        Map<String, Object> camposResponse = new LinkedHashMap<>(campos);
         if (!warnings.isEmpty()) {
             log.warn("Warnings de parsing de factura: {}", warnings);
         }
         return AudioAutocompletarResponse.builder()
                 .transcript(transcript)
-                .campos(campos)
+                .campos(camposResponse)
                 .warnings(warnings)
                 .build();
     }

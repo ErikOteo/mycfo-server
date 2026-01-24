@@ -40,37 +40,37 @@ export default function CargaVistaFinal() {
     factura: {
       formulario: `${API_BASE}/api/carga-datos`,
       documento: `${API_BASE}/facturas/documento`,
-      foto: `${API_BASE}/api/carga-datos`,
+      foto: `${API_BASE}/facturas/foto`,
       audio: `${API_BASE}/api/carga-datos/facturas/audio`,
     },
     movimiento: {
       formulario: `${API_BASE}/api/carga-datos`,
       documento: `${API_BASE}/movimientos/documento`,
-      foto: `${API_BASE}/api/carga-datos`,
+      foto: `${API_BASE}/movimientos/foto`,
       audio: `${API_BASE}/api/carga-datos/movimientos/audio`,
     },
     ingreso: {
       formulario: `${API_BASE}/api/carga-datos`,
       documento: `${API_BASE}/movimientos/ingreso/documento`,
-      foto: `${API_BASE}/api/carga-datos`,
+      foto: `${API_BASE}/movimientos/foto`,
       audio: `${API_BASE}/api/carga-datos/movimientos/audio`,
     },
     egreso: {
       formulario: `${API_BASE}/api/carga-datos`,
       documento: `${API_BASE}/movimientos/egreso/documento`,
-      foto: `${API_BASE}/api/carga-datos`,
+      foto: `${API_BASE}/movimientos/foto`,
       audio: `${API_BASE}/api/carga-datos/movimientos/audio`,
     },
     deuda: {
       formulario: `${API_BASE}/api/carga-datos`,
       documento: `${API_BASE}/movimientos/deuda/documento`,
-      foto: `${API_BASE}/api/carga-datos`,
+      foto: `${API_BASE}/movimientos/foto`,
       audio: `${API_BASE}/api/carga-datos/movimientos/audio`,
     },
     acreencia: {
       formulario: `${API_BASE}/api/carga-datos`,
       documento: `${API_BASE}/movimientos/acreencia/documento`,
-      foto: `${API_BASE}/api/carga-datos`,
+      foto: `${API_BASE}/movimientos/foto`,
       audio: `${API_BASE}/api/carga-datos/movimientos/audio`,
     },
   };
@@ -198,6 +198,75 @@ export default function CargaVistaFinal() {
     });
   };
 
+  const handleResultadoFoto = (respuesta) => {
+    if (!respuesta) return;
+    console.group("Resultado de foto");
+    console.log("Payload recibido:", respuesta);
+    const campos = respuesta.campos || {};
+    const normalizados = {};
+    const normalizarNumero = (valor) => {
+      if (valor === null || valor === undefined || valor === "") return valor;
+      const texto = String(valor).trim().replace(/\s+/g, "");
+      if (texto.includes(",") && texto.includes(".")) {
+        return texto.replace(/\./g, "").replace(",", ".");
+      }
+      if (texto.includes(",")) {
+        return texto.replace(",", ".");
+      }
+      return texto;
+    };
+    Object.entries(campos).forEach(([clave, valor]) => {
+      if (valor === null || valor === undefined || valor === "") return;
+      if (clave === "fechaEmision" || clave === "fechaVencimiento") {
+        const fecha = dayjs(valor);
+        if (fecha.isValid()) {
+          normalizados[clave] = fecha;
+        }
+      } else if (["montoTotal", "montoCuota", "tasaInteres", "cantidadCuotas", "cuotasPagadas"].includes(clave)) {
+        normalizados[clave] = normalizarNumero(valor);
+      } else {
+        normalizados[clave] = valor;
+      }
+    });
+    if (Object.keys(normalizados).length > 0 && !normalizados.moneda) {
+      normalizados.moneda = "ARS";
+    }
+    const merged = { ...formData, ...normalizados };
+
+    const camposDetectados =
+      Object.entries(normalizados).some(([campo, valor]) => {
+        if (!campo) return false;
+        if (campo.toLowerCase() === "moneda") return false;
+        if (valor === null || valor === undefined) return false;
+        return String(valor).trim() !== "";
+      });
+
+    if (!camposDetectados) {
+      console.warn(
+        "Autocompletado por foto: no se detectaron campos para completar."
+      );
+      handleFallbackManual({
+        mensaje:
+          "No pudimos interpretar la imagen. Completa los datos manualmente.",
+      });
+      console.groupEnd();
+      return;
+    }
+
+    console.table(
+      Object.entries(normalizados).map(([campo, valor]) => ({
+        campo,
+        valor,
+      }))
+    );
+    console.groupEnd();
+    const vistaPrevia = prepararVistaPrevia(merged);
+    abrirDialogoFormulario({
+      datos: merged,
+      vistaPrevia,
+    });
+  };
+
   const renderContenido = () => {
     const LoadingFallback = () => (
       <Box
@@ -238,7 +307,9 @@ export default function CargaVistaFinal() {
             <CargaImagen
               tipoDoc={tipo}
               endpoint={endpoint}
+              onResultado={handleResultadoFoto}
               onFallback={handleFallbackManual}
+              dialogOpen={formDialogOpen}
             />
           </Suspense>
         );
@@ -296,7 +367,7 @@ export default function CargaVistaFinal() {
             }
           >
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {dialogData && renderVistaPrevia()}
+              {dialogData && tipo === "factura" && renderVistaPrevia()}
               {dialogMessage && (
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
                   {dialogMessage}

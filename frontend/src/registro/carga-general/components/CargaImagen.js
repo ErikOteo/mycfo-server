@@ -8,20 +8,33 @@ import {
   DialogContent,
   DialogTitle,
   Alert,
+  Button,
+  CircularProgress,
 } from "@mui/material";
 import { CameraAlt, Check, Close, Delete } from "@mui/icons-material";
 import Webcam from "react-webcam";
 import CustomButton from "../../../shared-components/CustomButton";
 import ImageIcon from "@mui/icons-material/Image";
-import axios from "axios";
+import http from "../../../api/http";
 
-export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
+const tipoMovimientoMap = {
+  Movimiento: "Movimiento",
+  Ingreso: "Ingreso",
+  Egreso: "Egreso",
+  Deuda: "Deuda",
+  Acreencia: "Acreencia",
+};
+
+export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen }) {
   const webcamRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [capturando, setCapturando] = useState(true);
   const [fotoTemporal, setFotoTemporal] = useState(null);
-  const [fotos, setFotos] = useState([]);
+  const [fotoFinal, setFotoFinal] = useState(null);
+  const [fotoNombre, setFotoNombre] = useState(null);
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [error, setError] = useState(null);
+  const [cargando, setCargando] = useState(false);
 
   const tomarFoto = () => {
     const img = webcamRef.current.getScreenshot();
@@ -30,7 +43,8 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
   };
 
   const aceptarFoto = () => {
-    setFotos((prev) => [...prev, fotoTemporal]);
+    setFotoFinal(fotoTemporal);
+    setFotoNombre("foto-capturada.jpg");
     setFotoTemporal(null);
     setCapturando(true);
   };
@@ -40,8 +54,22 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
     setCapturando(true);
   };
 
-  const eliminarFoto = (index) => {
-    setFotos((prev) => prev.filter((_, i) => i !== index));
+  const eliminarFoto = () => {
+    setFotoFinal(null);
+    setFotoNombre(null);
+  };
+
+  const seleccionarArchivo = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFotoFinal(reader.result);
+      setFotoNombre(file.name || "imagen.jpg");
+      setFotoTemporal(null);
+      setCapturando(true);
+    };
+    reader.readAsDataURL(file);
   };
 
   const dataURLtoBlob = (dataURL) => {
@@ -56,7 +84,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
   };
 
   const handleSubmit = async () => {
-    if (fotos.length === 0) return;
+    if (!fotoFinal) return;
     if (!endpoint) {
       setError("No se encontró el endpoint para subir las fotos.");
       if (onFallback) {
@@ -68,15 +96,58 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
       return;
     }
     try {
+      setCargando(true);
       const fd = new FormData();
-      fotos.forEach((f, idx) => {
-        fd.append("files", dataURLtoBlob(f), `foto-${idx + 1}.jpg`);
+      fd.append("files", dataURLtoBlob(fotoFinal), fotoNombre || "imagen.jpg");
+      const tipoMovimiento = tipoMovimientoMap[tipoDoc];
+      if (tipoMovimiento && endpoint.includes("/movimientos/")) {
+        fd.append("tipoMovimiento", tipoMovimiento);
+      }
+      if (tipoDoc) {
+        fd.append("tipoDoc", tipoDoc);
+      }
+      const usuarioSub = sessionStorage.getItem("sub");
+      const response = await http.post(endpoint, fd, {
+        headers: {
+          // http.js meterá Authorization + X-Usuario-Sub si faltan
+          "X-Usuario-Sub": usuarioSub,
+        },
       });
-      await axios.post(endpoint, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert("✅ Fotos enviadas!");
-      setFotos([]);
+      const { campos, warnings } = response.data || {};
+      if (warnings?.length) {
+        console.warn("Advertencias al procesar imagen:", warnings);
+      }
+
+      const camposDetectados =
+        campos &&
+        Object.entries(campos).some(([key, value]) => {
+          if (!key) return false;
+          if (key.toLowerCase() === "moneda") return false;
+          return value !== null && value !== undefined && String(value).trim() !== "";
+        });
+
+      if (!camposDetectados) {
+        const warningPayload = {
+          message: "No se pudo interpretar la imagen. Proba con una foto mas nitida.",
+        };
+        console.warn("Procesamiento de imagen sin campos detectados.", warningPayload);
+        if (onFallback) {
+          onFallback({
+            origen: "foto",
+            mensaje: "No pudimos interpretar la imagen. Completa los datos manualmente.",
+            detalle: warningPayload,
+          });
+        }
+        return;
+      }
+
+      if (onResultado) {
+        onResultado(response.data);
+      } else {
+        alert("Fotos enviadas!");
+      }
+      setFotoFinal(null);
+      setFotoNombre(null);
       setError(null);
     } catch (err) {
       console.error("❌ Error en envío de foto:", err);
@@ -89,8 +160,22 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
           detalle: err,
         });
       }
+    } finally {
+      setCargando(false);
     }
   };
+
+  if (cargando) {
+    return (
+      <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
+        <CircularProgress size={40} />
+      </Box>
+    );
+  }
+
+  if (dialogOpen) {
+    return null;
+  }
 
   return (
     <Box sx={{ mt: 3 }}>
@@ -118,6 +203,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
           <IconButton
             onClick={tomarFoto}
             color="primary"
+            disabled={cargando}
             sx={{
               position: "absolute",
               bottom: 16,
@@ -140,52 +226,67 @@ export default function CargaImagen({ tipoDoc, endpoint, onFallback }) {
               gap: 4,
             }}
           >
-            <IconButton onClick={rechazarFoto} color="error" sx={{ width: 50, height: 50 }}>
+            <IconButton onClick={rechazarFoto} color="error" disabled={cargando} sx={{ width: 50, height: 50 }}>
               <Close />
             </IconButton>
-            <IconButton onClick={aceptarFoto} color="success" sx={{ width: 50, height: 50 }}>
+            <IconButton onClick={aceptarFoto} color="success" disabled={cargando} sx={{ width: 50, height: 50 }}>
               <Check />
             </IconButton>
           </Box>
         )}
       </Box>
 
-      {fotos.length > 0 && (
+      <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={seleccionarArchivo}
+          style={{ display: "none" }}
+        />
+        <Button
+          variant="outlined"
+          disabled={cargando}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Subir imagen desde PC
+        </Button>
+      </Box>
+
+      {fotoFinal && (
         <>
           <Typography variant="subtitle1" sx={{ mt: 3 }}>
-            Fotos seleccionadas:
+            Imagen seleccionada:
           </Typography>
-          {fotos.map((f, i) => (
-            <Paper
-              key={i}
-              sx={{
-                mt: 1,
-                p: 1.5,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                border: "1px solid",
-                borderColor: "grey.400",
-                borderRadius: 1,
-              }}
-            >
-              <Typography variant="body2">{`foto-${i + 1}.jpg`}</Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <IconButton onClick={() => setFotoAmpliada(f)} size="small" color="primary">
-                  <ImageIcon />
-                </IconButton>
-                <IconButton onClick={() => eliminarFoto(i)} size="small" color="error">
-                  <Delete />
-                </IconButton>
-              </Box>
-            </Paper>
-          ))}
+          <Paper
+            sx={{
+              mt: 1,
+              p: 1.5,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              border: "1px solid",
+              borderColor: "grey.400",
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="body2">{fotoNombre || "imagen.jpg"}</Typography>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <IconButton onClick={() => setFotoAmpliada(fotoFinal)} size="small" color="primary">
+                <ImageIcon />
+              </IconButton>
+              <IconButton onClick={eliminarFoto} size="small" color="error">
+                <Delete />
+              </IconButton>
+            </Box>
+          </Paper>
 
           <CustomButton
-            label="Subir fotos"
+            label="Subir imagen"
             width="100%"
             sx={{ mt: 2 }}
             onClick={handleSubmit}
+            disabled={cargando}
           />
           {error && (
             <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
