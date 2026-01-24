@@ -223,11 +223,6 @@ const FacturaListPage = () => {
       }
     } catch (error) {
       console.error("[FacturaListPage] Error fetching facturas:", error);
-      setSnackbar({
-        open: true,
-        message: "Error al cargar las facturas",
-        severity: "error",
-      });
       setFacturas([]);
       setRowCount(0);
     } finally {
@@ -607,7 +602,7 @@ const FacturaListPage = () => {
         <TextField
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Buscar por número, tipo, monto, fecha o contrapartes"
+          placeholder="Buscar"
           size="small"
           InputProps={{
             startAdornment: (
@@ -631,6 +626,16 @@ const FacturaListPage = () => {
                 placeholder: "dd/mm/aaaa",
                 sx: { backgroundColor: "white", borderRadius: "8px" },
               },
+              openPickerButton: {
+                size: "small",
+                sx: {
+                  p: 0.5,
+                  border: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                },
+              },
+              openPickerIcon: { sx: { fontSize: 18 } },
             }}
             sx={{ width: 150, flex: "0 0 140px" }}
           />
@@ -645,6 +650,16 @@ const FacturaListPage = () => {
                 placeholder: "dd/mm/aaaa",
                 sx: { backgroundColor: "white", borderRadius: "8px" },
               },
+              openPickerButton: {
+                size: "small",
+                sx: {
+                  p: 0.5,
+                  border: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                },
+              },
+              openPickerIcon: { sx: { fontSize: 18 } },
             }}
             sx={{ width: 140, flex: "0 0 140px" }}
           />

@@ -237,10 +237,7 @@ export default function TablaRegistrosV2() {
       }
     } catch (error) {
       console.error("Error cargando movimientos:", error);
-      alert(
-        "Error al cargar movimientos: " +
-          (error.response?.data?.mensaje || error.message),
-      );
+      // Si falla (por ejemplo, fecha inválida), dejamos la tabla vacía sin alertas
       setMovimientos([]);
       setRowCount(0);
     } finally {
@@ -925,7 +922,7 @@ export default function TablaRegistrosV2() {
         <TextField
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Buscar por tipo, monto, fecha, descripcion, origen o destino"
+          placeholder="Buscar"
           size="small"
           InputProps={{
             startAdornment: (
@@ -949,6 +946,16 @@ export default function TablaRegistrosV2() {
                 placeholder: "dd/mm/aaaa",
                 sx: { backgroundColor: "white", borderRadius: "8px" },
               },
+              openPickerButton: {
+                size: "small",
+                sx: {
+                  p: 0.5,
+                  border: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                },
+              },
+              openPickerIcon: { sx: { fontSize: 18 } },
             }}
             sx={{ width: 150, flex: "0 0 140px" }}
           />
@@ -963,6 +970,16 @@ export default function TablaRegistrosV2() {
                 placeholder: "dd/mm/aaaa",
                 sx: { backgroundColor: "white", borderRadius: "8px" },
               },
+              openPickerButton: {
+                size: "small",
+                sx: {
+                  p: 0.5,
+                  border: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                },
+              },
+              openPickerIcon: { sx: { fontSize: 18 } },
             }}
             sx={{ width: 140, flex: "0 0 140px" }}
           />
