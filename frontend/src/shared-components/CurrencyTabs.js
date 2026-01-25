@@ -62,8 +62,32 @@ const CurrencyTabs = ({ value, onChange, sx }) => {
         onChange={handleChange}
         color="primary"
       >
-        <ToggleButton value="ARS">Pesos (ARS)</ToggleButton>
-        <ToggleButton value="USD">Dólares (USD)</ToggleButton>
+        <ToggleButton
+          value="ARS"
+          sx={(theme) => ({
+            color: theme.vars
+              ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+              : theme.palette.text.primary,
+            "&.Mui-selected": {
+              color: theme.palette.primary.contrastText,
+            },
+          })}
+        >
+          Pesos (ARS)
+        </ToggleButton>
+        <ToggleButton
+          value="USD"
+          sx={(theme) => ({
+            color: theme.vars
+              ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+              : theme.palette.text.primary,
+            "&.Mui-selected": {
+              color: theme.palette.primary.contrastText,
+            },
+          })}
+        >
+          Dólares (USD)
+        </ToggleButton>
       </ToggleButtonGroup>
     </Box>
   );
