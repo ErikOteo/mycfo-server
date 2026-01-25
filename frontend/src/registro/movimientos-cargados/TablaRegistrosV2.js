@@ -1137,7 +1137,18 @@ export default function TablaRegistrosV2() {
             Limpiar
           </Button>
         )}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: { xs: 0, md: "auto" } }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            ml: { xs: 0, md: "auto" },
+            flexWrap: "wrap",
+          }}
+        >
+          <Button variant="contained" onClick={() => navigate("/carga")}>
+            Cargar movimiento
+          </Button>
           <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
         </Box>
       </Box>
