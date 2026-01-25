@@ -214,4 +214,17 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     List<Movimiento> findByDocumentoComercialIsNullAndMoneda(TipoMoneda moneda);
     Page<Movimiento> findByMoneda(TipoMoneda moneda, Pageable pageable);
     List<Movimiento> findByMoneda(TipoMoneda moneda);
+
+    // Métodos filtrados por empresa (multi-tenant)
+    Page<Movimiento> findByOrganizacionId(Long organizacionId, Pageable pageable);
+    List<Movimiento> findByOrganizacionId(Long organizacionId);
+
+    Page<Movimiento> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda, Pageable pageable);
+    List<Movimiento> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda);
+
+    Page<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNull(Long organizacionId, Pageable pageable);
+    List<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNull(Long organizacionId);
+
+    Page<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNullAndMoneda(Long organizacionId, TipoMoneda moneda, Pageable pageable);
+    List<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNullAndMoneda(Long organizacionId, TipoMoneda moneda);
 }
