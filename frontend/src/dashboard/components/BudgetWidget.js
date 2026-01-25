@@ -14,9 +14,10 @@ import Divider from "@mui/material/Divider";
 import Box from "@mui/material/Box";
 import { useNavigate } from "react-router-dom";
 import http from "../../api/http";
-import { formatCurrencyAR, formatPercentage } from "../../utils/formatters";
+import { formatCurrencyByCode, formatPercentage } from "../../utils/formatters";
 import useResolvedColorTokens from "../useResolvedColorTokens";
 import API_CONFIG from "../../config/api-config";
+import { matchesCurrencyFilter } from "../../pronostico/presupuesto/utils/currencyTag";
 
 const getStatusColor = (ratio) => {
   if (ratio <= 0.9) {
@@ -242,6 +243,7 @@ const BudgetWidget = ({
   loading: externalLoading = false,
   error: externalError = null,
   onRetry,
+  currency = "ARS",
 }) => {
   const navigate = useNavigate();
   const { resolvedMode, primaryTextColor, secondaryTextColor } = useResolvedColorTokens();
@@ -279,6 +281,7 @@ const BudgetWidget = ({
       params.set("page", "0");
       params.set("size", "100");
       params.set("sort", "createdAt,desc");
+      if (currency) params.set("moneda", currency);
       const response = await http.get(
         `${baseURL}/api/presupuestos?${params.toString()}`,
         {
@@ -287,7 +290,9 @@ const BudgetWidget = ({
           }
         }
       );
-      const list = extractBudgetList(response?.data);
+      const list = extractBudgetList(response?.data).filter((item) =>
+        matchesCurrencyFilter(item?.nombre, currency)
+      );
       const vigente = list.find((item) =>
         isBudgetActiveOnDate(item, referenceDate),
       );
@@ -330,6 +335,7 @@ const BudgetWidget = ({
     externalError,
     baseURL,
     referenceDate,
+    currency,
   ]);
 
   React.useEffect(() => {
@@ -435,14 +441,14 @@ const BudgetWidget = ({
               <Stack direction="row" justifyContent="space-between">
                 <Typography variant="body2" color="text.secondary">
                   Saldo estimado:{" "}
-                  {formatCurrencyAR(budget.totals.saldoEstimado)}
+                  {formatCurrencyByCode(budget.totals.saldoEstimado, currency)}
                 </Typography>
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   fontWeight={600}
                 >
-                  Saldo real: {formatCurrencyAR(budget.totals.saldoReal)}
+                  Saldo real: {formatCurrencyByCode(budget.totals.saldoReal, currency)}
                 </Typography>
               </Stack>
             ) : null}
@@ -495,18 +501,18 @@ const BudgetWidget = ({
                         },
                       }}
                     />
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        Planificado: {formatCurrencyAR(planned)}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        fontWeight={600}
-                      >
-                        Ejecutado: {formatCurrencyAR(actual)}
-                      </Typography>
-                    </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">
+                      Planificado: {formatCurrencyByCode(planned, currency)}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      fontWeight={600}
+                    >
+                      Ejecutado: {formatCurrencyByCode(actual, currency)}
+                    </Typography>
+                  </Stack>
                     <Divider sx={{ my: 0.5 }} />
                   </Box>
                 );

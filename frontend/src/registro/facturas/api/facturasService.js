@@ -29,6 +29,7 @@ export const fetchFacturas = async ({
   fechaHasta,
   tipoFactura,
   estadoPago,
+  moneda,
   search,
   searchDate,
 } = {}) => {
@@ -43,6 +44,7 @@ export const fetchFacturas = async ({
   if (fechaHasta) params.append("fechaHasta", fechaHasta);
   if (tipoFactura) params.append("tipoFactura", tipoFactura);
   if (estadoPago) params.append("estadoPago", estadoPago);
+  if (moneda) params.append("moneda", moneda);
   if (search) params.append("search", search);
   if (searchDate) params.append("searchDate", searchDate);
 

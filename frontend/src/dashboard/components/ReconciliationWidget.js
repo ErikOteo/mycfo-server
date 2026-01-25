@@ -11,25 +11,11 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import useResolvedColorTokens from "../useResolvedColorTokens";
+import { formatCurrencyByCode } from "../../utils/formatters";
 
 const numberFormatter = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 0,
 });
-
-const formatCurrency = (value) => {
-  if (value === null || value === undefined) {
-    return "--";
-  }
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(numeric);
-};
 
 const percentFormatter = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 0,
@@ -59,9 +45,14 @@ const ReconciliationWidget = ({
   error = null,
   onRetry,
   onNavigate,
+  currency = "ARS",
 }) => {
   const { resolvedMode } = useResolvedColorTokens();
   const isDarkMode = resolvedMode === "dark";
+  const formatAmount = React.useCallback(
+    (value) => formatCurrencyByCode(value, currency, { fallback: "--" }),
+    [currency]
+  );
 
   if (loading) {
     return (
@@ -251,7 +242,7 @@ const ReconciliationWidget = ({
                               color: (item.tipo === "Egreso" || item.montoTotal < 0) ? "error.main" : "success.main" 
                             }}
                           >
-                            {formatCurrency(item.montoTotal)}
+                            {formatAmount(item.montoTotal)}
                           </Typography>
                         )}
                       </Stack>

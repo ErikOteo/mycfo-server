@@ -10,6 +10,7 @@ import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
 
 export default function MainGrid() {
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
@@ -19,7 +20,13 @@ export default function MainGrid() {
     const [exportingPdf, setExportingPdf] = React.useState(false);
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
-    const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
+    const [currency, setCurrency] = usePreferredCurrency("ARS");
+
+    // Formateo de moneda para tooltips y ejes
+    const formatCurrency = React.useCallback(
+        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        [currency]
+    );
 
     const handleYearChange = (e) => setSelectedYear(e.target.value);
 
@@ -33,8 +40,12 @@ export default function MainGrid() {
         if (sub) headers['X-Usuario-Sub'] = sub;
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
+        const params = new URLSearchParams();
+        params.set('anio', selectedYear);
+        if (currency) params.set('moneda', currency);
+
         setLoading(true);
-        fetch(`${baseUrl}/cashflow?anio=${selectedYear}`, { headers })
+        fetch(`${baseUrl}/cashflow?${params.toString()}`, { headers })
             .then(async (r) => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const json = await r.json();
@@ -47,7 +58,7 @@ export default function MainGrid() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [selectedYear]);
+    }, [currency, selectedYear]);
 
     // Cargar logo para la carátula
     React.useEffect(() => {
@@ -165,7 +176,7 @@ export default function MainGrid() {
 
         exportToExcel(
             excelData,
-            `flujo-caja-${selectedYear}`,
+            `flujo-caja-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
             "Flujo de caja",
             colsConfig,
             mergesConfig,
@@ -191,9 +202,9 @@ export default function MainGrid() {
             const head = [["Mes", "Ingresos", "Egresos", "Neto"]];
             const body = meses.map((mes, i) => [
                 mes,
-                currency(totalIngresosMensual[i] || 0),
-                currency(totalEgresosMensual[i] || 0),
-                currency(netosMensual[i] || 0),
+                formatCurrency(totalIngresosMensual[i] || 0),
+                formatCurrency(totalEgresosMensual[i] || 0),
+                formatCurrency(netosMensual[i] || 0),
             ]);
 
             const totalIngresos = totalIngresosMensual.reduce((a, b) => a + (b || 0), 0);
@@ -206,16 +217,16 @@ export default function MainGrid() {
                 subtitle: `Periodo ${selectedYear}`,
                 charts: [{ element: chartElement }],
                 table: { head, body },
-                fileName: `flujo-caja-${selectedYear}`,
+                fileName: `flujo-caja-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
                 cover: {
                     show: true,
                     subtitle: `Periodo ${selectedYear}`,
                     logo: logoDataUrl,
                     meta: [{ label: "Generado", value: new Date().toLocaleDateString('es-AR') }],
                     kpis: [
-                        { label: "Ingresos", value: currency(totalIngresos) },
-                        { label: "Egresos", value: currency(totalEgresos) },
-                        { label: "Cash final", value: currency(cashFinal) },
+                        { label: "Ingresos", value: formatCurrency(totalIngresos) },
+                        { label: "Egresos", value: formatCurrency(totalEgresos) },
+                        { label: "Cash final", value: formatCurrency(cashFinal) },
                     ],
                 },
             });
@@ -241,7 +252,8 @@ export default function MainGrid() {
     }
 
     return (
-        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, p: 3 }}>
+        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, px: { xs: 2, md: 3 }, pt: { xs: 1.5, md: 2 }, pb: 3 }}>
+            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography component="h2" variant="h4">
                     Flujo de caja anual
@@ -269,8 +281,8 @@ export default function MainGrid() {
                         <BarChart data={dataGrafico} margin={{ top: 8, right: 16, bottom: 8, left: 56 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                             <XAxis dataKey="mes" />
-                            <YAxis tickFormatter={(v) => currency(v)} width={80} />
-                            <Tooltip formatter={(v) => currency(v)} />
+                            <YAxis tickFormatter={(v) => formatCurrency(v)} width={80} />
+                            <Tooltip formatter={(v) => formatCurrency(v)} />
                             <Legend />
                             <Bar dataKey="Ingresos" fill="#2e7d32" />
                             <Bar dataKey="Egresos" fill="#c62828" />

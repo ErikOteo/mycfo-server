@@ -14,17 +14,15 @@ import LinkIcon from "@mui/icons-material/Link";
 import StarIcon from "@mui/icons-material/Star";
 import StarHalfIcon from "@mui/icons-material/StarHalf";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
+import { formatCurrencyByCode } from "../../utils/formatters";
 
 /**
  * Card para mostrar un documento sugerido en el panel de conciliación
  */
 export default function DocumentoCard({ documento, onVincular }) {
-  const formatMonto = (monto) => {
-    if (!monto) return "$0";
-    return new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-    }).format(Math.abs(monto));
+  const formatMonto = (monto, moneda) => {
+    if (!monto && monto !== 0) return "$0";
+    return formatCurrencyByCode(Math.abs(monto), moneda || "ARS", { fallback: "$0" });
   };
 
   const formatFecha = (fecha) => {
@@ -160,7 +158,7 @@ export default function DocumentoCard({ documento, onVincular }) {
                 variant="body2"
                 sx={{ fontWeight: 500, color: "#1976d2" }}
               >
-                {formatMonto(documento.montoTotal)}
+                {formatMonto(documento.montoTotal, documento.moneda)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {formatFecha(documento.fechaEmision)}

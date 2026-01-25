@@ -37,7 +37,6 @@ import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import WalletIcon from "@mui/icons-material/Wallet";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import axios from "axios";
 import API_CONFIG from "../../config/api-config";
 import CustomSelect from "../../shared-components/CustomSelect";
 import dayjs from "dayjs";
@@ -57,6 +56,10 @@ import { exportPdfReport } from "../../utils/exportPdfUtils";
 
 // ✅ IMPORTANTE: usar tu cliente central con interceptors
 import http from "../../api/http";
+import CurrencyTabs, {
+  getStoredCurrencyPreference,
+  persistCurrencyPreference,
+} from "../../shared-components/CurrencyTabs";
 
 export default function TablaRegistrosV2() {
   const [movimientos, setMovimientos] = useState([]);
@@ -70,7 +73,7 @@ export default function TablaRegistrosV2() {
     pageSize: 10,
   });
   const [rowCount, setRowCount] = useState(0);
-
+  const [currency, setCurrency] = useState(getStoredCurrencyPreference());
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("view"); // "view" o "edit"
@@ -200,6 +203,13 @@ export default function TablaRegistrosV2() {
     }
   };
 
+  const handleCurrencyChange = useCallback((nextCurrency) => {
+    if (!nextCurrency) return;
+    persistCurrencyPreference(nextCurrency);
+    setCurrency(nextCurrency);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  }, []);
+
   const cargarMovimientos = useCallback(async () => {
     setLoading(true);
     try {
@@ -219,7 +229,8 @@ export default function TablaRegistrosV2() {
         size: paginationModel.pageSize,
         sortBy: "fechaEmision",
         sortDir: "desc",
-        // Si es fecha, usamos searchDate y no enviamos el texto para evitar condiciГіn AND que vacГ­a resultados
+        moneda: currency,
+        // Si es fecha, usamos searchDate y no enviamos el texto para evitar condición AND que vacía resultados
         search: searchDateISO ? undefined : debouncedSearch || undefined,
         searchDate: searchDateISO || undefined,
         fechaDesde: fechaDesde
@@ -238,7 +249,7 @@ export default function TablaRegistrosV2() {
         searchDate: searchDateISO,
       });
 
-      const response = await axios.get(`${API_BASE}/movimientos`, {
+      const response = await http.get(`${API_BASE}/movimientos`, {
         headers,
         params,
       });
@@ -267,7 +278,7 @@ export default function TablaRegistrosV2() {
     } finally {
       setLoading(false);
     }
-  }, [paginationModel, debouncedSearch, searchDateISO, fechaDesde, fechaHasta]);
+  }, [currency, paginationModel, debouncedSearch, searchDateISO, fechaDesde, fechaHasta]);
 
   const initializedRef = useRef(false);
 
@@ -430,7 +441,7 @@ export default function TablaRegistrosV2() {
 
       console.log("📤 Enviando datos al backend:", datosParaBackend);
 
-      await axios.put(
+      await http.put(
         `${API_BASE}/movimientos/${selectedMovimiento.id}`,
         datosParaBackend,
         { headers },
@@ -462,7 +473,7 @@ export default function TablaRegistrosV2() {
       const usuarioSub = sessionStorage.getItem("sub");
       const headers = { "X-Usuario-Sub": usuarioSub };
 
-      await axios.delete(`${API_BASE}/movimientos/${movimientoToDelete.id}`, {
+      await http.delete(`${API_BASE}/movimientos/${movimientoToDelete.id}`, {
         headers,
       });
       setSuccessSnackbar({
@@ -637,6 +648,7 @@ export default function TablaRegistrosV2() {
     searchDate: searchDateISO || undefined,
     fechaDesde: fechaDesde ? dayjs(fechaDesde).format("YYYY-MM-DD") : undefined,
     fechaHasta: fechaHasta ? dayjs(fechaHasta).format("YYYY-MM-DD") : undefined,
+    moneda: currency,
   });
 
   const fetchMovimientosParaExportar = async () => {
@@ -650,7 +662,7 @@ export default function TablaRegistrosV2() {
     const params = buildExportParams();
 
     try {
-      const response = await axios.get(`${API_BASE}/movimientos`, {
+      const response = await http.get(`${API_BASE}/movimientos`, {
         headers,
         params,
       });
@@ -918,7 +930,7 @@ export default function TablaRegistrosV2() {
       descripcionColumn,
       accionesColumn,
     ];
-  }, [isMobile, usuarioRol]);
+  }, [isMobile, usuarioRol, currency]);
 
   const exportColumns = React.useMemo(
     () => columns.filter((col) => col.field !== "acciones"),
@@ -1017,7 +1029,19 @@ export default function TablaRegistrosV2() {
   };
 
   return (
-    <Box sx={{ width: "100%", p: 3 }}>
+    <Box
+      sx={{
+        width: "100%",
+        px: { xs: 2, md: 3 },
+        pt: { xs: 1.5, md: 2 },
+        pb: 3,
+      }}
+    >
+      <CurrencyTabs
+        value={currency}
+        onChange={handleCurrencyChange}
+        sx={{ justifyContent: "center", mb: 1.5 }}
+      />
       <Typography
         variant="h4"
         component="h1"

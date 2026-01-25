@@ -12,21 +12,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useTheme, alpha } from "@mui/material/styles";
 import useResolvedColorTokens from "../useResolvedColorTokens";
-
-const formatCurrency = (value) => {
-  if (value === null || value === undefined) {
-    return "--";
-  }
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(numeric);
-};
+import { formatCurrencyByCode } from "../../utils/formatters";
 
 const SalesByCategoryWidget = ({
   data = [],
@@ -35,10 +21,15 @@ const SalesByCategoryWidget = ({
   emptyMessage = "No hay datos para mostrar por categoría en este período.",
   title = "Ingresos por categorías",
   subtitle = "Distribución anual por segmento",
+  currency = "ARS",
 }) => {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const { primaryTextColor, secondaryTextColor } = useResolvedColorTokens();
+  const formatAmount = React.useCallback(
+    (value) => formatCurrencyByCode(value, currency, { fallback: "--" }),
+    [currency]
+  );
 
   if (loading) {
     return (
@@ -155,7 +146,7 @@ const SalesByCategoryWidget = ({
                     fontWeight={600}
                     sx={{ color: primaryTextColor }}
                   >
-                    {formatCurrency(topCategory?.value)}
+                    {formatAmount(topCategory?.value)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: primaryTextColor }}>
                     {topCategory?.category ?? "--"}
@@ -177,7 +168,7 @@ const SalesByCategoryWidget = ({
                     fontWeight={600}
                     sx={{ color: primaryTextColor }}
                   >
-                    {formatCurrency(bottomCategory?.value)}
+                    {formatAmount(bottomCategory?.value)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: primaryTextColor }}>
                     {bottomCategory?.category ?? "--"}
@@ -195,12 +186,12 @@ const SalesByCategoryWidget = ({
                     Promedio
                   </Typography>
                   <Typography
-                    variant="subtitle2"
-                    fontWeight={600}
-                    sx={{ color: primaryTextColor }}
-                  >
-                    {formatCurrency(average)}
-                  </Typography>
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{ color: primaryTextColor }}
+                >
+                  {formatAmount(average)}
+                </Typography>
                   <Typography variant="caption" sx={{ color: primaryTextColor }}>
                     {chartData.length} categorías
                   </Typography>
@@ -256,7 +247,7 @@ const SalesByCategoryWidget = ({
                 />
                 <YAxis 
                   tick={{ fill: primaryTextColor, fontSize: 9 }}
-                  tickFormatter={(value) => formatCurrency(value)}
+                  tickFormatter={(value) => formatAmount(value)}
                   width={80}
                 />
                 <Tooltip 
@@ -266,7 +257,7 @@ const SalesByCategoryWidget = ({
                     borderRadius: 8,
                   }}
                   labelStyle={{ color: primaryTextColor }}
-                  formatter={(value) => [formatCurrency(value), "Valor"]}
+                  formatter={(value) => [formatAmount(value), "Valor"]}
                 />
                 <Bar 
                   dataKey="value" 

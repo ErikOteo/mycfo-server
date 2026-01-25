@@ -18,6 +18,7 @@ import registro.cargarDatos.dtos.ResumenMensualResponse;
 import registro.cargarDatos.dtos.SaldoTotalResponse;
 import registro.cargarDatos.models.Factura;
 import registro.cargarDatos.models.Movimiento;
+import registro.cargarDatos.models.TipoMoneda;
 import registro.cargarDatos.models.TipoMovimiento;
 import registro.cargarDatos.services.FacturaService;
 import registro.cargarDatos.services.MovimientoService;
@@ -153,6 +154,7 @@ public class MovimientoController {
             @RequestParam(required = false) List<TipoMovimiento> tipos,
             @RequestParam(required = false) Boolean conciliado,
             @RequestParam(required = false) String nombreRelacionado,
+            @RequestParam(required = false) String moneda,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchDate,
             @RequestParam(defaultValue = "0") int page,
@@ -163,6 +165,15 @@ public class MovimientoController {
         try {
             // Obtener empresa del usuario
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+            TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = TipoMoneda.fromString(moneda);
+                } catch (IllegalArgumentException ex) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
             
             Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
             Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
@@ -177,6 +188,7 @@ public class MovimientoController {
                     tipos,
                     conciliado,
                     nombreRelacionado,
+                    monedaEnum,
                     search,
                     searchDate,
                     pageable
@@ -201,12 +213,22 @@ public class MovimientoController {
             @RequestParam(required = false) List<TipoMovimiento> tipos,
             @RequestParam(required = false) Boolean conciliado,
             @RequestParam(required = false) String nombreRelacionado,
+            @RequestParam(required = false) String moneda,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchDate) {
-        
+
         try {
             // Obtener empresa del usuario
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+            TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = TipoMoneda.fromString(moneda);
+                } catch (IllegalArgumentException ex) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
             
             log.debug("Obteniendo todos los movimientos para empresa: {}", empresaId);
             
@@ -218,6 +240,7 @@ public class MovimientoController {
                     tipos,
                     conciliado,
                     nombreRelacionado,
+                    monedaEnum,
                     search,
                     searchDate
             );
@@ -324,46 +347,61 @@ public class MovimientoController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
             @RequestParam(required = false, defaultValue = "12") Integer meses,
             @RequestParam(required = false, defaultValue = "6") Integer limiteMovimientos,
-            @RequestParam(required = false, defaultValue = "6") Integer limiteFacturas
+            @RequestParam(required = false, defaultValue = "6") Integer limiteFacturas,
+            @RequestParam(required = false) String moneda
     ) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+            TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = TipoMoneda.fromString(moneda);
+                } catch (IllegalArgumentException ex) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
 
             LocalDate fechaBase = fecha != null ? fecha : LocalDate.now();
             int mesesSeguros = meses != null ? meses : 12;
             int limiteMovsSeguros = limiteMovimientos != null ? Math.max(limiteMovimientos, 1) : 6;
             int limiteFactSeguros = limiteFacturas != null ? Math.max(limiteFacturas, 1) : 6;
 
-            ResumenMensualResponse resumenMensual = movimientoService.obtenerResumenMensual(empresaId, null, fechaBase);
+            ResumenMensualResponse resumenMensual = movimientoService.obtenerResumenMensual(empresaId, null, fechaBase, monedaEnum);
             MontosMensualesResponse ingresosMensuales = movimientoService.obtenerIngresosMensuales(
                     empresaId,
                     usuarioSub,
                     fechaBase,
-                    mesesSeguros
+                    mesesSeguros,
+                    monedaEnum
             );
             MontosMensualesResponse egresosMensuales = movimientoService.obtenerEgresosMensuales(
                     empresaId,
                     usuarioSub,
                     fechaBase,
-                    mesesSeguros
+                    mesesSeguros,
+                    monedaEnum
             );
             MontosPorCategoriaResponse ingresosPorCategoria = movimientoService.obtenerIngresosPorCategoria(
                     empresaId,
                     usuarioSub,
-                    fechaBase
+                    fechaBase,
+                    monedaEnum
             );
             MontosPorCategoriaResponse egresosPorCategoria = movimientoService.obtenerEgresosPorCategoria(
                     empresaId,
                     usuarioSub,
-                    fechaBase
+                    fechaBase,
+                    monedaEnum
             );
             ConciliacionResumenResponse conciliacion = movimientoService.obtenerResumenConciliacion(
                     empresaId,
                     usuarioSub,
-                    fechaBase
+                    fechaBase,
+                    monedaEnum
             );
 
-            Double saldoTotalValor = movimientoService.obtenerSaldoTotalEmpresa(empresaId);
+            Double saldoTotalValor = movimientoService.obtenerSaldoTotalEmpresa(empresaId, monedaEnum);
             SaldoTotalResponse saldoTotal = SaldoTotalResponse.builder()
                     .organizacionId(empresaId)
                     .saldoTotal(saldoTotalValor)
@@ -378,6 +416,7 @@ public class MovimientoController {
                     null,
                     null,
                     null,
+                    monedaEnum,
                     null,
                     null,
                     movimientosPageable
@@ -387,6 +426,7 @@ public class MovimientoController {
             Pageable facturasPageable = PageRequest.of(0, limiteFactSeguros, Sort.by(Sort.Direction.DESC, "fechaEmision"));
             org.springframework.data.domain.Page<Factura> facturasPage = facturaService.listarPaginadasPorOrganizacion(
                     empresaId,
+                    monedaEnum,
                     facturasPageable
             );
             List<Factura> facturasRecientes = facturasPage.getContent();
@@ -535,16 +575,25 @@ public class MovimientoController {
     public ResponseEntity<MovimientosPresupuestoResponse> obtenerMovimientosParaPresupuesto(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @RequestParam(required = false) String moneda
     ) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+            TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = TipoMoneda.fromString(moneda);
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
             
             log.info("Obteniendo movimientos para presupuesto - Empresa: {}, Desde: {}, Hasta: {}", 
                     empresaId, fechaDesde, fechaHasta);
             
             MovimientosPresupuestoResponse response = movimientoService.obtenerMovimientosParaPresupuesto(
-                    empresaId, fechaDesde, fechaHasta);
+                    empresaId, fechaDesde, fechaHasta, monedaEnum);
             
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {

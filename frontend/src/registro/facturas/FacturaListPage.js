@@ -31,9 +31,12 @@ import {
   deleteFactura,
   updateFactura,
 } from "./api/facturasService";
-import { formatCurrencyAR } from "../../utils/formatters";
+import { formatCurrencyByCode } from "../../utils/formatters";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import API_CONFIG from "../../config/api-config";
+import CurrencyTabs, {
+  usePreferredCurrency,
+} from "../../shared-components/CurrencyTabs";
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
@@ -72,6 +75,7 @@ const FacturaListPage = () => {
   });
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [usuarioRol, setUsuarioRol] = useState(null);
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState(null); // Dayjs | null
@@ -234,6 +238,7 @@ const FacturaListPage = () => {
         fechaDesde: fromDate ? fromDate.format("YYYY-MM-DD") : undefined,
         fechaHasta: toDate ? toDate.format("YYYY-MM-DD") : undefined,
         ...filters,
+        moneda: currency,
       };
       console.debug("[FacturaListPage] Params enviados:", params);
       const response = await fetchFacturas(params);
@@ -255,6 +260,7 @@ const FacturaListPage = () => {
       setLoading(false);
     }
   }, [
+    currency,
     filters,
     paginationModel,
     debouncedSearch,
@@ -277,6 +283,7 @@ const FacturaListPage = () => {
           ? dayjs(fechaHasta).format("YYYY-MM-DD")
           : undefined,
         ...filters,
+        moneda: currency,
       });
 
       if (response && typeof response === "object" && "content" in response) {
@@ -296,6 +303,7 @@ const FacturaListPage = () => {
     fechaDesde,
     fechaHasta,
     filters,
+    currency,
   ]);
 
   const cargarRolUsuario = useCallback(() => {
@@ -327,6 +335,12 @@ const FacturaListPage = () => {
     ],
     [],
   );
+
+  const handleCurrencyChange = useCallback((next) => {
+    if (!next) return;
+    setCurrency(next);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
+  }, [setCurrency]);
 
   const initialState = useMemo(
     () => ({
@@ -585,7 +599,7 @@ const FacturaListPage = () => {
         minWidth: 140,
         renderCell: (params) =>
           params.row.montoTotal != null
-            ? formatCurrencyAR(params.row.montoTotal)
+            ? formatCurrencyByCode(params.row.montoTotal, params.row.moneda || currency)
             : "-",
       },
       {
@@ -638,7 +652,7 @@ const FacturaListPage = () => {
       },
       accionesColumn,
     ];
-  }, [isMobile, usuarioRol, formatFechaEmision, parseFechaEmision]);
+  }, [currency, isMobile, usuarioRol, formatFechaEmision, parseFechaEmision]);
 
   const exportColumns = useMemo(
     () => columns.filter((c) => c.field !== "acciones"),
@@ -648,7 +662,9 @@ const FacturaListPage = () => {
   const formatValorExport = (row, field) => {
     if (field === "fechaEmision") return formatFechaEmision(row.fechaEmision);
     if (field === "montoTotal") {
-      return row.montoTotal != null ? formatCurrencyAR(row.montoTotal) : "-";
+      return row.montoTotal != null
+        ? formatCurrencyByCode(row.montoTotal, row.moneda || currency)
+        : "-";
     }
     const value = row[field];
     if (value == null) return "-";
@@ -670,7 +686,7 @@ const FacturaListPage = () => {
 
     exportToExcel(
       excelData,
-      "Facturas",
+      `facturas-${(currency || "ARS").toLowerCase()}`,
       "Facturas",
       colsConfig,
       [],
@@ -695,7 +711,7 @@ const FacturaListPage = () => {
       subtitle: "Listado",
       charts: [],
       table: { head, body },
-      fileName: "Facturas",
+      fileName: `facturas-${(currency || "ARS").toLowerCase()}`,
       footerOnFirstPage: false,
       cover: {
         show: true,
@@ -719,7 +735,18 @@ const FacturaListPage = () => {
   };
 
   return (
-    <Box sx={{ width: "100%", p: 3 }}>
+    <Box
+      sx={{
+        width: "100%",
+        px: { xs: 2, md: 3 },
+        pt: { xs: 1.5, md: 2 },
+      }}
+    >
+      <CurrencyTabs
+        value={currency}
+        onChange={handleCurrencyChange}
+        sx={{ justifyContent: "center", mb: 1.5 }}
+      />
       <Typography
         variant="h4"
         component="h1"

@@ -83,7 +83,9 @@ export default function CargaFormulario({
   React.useEffect(() => {
     setFormData((prev) => {
       const actual = prev || {};
-      if (actual.moneda === "ARS") return actual;
+      if (actual.moneda) {
+        return actual;
+      }
       return { ...actual, moneda: "ARS" };
     });
   }, [setFormData]);
@@ -113,7 +115,9 @@ export default function CargaFormulario({
         resultado[clave] = valor ?? "";
       }
     });
-    resultado.moneda = "ARS";
+    if (resultado.moneda === undefined || resultado.moneda === null || resultado.moneda === "") {
+      resultado.moneda = "ARS";
+    }
     return resultado;
   }, []);
 
