@@ -17,11 +17,11 @@ public class InsightsController {
     @PostMapping("/insights")
     public ResponseEntity<Map<String, Object>> generarInsights(
             @RequestHeader("X-Usuario-Sub") String userSub,
+            @RequestHeader("Authorization") String authorization,
             @RequestParam(required = false) Integer anio,
             @RequestParam(required = false) Integer mes
     ) {
-        var resp = insightsService.generarInsights(userSub, anio, mes);
+        var resp = insightsService.generarInsights(userSub, authorization, anio, mes);
         return ResponseEntity.ok(resp);
     }
 }
-

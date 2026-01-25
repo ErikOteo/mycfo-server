@@ -9,10 +9,14 @@ const EXPORT_EXCEL_BG = '#E5F4E5';
 const EXPORT_EXCEL_BG_HOVER = '#CAE7CB';
 
 export default function ExportadorSimple({
-                                             onExportPdf,
-                                             onExportExcel,
-                                             sx = {},
-                                         }) {
+    onExportPdf,
+    onExportExcel,
+    exportingPdf = false,
+    exportingExcel = false,
+    disabledPdf = false,
+    disabledExcel = false,
+    sx = {},
+}) {
     return (
         <Box
             sx={{
@@ -22,11 +26,12 @@ export default function ExportadorSimple({
                 ...sx,
             }}
         >
-            <Tooltip title="Exportar PDF">
+            <Tooltip title={exportingPdf ? "Generando PDF..." : "Exportar PDF"}>
                 <IconButton
                     onClick={onExportPdf}
                     size="small"
                     color="error"
+                    disabled={disabledPdf || exportingPdf}
                     sx={(theme) => {
                         const hoverStyles = {
                             bgcolor: `${EXPORT_PDF_BG_HOVER} !important`,
@@ -47,6 +52,8 @@ export default function ExportadorSimple({
                             '&:hover': hoverStyles,
                             width: 36,
                             height: 36,
+                            opacity: (disabledPdf || exportingPdf) ? 0.6 : 1,
+                            cursor: (disabledPdf || exportingPdf) ? 'not-allowed' : 'pointer',
                             ...theme.applyStyles('dark', {
                                 borderColor: '#d32f2f',
                                 '&:hover': hoverStyles,
@@ -54,16 +61,18 @@ export default function ExportadorSimple({
                         };
                     }}
                     aria-label="Exportar PDF"
+                    aria-busy={exportingPdf}
                 >
                     <PictureAsPdfIcon fontSize="small" />
                 </IconButton>
             </Tooltip>
 
-            <Tooltip title="Exportar Excel">
+            <Tooltip title={exportingExcel ? "Generando Excel..." : "Exportar Excel"}>
                 <IconButton
                     onClick={onExportExcel}
                     size="small"
                     color="success"
+                    disabled={disabledExcel || exportingExcel}
                     sx={(theme) => {
                         const hoverStyles = {
                             bgcolor: `${EXPORT_EXCEL_BG_HOVER} !important`,
@@ -84,6 +93,8 @@ export default function ExportadorSimple({
                             '&:hover': hoverStyles,
                             width: 36,
                             height: 36,
+                            opacity: (disabledExcel || exportingExcel) ? 0.6 : 1,
+                            cursor: (disabledExcel || exportingExcel) ? 'not-allowed' : 'pointer',
                             ...theme.applyStyles('dark', {
                                 borderColor: '#2e7d32',
                                 '&:hover': hoverStyles,
@@ -91,6 +102,7 @@ export default function ExportadorSimple({
                         };
                     }}
                     aria-label="Exportar Excel"
+                    aria-busy={exportingExcel}
                 >
                     <GridOnIcon fontSize="small" /> {/* Icono de tabla tipo Excel */}
                 </IconButton>

@@ -169,7 +169,10 @@ public class EventService {
         String title = "Reporte generado: " + evt.reportName();
         String body = String.format("Tipo: %s | Periodo: %s", evt.reportType(), evt.period());
 
-        NotificationType type = evt.hasAnomalies() ? NotificationType.REPORT_ANOMALY : NotificationType.REPORT_READY;
+        boolean isMonthly = "MONTHLY_SUMMARY".equalsIgnoreCase(evt.reportType());
+        NotificationType type = isMonthly
+                ? NotificationType.MONTHLY_SUMMARY
+                : (evt.hasAnomalies() ? NotificationType.REPORT_ANOMALY : NotificationType.REPORT_READY);
         Severity severity = evt.hasAnomalies() ? Severity.WARN : Severity.INFO;
 
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
@@ -180,6 +183,53 @@ public class EventService {
                         title,
                         body,
                         severity,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleBudgetWarning(BudgetWarningEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
+
+        String title = "Presupuesto al " + evt.executedPercent() + "%: " + evt.budgetName();
+        String body = "Categoria: %s | Presupuestado: $%s | Ejecutado: $%s".formatted(
+                evt.category() != null ? evt.category() : "General",
+                evt.budgeted(),
+                evt.actual()
+        );
+
+        String resourceId = "budget_" + evt.budgetId() + "_" + (evt.category() != null ? evt.category() : "general");
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.BUDGET_WARNING,
+                        ResourceType.BUDGET,
+                        resourceId,
+                        title,
+                        body,
+                        Severity.INFO,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleBudgetMissingCategory(BudgetMissingCategoryEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
+
+        String title = "Categoría sin presupuesto: " + evt.category();
+        String body = "No hay presupuesto asignado para %s en %s".formatted(
+                evt.category(),
+                evt.period() != null ? evt.period() : "el período actual"
+        );
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.BUDGET_MISSING_CATEGORY,
+                        ResourceType.BUDGET,
+                        "budget_missing_" + evt.category(),
+                        title,
+                        body,
+                        Severity.WARN,
                         createdAt));
     }
 
@@ -204,6 +254,53 @@ public class EventService {
                         title,
                         body,
                         severity,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleBillDue(BillDueEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.dueDate() != null ? evt.dueDate() : Instant.now();
+
+        String title = "Factura por vencer: " + (evt.billNumber() != null ? evt.billNumber() : evt.billId());
+        String body = "Monto: $%s | Vence en %s días".formatted(
+                evt.amount() != null ? evt.amount() : "0",
+                evt.daysUntilDue() != null ? evt.daysUntilDue() : "?"
+        );
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> {
+            Notification notification = buildBaseNotification(ctx);
+            notification.setType(NotificationType.REMINDER_BILL_DUE);
+            notification.setTitle(title);
+            notification.setBody(body);
+            notification.setSeverity(Severity.WARN);
+            notification.setResourceType(ResourceType.BILL);
+            notification.setResourceId(evt.billId() != null ? evt.billId().toString() : "bill_due");
+            notification.setActionUrl(evt.link());
+            notification.setCreatedAt(createdAt);
+            notificationService.create(notification);
+        });
+    }
+
+    @Transactional
+    public void handleReconciliationStale(ReconciliationStaleEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.asOf() != null ? evt.asOf() : Instant.now();
+
+        String title = "Conciliación pendiente hace %s días".formatted(evt.daysStale());
+        String body = "Cuenta: %s | Pendientes: %d".formatted(
+                evt.accountName() != null ? evt.accountName() : "sin nombre",
+                evt.pendingCount()
+        );
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.RECONCILIATION_STALE,
+                        ResourceType.MOVEMENT,
+                        "recon_" + (evt.accountId() != null ? evt.accountId() : "default"),
+                        title,
+                        body,
+                        Severity.WARN,
                         createdAt));
     }
 

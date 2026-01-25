@@ -112,11 +112,12 @@ public class PresupuestoController {
     public ResponseEntity<?> crear(
         @RequestBody CrearPresupuestoRequest req,
         @RequestHeader(value = "X-Usuario-Sub", required = false) String usuarioSubHeader,
+        @RequestHeader(value = "Authorization", required = false) String authorization,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        RequestContext ctx = resolveContext(usuarioSubHeader, jwt);
+        RequestContext ctx = resolveContext(usuarioSubHeader, jwt, authorization);
         try {
-            Presupuesto presupuesto = service.crearPresupuesto(req, ctx.organizacionId(), ctx.sub());
+            Presupuesto presupuesto = service.crearPresupuesto(req, ctx.organizacionId(), ctx.sub(), authorization);
             PresupuestoDTO dto = PresupuestoDTO.builder()
                 .id(presupuesto.getId())
                 .nombre(presupuesto.getNombre())
@@ -467,8 +468,12 @@ public class PresupuestoController {
     }
 
     private RequestContext resolveContext(String headerSub, Jwt jwt) {
+        return resolveContext(headerSub, jwt, null);
+    }
+
+    private RequestContext resolveContext(String headerSub, Jwt jwt, String authorization) {
         String sub = resolveEffectiveSub(headerSub, jwt);
-        Long organizacionId = resolveOrganizacionId(sub);
+        Long organizacionId = resolveOrganizacionId(sub, authorization);
         return new RequestContext(sub, organizacionId);
     }
 
@@ -479,9 +484,9 @@ public class PresupuestoController {
         return requireSub(jwt);
     }
 
-    private Long resolveOrganizacionId(String sub) {
+    private Long resolveOrganizacionId(String sub, String authorization) {
         try {
-            return administracionService.obtenerEmpresaIdPorUsuarioSub(sub);
+            return administracionService.obtenerEmpresaIdPorUsuarioSub(sub, authorization);
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, ex.getMessage(), ex);
         }

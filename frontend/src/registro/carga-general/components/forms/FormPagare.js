@@ -1,10 +1,9 @@
 import React, { useEffect } from "react";
 import { Box, FormLabel, FormHelperText } from "@mui/material";
 import OutlinedInput from "@mui/material/OutlinedInput";
-import CustomSingleAutoComplete from "../../../../shared-components/CustomSingleAutoComplete";
+import CategoriaAutoComplete from "../../../../shared-components/CategoriaAutoComplete";
 import CustomDatePicker from "../../../../shared-components/CustomDatePicker";
 import CustomSelect from "../../../../shared-components/CustomSelect";
-import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
 import dayjs from "dayjs";
 
 const CURRENCY_OPTIONS = ["ARS", "USD"];
@@ -188,7 +187,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
       {/* 6️⃣ Categoría */}
       <Box sx={{ flex: 1 }}>
         <FormLabel>Categoría *</FormLabel>
-        <CustomSingleAutoComplete
+        <CategoriaAutoComplete
           options={TODAS_LAS_CATEGORIAS}
           value={formData.categoria || ""}
           onChange={(valor) => setFormData((p) => ({ ...p, categoria: valor }))}
@@ -214,7 +213,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
         </Box>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Número factura asociada</FormLabel>
-          <CustomSingleAutoComplete
+          <CategoriaAutoComplete
             options={["112", "113", "114"]}
             value={formData.numeroFacturaAsociada || ""}
             onChange={(valor) =>

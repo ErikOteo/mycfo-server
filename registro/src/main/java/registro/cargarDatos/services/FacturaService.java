@@ -174,14 +174,95 @@ public class FacturaService {
             TipoMoneda moneda,
             org.springframework.data.domain.Pageable pageable
     ) {
-        org.springframework.data.domain.Page<Factura> page = facturaRepository.buscarFacturas(
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, null, null, pageable);
+    }
+
+    public List<Factura> buscarFacturas(
+            Long organizacionId,
+            String usuarioId,
+            java.time.LocalDate fechaDesde,
+            java.time.LocalDate fechaHasta,
+            String tipoFactura,
+            EstadoPago estadoPago,
+            TipoMoneda moneda
+    ) {
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, null, null);
+    }
+
+    public List<Factura> buscarFacturas(
+            Long organizacionId,
+            String usuarioId,
+            java.time.LocalDate fechaDesde,
+            java.time.LocalDate fechaHasta,
+            String tipoFactura,
+            EstadoPago estadoPago,
+            String search,
+            java.time.LocalDate searchDate
+    ) {
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, null, search, searchDate);
+    }
+
+    public List<Factura> buscarFacturas(
+            Long organizacionId,
+            String usuarioId,
+            java.time.LocalDate fechaDesde,
+            java.time.LocalDate fechaHasta,
+            String tipoFactura,
+            EstadoPago estadoPago,
+            TipoMoneda moneda,
+            String search,
+            java.time.LocalDate searchDate
+    ) {
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
+        java.util.List<Factura> result = facturaRepository.buscarFacturas(
                 organizacionId,
                 usuarioId,
-                fechaDesde,
-                fechaHasta,
+                desde,
+                hasta,
                 tipoFactura,
                 estadoPago,
                 moneda,
+                search,
+                searchDate
+        );
+
+        if (moneda == null) {
+            return result;
+        }
+
+        // Salvaguarda por si el filtro no se aplicó a nivel query
+        return result.stream()
+                .filter(f -> moneda.equals(f.getMoneda()))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public org.springframework.data.domain.Page<Factura> buscarFacturas(
+            Long organizacionId,
+            String usuarioId,
+            java.time.LocalDate fechaDesde,
+            java.time.LocalDate fechaHasta,
+            String tipoFactura,
+            EstadoPago estadoPago,
+            TipoMoneda moneda,
+            String search,
+            java.time.LocalDate searchDate,
+            org.springframework.data.domain.Pageable pageable
+    ) {
+        java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
+        java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
+
+        org.springframework.data.domain.Page<Factura> page = facturaRepository.buscarFacturas(
+                organizacionId,
+                usuarioId,
+                desde,
+                hasta,
+                tipoFactura,
+                estadoPago,
+                moneda,
+                search,
+                searchDate,
                 pageable
         );
 
@@ -195,52 +276,12 @@ public class FacturaService {
         return new org.springframework.data.domain.PageImpl<>(filtradas, pageable, filtradas.size());
     }
 
-    public List<Factura> buscarFacturas(
-            Long organizacionId,
-            String usuarioId,
-            java.time.LocalDate fechaDesde,
-            java.time.LocalDate fechaHasta,
-            String tipoFactura,
-            EstadoPago estadoPago,
-            TipoMoneda moneda
-    ) {
-        List<Factura> result = facturaRepository.buscarFacturas(
-                organizacionId,
-                usuarioId,
-                fechaDesde,
-                fechaHasta,
-                tipoFactura,
-                estadoPago,
-                moneda
-        );
-
-        if (moneda == null) {
-            return result;
-        }
-
-        // Salvaguarda por si el filtro no se aplicó a nivel query
-        return result.stream()
-                .filter(f -> moneda.equals(f.getMoneda()))
-                .collect(java.util.stream.Collectors.toList());
-    }
-
-    public List<Factura> buscarFacturas(
-            Long organizacionId,
-            String usuarioId,
-            java.time.LocalDate fechaDesde,
-            java.time.LocalDate fechaHasta,
-            String tipoFactura,
-            EstadoPago estadoPago
-    ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, null);
-    }
-
     public Map<java.time.YearMonth, List<Factura>> agruparFacturasPorMes(
             Long organizacionId,
             java.time.LocalDate fechaDesde,
             java.time.LocalDate fechaHasta
     ) {
-        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null).stream()
+        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null, null, null).stream()
                 .collect(Collectors.groupingBy(
                         factura -> java.time.YearMonth.from(factura.getFechaEmision() != null
                                 ? factura.getFechaEmision()

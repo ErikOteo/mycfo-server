@@ -23,7 +23,7 @@ const MiniChart = ({ title, ingresos = 0, egresos = 0, loading, error, currency 
       ) : error ? (
         <Alert severity="error">{error}</Alert>
       ) : (
-        <ResponsiveContainer width="100%" height={140}>
+        <ResponsiveContainer width="100%" height={140} minWidth={0} minHeight={140}>
           <BarChart data={[{ name: "Mes", Ingresos: ingresos, Egresos: egresos }]}
                     margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
             <XAxis dataKey="name" hide />

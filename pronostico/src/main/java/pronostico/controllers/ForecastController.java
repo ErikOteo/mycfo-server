@@ -69,10 +69,11 @@ public class ForecastController {
     @PostMapping("/generar/{forecastConfigId}")
     public ResponseEntity<ForecastDTO> generarForecast(
             @PathVariable Long forecastConfigId,
-            @AuthenticationPrincipal Jwt jwt) {
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("Authorization") String authorization) {
         try {
             String usuarioSub = requireSub(jwt);
-            ForecastDTO forecast = forecastService.generarForecast(forecastConfigId, usuarioSub);
+            ForecastDTO forecast = forecastService.generarForecast(forecastConfigId, usuarioSub, authorization);
             return ResponseEntity.status(HttpStatus.CREATED).body(forecast);
         } catch (ResponseStatusException e) {
             throw e;
@@ -112,10 +113,11 @@ public class ForecastController {
     @PostMapping("/rolling")
     public ResponseEntity<Map<String, Object>> generarRollingForecast(
             @RequestParam Integer horizonteMeses,
-            @AuthenticationPrincipal Jwt jwt) {
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("Authorization") String authorization) {
         try {
             String usuarioSub = requireSub(jwt);
-            Map<String, Object> response = forecastService.generarRollingForecast(usuarioSub, horizonteMeses);
+            Map<String, Object> response = forecastService.generarRollingForecast(usuarioSub, horizonteMeses, authorization);
             return ResponseEntity.ok(response);
         } catch (ResponseStatusException e) {
             throw e;
@@ -125,4 +127,3 @@ public class ForecastController {
         }
     }
 }
-

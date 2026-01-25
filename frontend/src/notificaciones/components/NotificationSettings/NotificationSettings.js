@@ -91,9 +91,16 @@ export default function NotificationSettings() {
   const notificationTypes = [
     { value: "MOVEMENT_NEW", label: "Nuevos Movimientos" },
     { value: "MOVEMENT_HIGH", label: "Movimientos Altos" },
+    { value: "RECONCILIATION_STALE", label: "Conciliación Pendiente" },
+    { value: "REMINDER_BILL_DUE", label: "Facturas por Vencer" },
+    { value: "USER_INVITED", label: "Usuarios Invitados" },
+    { value: "ROLE_CHANGED", label: "Cambios de Rol" },
     { value: "BUDGET_EXCEEDED", label: "Presupuestos Excedidos" },
+    { value: "BUDGET_WARNING", label: "Presupuestos al 80%" },
+    { value: "BUDGET_MISSING_CATEGORY", label: "Categorías sin Presupuesto" },
     { value: "CASH_FLOW_ALERT", label: "Alertas de Cash Flow" },
     { value: "REPORT_READY", label: "Reportes Listos" },
+    { value: "MONTHLY_SUMMARY", label: "Resumen Mensual" },
     { value: "REMINDER_CUSTOM", label: "Recordatorios" },
     { value: "SYSTEM_MAINTENANCE", label: "Mantenimiento del Sistema" },
   ];

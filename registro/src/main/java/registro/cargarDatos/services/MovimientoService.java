@@ -222,6 +222,8 @@ public class MovimientoService {
             List<TipoMovimiento> tipos,
             Boolean conciliado,
             String nombreRelacionado,
+            String search,
+            LocalDate searchDate,
             Pageable pageable
     ) {
         return obtenerMovimientos(
@@ -233,6 +235,8 @@ public class MovimientoService {
                 conciliado,
                 nombreRelacionado,
                 null,
+                search,
+                searchDate,
                 pageable
         );
     }
@@ -246,6 +250,8 @@ public class MovimientoService {
             Boolean conciliado,
             String nombreRelacionado,
             TipoMoneda moneda,
+            String search,
+            LocalDate searchDate,
             Pageable pageable
     ) {
         LocalDateTime fechaDesdeTime = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
@@ -260,6 +266,8 @@ public class MovimientoService {
                 moneda,
                 conciliado,
                 nombreRelacionado,
+                search,
+                searchDate,
                 pageable
         );
     }
@@ -276,7 +284,9 @@ public class MovimientoService {
             LocalDate fechaHasta,
             List<TipoMovimiento> tipos,
             Boolean conciliado,
-            String nombreRelacionado
+            String nombreRelacionado,
+            String search,
+            LocalDate searchDate
     ) {
         return obtenerTodosLosMovimientos(
                 organizacionId,
@@ -286,7 +296,9 @@ public class MovimientoService {
                 tipos,
                 conciliado,
                 nombreRelacionado,
-                null
+                null,
+                search,
+                searchDate
         );
     }
 
@@ -298,7 +310,9 @@ public class MovimientoService {
             List<TipoMovimiento> tipos,
             Boolean conciliado,
             String nombreRelacionado,
-            TipoMoneda moneda
+            TipoMoneda moneda,
+            String search,
+            LocalDate searchDate
     ) {
         LocalDateTime fechaDesdeTime = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
         LocalDateTime fechaHastaTime = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay() : null;
@@ -313,6 +327,8 @@ public class MovimientoService {
                 moneda,
                 conciliado,
                 nombreRelacionado,
+                search,
+                searchDate,
                 Pageable.unpaged()
         );
         
@@ -329,7 +345,9 @@ public class MovimientoService {
             LocalDate fechaHasta,
             List<TipoMovimiento> tipos,
             Boolean conciliado,
-            String nombreRelacionado
+            String nombreRelacionado,
+            String search,
+            LocalDate searchDate
     ) {
         // Obtener todos los movimientos filtrados
         List<Movimiento> movimientos = obtenerTodosLosMovimientos(
@@ -340,7 +358,9 @@ public class MovimientoService {
                 tipos,
                 conciliado,
                 nombreRelacionado,
-                null
+                null,
+                search,
+                searchDate
         );
         
         // Agrupar por mes y tipo

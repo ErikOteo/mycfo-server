@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Box, Paper, IconButton, Alert, CircularProgress, Typography } from "@mui/material";
 import { Mic, Close, Delete } from "@mui/icons-material";
 import CustomButton from "../../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../../api/http";
 import { styled, keyframes } from "@mui/material/styles";
 
 const pulse = keyframes`
@@ -97,14 +97,14 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
     setAudioFile(null);
 
     try {
-      const response = await axios.post(endpoint, fd, {
+      const response = await http.post(endpoint, fd, {
         headers: {
-          "Content-Type": "multipart/form-data",
+          // http.js agrega Authorization; dejamos X-Usuario-Sub explícito
           "X-Usuario-Sub": usuarioSub,
         },
       });
       console.log("Respuesta completa del audio:", response.data);
-      const { campos, transcript, warnings } = response.data || {};
+      const { campos, transcript, rawText, warnings } = response.data || {};
       if (warnings?.length) {
         console.warn("Advertencias al procesar audio:", warnings);
       }
@@ -118,9 +118,10 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
       });
 
       if (!camposDetectados) {
+        const fallbackTranscript = transcript || rawText;
         const warningPayload = {
           message: "No se pudo interpretar el audio. Por favor grabalo nuevamente procurando mayor claridad.",
-          transcript: transcript || "Sin transcripción disponible.",
+          transcript: fallbackTranscript || "Sin transcripción disponible.",
         };
         setParseWarning(warningPayload);
         console.warn("Procesamiento de audio sin campos detectados.", { transcript, warnings });

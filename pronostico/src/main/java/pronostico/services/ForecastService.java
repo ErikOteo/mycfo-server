@@ -49,6 +49,11 @@ public class ForecastService {
      */
     @Transactional
     public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor) {
+        return generarForecast(forecastConfigId, creadoPor, null);
+    }
+
+    @Transactional
+    public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor, String authorization) {
         var config = forecastConfigRepository.findById(forecastConfigId)
                 .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, 
                         "Configuración de forecast no encontrada"));
@@ -60,7 +65,7 @@ public class ForecastService {
         
         // 1. Obtener movimientos históricos mensuales desde Registro
         Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales = 
-                registroService.obtenerMovimientosMensuales(config.getOrganizacionId());
+                registroService.obtenerMovimientosMensuales(config.getOrganizacionId(), authorization, creadoPor);
         
         // 2. Procesar y convertir movimientos al formato esperado por el servicio de forecast
         List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales);
@@ -78,7 +83,7 @@ public class ForecastService {
      * @param horizonteMeses Meses a pronosticar hacia adelante
      * @return Response del servicio de forecast con los resultados
      */
-    public Map<String, Object> generarRollingForecast(String usuarioSub, Integer horizonteMeses) {
+    public Map<String, Object> generarRollingForecast(String usuarioSub, Integer horizonteMeses, String authorization) {
         // Validar que el usuario tiene empresa asociada
         Long organizacionId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
         
@@ -92,7 +97,7 @@ public class ForecastService {
         
         // 1. Obtener movimientos históricos mensuales desde Registro
         Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales = 
-                registroService.obtenerMovimientosMensuales(organizacionId);
+                registroService.obtenerMovimientosMensuales(organizacionId, authorization, usuarioSub);
         
         // 2. Procesar y convertir movimientos al formato esperado por el servicio de forecast
         List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales);
@@ -497,4 +502,3 @@ public class ForecastService {
                 .build();
     }
 }
-

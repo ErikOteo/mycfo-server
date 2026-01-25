@@ -1,5 +1,7 @@
-import axios from "axios";
 import API_CONFIG from "../../../config/api-config";
+
+// ✅ usar tu cliente central con interceptors
+import http from "../../../api/http";
 
 const BASE_URL = API_CONFIG.REGISTRO;
 
@@ -12,6 +14,8 @@ const withUserHeaders = () => {
     headers: {
       "X-Usuario-Sub": usuarioSub,
     },
+    // Si esto lo necesitás por algo puntual, lo dejo igual.
+    // Si no lo necesitás, lo ideal es sacarlo para no depender de JSESSIONID.
     withCredentials: true,
   };
 };
@@ -26,6 +30,8 @@ export const fetchFacturas = async ({
   tipoFactura,
   estadoPago,
   moneda,
+  search,
+  searchDate,
 } = {}) => {
   const params = new URLSearchParams({
     page,
@@ -39,8 +45,13 @@ export const fetchFacturas = async ({
   if (tipoFactura) params.append("tipoFactura", tipoFactura);
   if (estadoPago) params.append("estadoPago", estadoPago);
   if (moneda) params.append("moneda", moneda);
+  if (search) params.append("search", search);
+  if (searchDate) params.append("searchDate", searchDate);
+  if (moneda) params.append("moneda", moneda);
+  if (search) params.append("search", search);
+  if (searchDate) params.append("searchDate", searchDate);
 
-  const response = await axios.get(
+  const response = await http.get(
     `${BASE_URL}/facturas/buscar?${params.toString()}`,
     withUserHeaders()
   );
@@ -49,20 +60,19 @@ export const fetchFacturas = async ({
 };
 
 export const deleteFactura = async (id) => {
-  await axios.delete(`${BASE_URL}/facturas/${id}`, withUserHeaders());
+  await http.delete(`${BASE_URL}/facturas/${id}`, withUserHeaders());
 };
 
 const serializeFactura = (payload) => {
   const data = { ...payload };
   if (data.fechaEmision && typeof data.fechaEmision?.format === "function") {
-    // Incluir fecha y hora completas tal como se eligieron en el formulario
     data.fechaEmision = data.fechaEmision.format("YYYY-MM-DDTHH:mm:ss");
   }
   return data;
 };
 
 export const updateFactura = async (id, payload) => {
-  const response = await axios.put(
+  const response = await http.put(
     `${BASE_URL}/facturas/${id}`,
     serializeFactura(payload),
     withUserHeaders()
@@ -71,10 +81,9 @@ export const updateFactura = async (id, payload) => {
 };
 
 export const getFacturaById = async (id) => {
-  const response = await axios.get(
+  const response = await http.get(
     `${BASE_URL}/facturas/${id}`,
     withUserHeaders()
   );
   return response.data;
 };
-

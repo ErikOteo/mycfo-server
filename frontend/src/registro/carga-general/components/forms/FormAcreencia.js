@@ -1,11 +1,10 @@
 import React, { useEffect } from "react";
 import { Box, FormLabel, FormHelperText } from "@mui/material";
 import OutlinedInput from "@mui/material/OutlinedInput";
-import CustomSingleAutoComplete from "../../../../shared-components/CustomSingleAutoComplete";
+import CategoriaAutoComplete from "../../../../shared-components/CategoriaAutoComplete";
 import CustomDateTimePicker from "../../../../shared-components/CustomDateTimePicker";
 import CustomDatePicker from "../../../../shared-components/CustomDatePicker";
 import CustomSelect from "../../../../shared-components/CustomSelect";
-import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
 import dayjs from "dayjs";
 
 const CURRENCY_OPTIONS = ["ARS", "USD"];
@@ -177,13 +176,15 @@ export default function FormAcreencia({
         </Box>
       </Box>
 
-      {/* 6️⃣ Categoría */}
+      {/* 6: Categoria */}
       <Box>
-        <FormLabel>Categoría</FormLabel>
-        <CustomSingleAutoComplete
-          options={TODAS_LAS_CATEGORIAS}
+        <FormLabel>Categoria</FormLabel>
+        <CategoriaAutoComplete
+          tipo="Acreencia"
           value={formData.categoria || ""}
           onChange={(valor) => setFormData((p) => ({ ...p, categoria: valor }))}
+          error={!!errors.categoria}
+          helperText={errors.categoria}
         />
       </Box>
 

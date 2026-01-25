@@ -162,16 +162,26 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
            "AND (:nombreRelacionado IS NULL OR " +
            "     LOWER(m.origenNombre) LIKE LOWER(CONCAT('%', :nombreRelacionado, '%')) OR " +
            "     LOWER(m.destinoNombre) LIKE LOWER(CONCAT('%', :nombreRelacionado, '%')) OR " +
-           "     LOWER(m.descripcion) LIKE LOWER(CONCAT('%', :nombreRelacionado, '%')))")
+           "     LOWER(m.descripcion) LIKE LOWER(CONCAT('%', :nombreRelacionado, '%'))) " +
+           "AND (:search IS NULL OR " +
+           "     LOWER(COALESCE(m.origenNombre, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(COALESCE(m.destinoNombre, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(COALESCE(m.descripcion, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(COALESCE(m.categoria, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(COALESCE(m.origenCuit, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(COALESCE(m.destinoCuit, '')) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:searchDate IS NULL OR DATE(m.fechaEmision) = :searchDate)")
     org.springframework.data.domain.Page<Movimiento> findMovimientosConFiltros(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
-           @Param("fechaDesde") LocalDateTime fechaDesde,
-           @Param("fechaHasta") LocalDateTime fechaHasta,
-           @Param("tipos") List<TipoMovimiento> tipos,
-           @Param("moneda") TipoMoneda moneda,
-           @Param("conciliado") Boolean conciliado,
-           @Param("nombreRelacionado") String nombreRelacionado,
+            @Param("fechaDesde") LocalDateTime fechaDesde,
+            @Param("fechaHasta") LocalDateTime fechaHasta,
+            @Param("tipos") List<TipoMovimiento> tipos,
+            @Param("moneda") TipoMoneda moneda,
+            @Param("conciliado") Boolean conciliado,
+            @Param("nombreRelacionado") String nombreRelacionado,
+            @Param("search") String search,
+            @Param("searchDate") java.time.LocalDate searchDate,
             org.springframework.data.domain.Pageable pageable
     );
 

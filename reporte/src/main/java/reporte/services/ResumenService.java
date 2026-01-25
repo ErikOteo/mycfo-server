@@ -1,8 +1,11 @@
 package reporte.services;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -102,10 +105,14 @@ public class ResumenService {
     }
 
     public ResumenMensualDTO obtenerResumenMensual(int anio, int mes, List<String> categoriasFiltro, String userSub) {
-        return obtenerResumenMensual(anio, mes, categoriasFiltro, userSub, null);
+        return obtenerResumenMensual(anio, mes, categoriasFiltro, userSub, null, null);
     }
 
     public ResumenMensualDTO obtenerResumenMensual(int anio, int mes, List<String> categoriasFiltro, String userSub, String moneda) {
+        return obtenerResumenMensual(anio, mes, categoriasFiltro, userSub, moneda, null);
+    }
+
+    public ResumenMensualDTO obtenerResumenMensual(int anio, int mes, List<String> categoriasFiltro, String userSub, String moneda, String authorization) {
         LocalDate desde = LocalDate.of(anio, mes, 1);
         LocalDate hasta = desde.withDayOfMonth(desde.lengthOfMonth());
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
@@ -117,13 +124,28 @@ public class ResumenService {
         }
 
         HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Usuario-Sub", userSub);
-        ResponseEntity<PageResponse<RegistroDTO>> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
-                new ParameterizedTypeReference<PageResponse<RegistroDTO>>() {}
-        );
+        if (userSub != null) {
+            headers.add("X-Usuario-Sub", userSub);
+        }
+        if (authorization != null && !authorization.isBlank()) {
+            headers.add("Authorization", authorization);
+        }
+
+        ResponseEntity<PageResponse<RegistroDTO>> response;
+        try {
+            response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<PageResponse<RegistroDTO>>() {}
+            );
+        } catch (HttpClientErrorException e) {
+            var status = e.getStatusCode();
+            if (status.value() == HttpStatus.UNAUTHORIZED.value() || status.value() == HttpStatus.FORBIDDEN.value()) {
+                throw new ResponseStatusException(status, "No autorizado al consultar movimientos en Registro", e);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Error consultando movimientos en Registro", e);
+        }
 
         List<RegistroDTO> lista = Optional.ofNullable(response.getBody())
                 .map(PageResponse::getContent)

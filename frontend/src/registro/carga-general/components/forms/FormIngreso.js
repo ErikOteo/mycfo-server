@@ -1,10 +1,9 @@
 import React, { useEffect } from "react";
 import { Box, FormLabel, FormHelperText } from "@mui/material";
 import OutlinedInput from "@mui/material/OutlinedInput";
-import CustomSingleAutoComplete from "../../../../shared-components/CustomSingleAutoComplete";
+import CategoriaAutoComplete from "../../../../shared-components/CategoriaAutoComplete";
 import CustomDateTimePicker from "../../../../shared-components/CustomDateTimePicker";
 import CustomSelect from "../../../../shared-components/CustomSelect";
-import { TODAS_LAS_CATEGORIAS } from "../../../../shared-components/categorias";
 import dayjs from "dayjs";
 
 const CURRENCY_OPTIONS = ["ARS", "USD"];
@@ -25,7 +24,7 @@ export default function FormIngreso({
     <Box
       sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}
     >
-      {/* 1️⃣ Monto total + Moneda + Medio de pago */}
+      {/* 1: Monto total + Moneda + Medio de pago */}
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
@@ -74,7 +73,7 @@ export default function FormIngreso({
         </Box>
       </Box>
 
-      {/* 2️⃣ Fecha emisión (con hora) */}
+      {/* 2: Fecha emision (con hora) */}
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Fecha emisión *</FormLabel>
@@ -91,7 +90,7 @@ export default function FormIngreso({
         </Box>
       </Box>
 
-      {/* 3️⃣ Datos del cliente (origen) */}
+      {/* 3: Datos del cliente (origen) */}
       <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre del cliente</FormLabel>
@@ -117,20 +116,21 @@ export default function FormIngreso({
         </Box>
       </Box>
 
-
-      {/* 4️⃣ Categoría */}
+      {/* 4: Categoria */}
       <Box>
-        <FormLabel>Categoría</FormLabel>
-        <CustomSingleAutoComplete
-          options={TODAS_LAS_CATEGORIAS}
+        <FormLabel>Categoria</FormLabel>
+        <CategoriaAutoComplete
+          tipo="Ingreso"
           value={formData.categoria || ""}
           onChange={(valor) => setFormData((p) => ({ ...p, categoria: valor }))}
+          error={!!errors.categoria}
+          helperText={errors.categoria}
         />
       </Box>
 
-      {/* 5️⃣ Descripción */}
+      {/* 5: Descripcion */}
       <Box>
-        <FormLabel>Descripción</FormLabel>
+        <FormLabel>Descripcion</FormLabel>
         <OutlinedInput
           multiline
           value={formData.descripcion || ""}

@@ -52,6 +52,30 @@ public class EventController {
         return ResponseEntity.accepted().build();
     }
 
+    @PostMapping("/budget-warning")
+    public ResponseEntity<Void> onBudgetWarning(@RequestBody BudgetWarningEvent evt) {
+        eventService.handleBudgetWarning(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/budget-missing-category")
+    public ResponseEntity<Void> onBudgetMissingCategory(@RequestBody BudgetMissingCategoryEvent evt) {
+        eventService.handleBudgetMissingCategory(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/bill-due")
+    public ResponseEntity<Void> onBillDue(@RequestBody BillDueEvent evt) {
+        eventService.handleBillDue(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/reconciliation-stale")
+    public ResponseEntity<Void> onReconciliationStale(@RequestBody ReconciliationStaleEvent evt) {
+        eventService.handleReconciliationStale(evt);
+        return ResponseEntity.accepted().build();
+    }
+
     @PostMapping("/custom-reminder")
     public ResponseEntity<Void> onCustomReminder(@RequestBody CustomReminderEvent evt) {
         eventService.handleCustomReminder(evt);

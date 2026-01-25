@@ -1,15 +1,13 @@
 import * as React from 'react';
 import {
-    Box, Typography, Paper, Container, CssBaseline, CircularProgress
+    Box, Typography, Paper, CssBaseline
 } from '@mui/material';
 import Filtros from './Filtros';
 import TablaDetalle from './TablaDetalle';
 import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { jsPDF } from "jspdf";
-import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas';
-import { exportToExcel } from '../../../utils/exportExcelUtils'; // Importando la utilidad de Excel
+import { exportToExcel } from '../../../utils/exportExcelUtils';
+import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
@@ -23,6 +21,8 @@ export default function MainGrid() {
         detalleEgresos: [],
     });
     const [loading, setLoading] = React.useState(false);
+    const [exportingPdf, setExportingPdf] = React.useState(false);
+    const [logoDataUrl, setLogoDataUrl] = React.useState(null);
     const chartRef = React.useRef(null);
     const [currency, setCurrency] = usePreferredCurrency("ARS");
 
@@ -69,9 +69,25 @@ export default function MainGrid() {
             });
     }, [currency, selectedYear]);
 
+    // Cargar logo para la carátula
+    React.useEffect(() => {
+        const loadLogo = async () => {
+            try {
+                const res = await fetch('/logo512.png');
+                const blob = await res.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => setLogoDataUrl(reader.result);
+                reader.readAsDataURL(blob);
+            } catch {
+                setLogoDataUrl(null);
+            }
+        };
+        loadLogo();
+    }, []);
+
     const normalizeCategoria = (c) => {
         const s = (c ?? '').toString().trim();
-        return s.length ? s : 'Sin categoría';
+        return s.length ? s : 'Sin categoria';
     };
 
     const handleExportExcel = () => {
@@ -82,74 +98,105 @@ export default function MainGrid() {
 
         const excelData = [
             ["Estado de Resultados", `(${selectedYear})`],
-            [], // Fila vacía
-            ["Ingresos", "", {v: totalIngresos, t: 'n'}],
-            ...detalleIngresos.map(item => ["", normalizeCategoria(item.categoria), {v: Number(item.total) || 0, t: 'n'}]),
-            [], // Fila vacía
-            ["Egresos", "", {v: totalEgresos, t: 'n'}],
-            ...detalleEgresos.map(item => ["", normalizeCategoria(item.categoria), {v: Math.abs(Number(item.total) || 0), t: 'n'}]),
-            [], // Fila vacía
-            ["Resultado del Ejercicio", "", {v: resultado, t: 'n'}]
+            [],
+            ["Ingresos", "", { v: totalIngresos, t: 'n' }],
+            ...detalleIngresos.map(item => ["", normalizeCategoria(item.categoria), { v: Number(item.total) || 0, t: 'n' }]),
+            [],
+            ["Egresos", "", { v: totalEgresos, t: 'n' }],
+            ...detalleEgresos.map(item => ["", normalizeCategoria(item.categoria), { v: Math.abs(Number(item.total) || 0), t: 'n' }]),
+            [],
+            ["Resultado del Ejercicio", "", { v: resultado, t: 'n' }]
         ];
 
-        const colsConfig = [{ wch: 25 }, { wch: 25 }, { wch: 15 }]; // Ancho para las columnas A, B, C
+        const ingresosHeaderRow = 2;
+        const egresosHeaderRow = 4 + detalleIngresos.length;
+        const resultadoRow = 6 + detalleIngresos.length + detalleEgresos.length;
+
+        const colsConfig = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
         const mergesConfig = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, // Título principal
-            { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } }, // Encabezado Ingresos
-            { s: { r: 2 + detalleIngresos.length + 1, c: 0 }, e: { r: 2 + detalleIngresos.length + 1, c: 1 } }, // Encabezado Egresos
-            { s: { r: 2 + detalleIngresos.length + 1 + detalleEgresos.length + 2, c: 0 }, e: { r: 2 + detalleIngresos.length + 1 + detalleEgresos.length + 2, c: 1 } }, // Encabezado Resultado
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+            { s: { r: ingresosHeaderRow, c: 0 }, e: { r: ingresosHeaderRow, c: 1 } },
+            { s: { r: egresosHeaderRow, c: 0 }, e: { r: egresosHeaderRow, c: 1 } },
+            { s: { r: resultadoRow, c: 0 }, e: { r: resultadoRow, c: 1 } },
         ];
-        const currencyColumns = ['C']; // Columna C para formato de moneda
+        const currencyColumns = ['C'];
 
-        exportToExcel(excelData, `estado-de-resultados-${selectedYear}-${(currency || 'ARS').toLowerCase()}`, "Estado de Resultados", colsConfig, mergesConfig, currencyColumns);
+        exportToExcel(
+            excelData,
+            `estado-de-resultados-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
+            "Estado de Resultados",
+            colsConfig,
+            mergesConfig,
+            currencyColumns,
+            {
+                headerRows: [0, ingresosHeaderRow, egresosHeaderRow],
+                totalRows: [resultadoRow],
+                zebra: true,
+                freezePane: { rowSplit: 2, colSplit: 1 },
+            }
+        );
     };
 
-    const handleExportPdf = () => {
+    const handleExportPdf = async () => {
         const chartElement = chartRef.current;
         if (!chartElement) {
-            alert("No se pudo encontrar el gráfico para exportar.");
+            alert("No se pudo encontrar el grafico para exportar.");
             return;
         }
 
-        html2canvas(chartElement).then((canvas) => {
-            const imgData = canvas.toDataURL('image/png');
-            const doc = new jsPDF();
-
-            doc.text(`Estado de Resultados (${selectedYear})`, 14, 22);
-
-            const imgProps = doc.getImageProperties(imgData);
-            const pdfWidth = doc.internal.pageSize.getWidth();
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-            doc.addImage(imgData, 'PNG', 14, 30, pdfWidth - 28, pdfHeight);
-
+        setExportingPdf(true);
+        try {
             const { detalleIngresos, detalleEgresos } = data;
-            const totalIngresos = detalleIngresos.reduce((sum, item) => sum + item.total, 0);
-            const totalEgresos = detalleEgresos.reduce((sum, item) => sum + item.total, 0);
+            const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+            const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
             const resultado = totalIngresos - totalEgresos;
 
-            const head = [["Tipo", "Categoría", "Total"]];
+            const head = [["Tipo", "Categoria", "Total"]];
             const body = [];
 
-            body.push(["Ingresos", "", totalIngresos.toFixed(2)]);
+            body.push(["Ingresos", "", formatCurrency(totalIngresos)]);
             detalleIngresos.forEach(item => {
                 const val = Number(item.total) || 0;
-                body.push(["", normalizeCategoria(item.categoria), val.toFixed(2)]);
+                body.push(["", normalizeCategoria(item.categoria), formatCurrency(val)]);
             });
 
-            body.push(["Egresos", "", totalEgresos.toFixed(2)]);
+            body.push(["Egresos", "", formatCurrency(totalEgresos)]);
             detalleEgresos.forEach(item => {
                 const val = Math.abs(Number(item.total) || 0);
-                body.push(["", normalizeCategoria(item.categoria), val.toFixed(2)]);
+                body.push(["", normalizeCategoria(item.categoria), formatCurrency(val)]);
             });
 
-            body.push(["Resultado del Ejercicio", "", resultado.toFixed(2)]);
+            body.push(["Resultado del Ejercicio", "", formatCurrency(resultado)]);
 
-            autoTable(doc, { head: head, body: body, startY: pdfHeight + 40 });
-            doc.save(`estado-de-resultados-${selectedYear}-${(currency || 'ARS').toLowerCase()}.pdf`);
-        });
+            await exportPdfReport({
+                title: `Estado de Resultados`,
+                subtitle: `Periodo ${selectedYear}`,
+                charts: [{ element: chartElement }],
+                table: { head, body },
+                fileName: `estado-de-resultados-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
+                cover: {
+                    show: true,
+                    subtitle: `Periodo ${selectedYear}`,
+                    logo: logoDataUrl,
+                    meta: [
+                        { label: "Generado", value: new Date().toLocaleDateString('es-AR') },
+                    ],
+                    kpis: [
+                        { label: "Ingresos", value: formatCurrency(totalIngresos) },
+                        { label: "Egresos", value: formatCurrency(totalEgresos) },
+                        { label: "Resultado", value: formatCurrency(resultado) },
+                    ],
+                },
+            });
+        } catch (e) {
+            console.error("Error al exportar PDF de P&L:", e);
+            alert("No se pudo generar el PDF. Intente nuevamente.");
+        } finally {
+            setExportingPdf(false);
+        }
     };
 
-    const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const dataGrafico = meses.map((mes, i) => ({ mes, Ingresos: data.ingresosMensuales[i], Egresos: data.egresosMensuales[i] }));
 
     if (loading) {
@@ -178,7 +225,11 @@ export default function MainGrid() {
                     <Typography component="h2" variant="h4">
                         Estado de Resultados
                     </Typography>
-                    <ExportadorSimple onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
+                    <ExportadorSimple
+                        onExportExcel={handleExportExcel}
+                        onExportPdf={handleExportPdf}
+                        exportingPdf={exportingPdf}
+                    />
                 </Box>
 
             <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />

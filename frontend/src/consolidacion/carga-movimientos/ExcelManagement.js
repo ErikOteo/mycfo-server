@@ -13,7 +13,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import UploadIcon from "@mui/icons-material/Upload";
 import CargaMovimientos from "./CargaMovimientos";
 import ExcelHistoryTable from "./components/ExcelHistoryTable";
-import axios from "axios";
+import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
 
 export default function ExcelManagement() {
@@ -32,7 +32,7 @@ export default function ExcelManagement() {
         setHistorialLoading(false);
         return;
       }
-      const response = await axios.get(
+      const response = await http.get(
         `${API_CONFIG.REGISTRO}/api/historial-cargas`,
         {
           headers: {

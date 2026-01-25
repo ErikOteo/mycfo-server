@@ -10,9 +10,10 @@ import CamposRequeridos from "./components/CamposRequeridos";
 import ResumenCarga from "./components/ResumenCarga";
 import TablaErrores from "./components/TablaErrores";
 import ExcelPreviewDialog from "./components/ExcelPreviewDialog";
+import ExcelLibreMapper from "./components/ExcelLibreMapper";
 import DropzoneUploader from "./../../shared-components/DropzoneUploader";
 import CustomButton from "./../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
 
 export default function CargaMovimientos({ onCargaCompletada }) {
@@ -23,19 +24,36 @@ export default function CargaMovimientos({ onCargaCompletada }) {
   const [previewData, setPreviewData] = React.useState([]);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [fileName, setFileName] = React.useState("");
+  const [excelLibreConfig, setExcelLibreConfig] = React.useState({
+    columnMap: { fecha: 0, descripcion: 1, monto: 2 },
+    dataStartRow: 2,
+    dateFormat: "dd/MM/yyyy",
+    decimalSeparator: ",",
+  });
   const obtenerUsuarioSub = () => sessionStorage.getItem("sub");
 
   const handleTipoOrigenChange = (event) => {
     const value = event.target.value;
     // Mostrar opciones pero ignorar selección para las bloqueadas
-    const bloqueados = ["santander", "modo", "galicia"];
+    const bloqueados = ["modo"];
     if (bloqueados.includes(value)) return;
     setTipoOrigen(value);
+    if (value !== "excel-libre") {
+      setExcelLibreConfig((prev) => ({
+        ...prev,
+        columnMap: prev.columnMap || { fecha: 0, descripcion: 1, monto: 2 },
+      }));
+    }
   };
 
   const handleFileSelected = (archivo) => {
+    if (!archivo) {
+      setFile(null);
+      setFileName("");
+      return;
+    }
     setFile(archivo);
-    setFileName(archivo.name);
+    setFileName(archivo.name || "");
     console.log("Archivo recibido:", archivo);
   };
 
@@ -43,6 +61,20 @@ export default function CargaMovimientos({ onCargaCompletada }) {
     if (!file || !tipoOrigen) {
       console.warn("Debe seleccionar un tipo de archivo y subir un archivo");
       return;
+    }
+
+    if (tipoOrigen === "excel-libre") {
+      const colMap = excelLibreConfig?.columnMap || {};
+      if (
+        colMap.fecha === undefined ||
+        colMap.descripcion === undefined ||
+        colMap.monto === undefined
+      ) {
+        alert(
+          "Configurá el mapeo: fecha, descripción y monto son obligatorios.",
+        );
+        return;
+      }
     }
 
     setPreviewLoading(true);
@@ -56,17 +88,27 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tipoOrigen", tipoOrigen);
+      if (tipoOrigen === "excel-libre") {
+        formData.append("config", JSON.stringify(excelLibreConfig));
+      }
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_CONFIG.REGISTRO}/api/preview-excel`,
         formData,
         {
           headers: {
-            "Content-Type": "multipart/form-data",
             "X-Usuario-Sub": usuarioSub,
           },
-        }
+        },
       );
+
+      console.log("[CargaMovimientos] Preview response", {
+        tipoOrigen,
+        fileName: file?.name,
+        total: response.data?.totalRegistros,
+        registros: response.data?.registros?.length,
+        sample: response.data?.registros?.slice?.(0, 5),
+      });
 
       setPreviewData(response.data.registros || []);
       setPreviewOpen(true);
@@ -91,7 +133,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         tipoOrigen: tipoOrigen,
       };
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_CONFIG.REGISTRO}/api/guardar-seleccionados`,
         requestData,
         {
@@ -99,8 +141,15 @@ export default function CargaMovimientos({ onCargaCompletada }) {
             "Content-Type": "application/json",
             "X-Usuario-Sub": usuarioSub,
           },
-        }
+        },
       );
+
+      console.log("[CargaMovimientos] Guardar seleccionados", {
+        tipoOrigen,
+        fileName,
+        enviados: selectedRegistros?.length,
+        resultado: response.data,
+      });
 
       setResumen(response.data);
       setPreviewOpen(false);
@@ -134,20 +183,31 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           onChange={handleTipoOrigenChange}
         >
           <MenuItem value="">Seleccione una opción</MenuItem>
-          <MenuItem value="mycfo">MyCFO (plantilla genérica)</MenuItem>
+          <MenuItem value="mycfo">MyCFO - Plantilla Genérica</MenuItem>
+          <MenuItem value="excel-libre">Excel libre - Mapeo Manual</MenuItem>
           <MenuItem value="mercado-pago">Mercado Pago</MenuItem>
-          <MenuItem value="modo">MODO</MenuItem>
           <MenuItem value="santander">Banco Santander</MenuItem>
           <MenuItem value="galicia">Banco Galicia</MenuItem>
+          <MenuItem value="nacion">Banco Nación</MenuItem>
+          <MenuItem value="uala">Ualá (PDF)</MenuItem>
         </Select>
       </FormControl>
+      {tipoOrigen === "excel-libre" && (
+        <Box sx={{ mb: 3 }}>
+          <ExcelLibreMapper
+            value={excelLibreConfig}
+            onChange={(next) =>
+              setExcelLibreConfig((prev) => ({ ...prev, ...next }))
+            }
+          />
+        </Box>
+      )}
       <DropzoneUploader
         onFileSelected={handleFileSelected}
         width="100%"
         height={120}
         sx={{ mb: 3 }}
       />
-
       <CustomButton
         width="100%"
         onClick={procesarArchivo}

@@ -4,7 +4,6 @@ import {
   TableCell, TableBody, Grid, TextField, MenuItem, IconButton,
   Stepper, Step, StepLabel, Alert, AlertTitle, Divider, Tooltip, Chip, Stack, FormControlLabel, Switch, CircularProgress, Autocomplete
 } from '@mui/material';
-import { TODAS_LAS_CATEGORIAS } from '../../../shared-components/categorias';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import MonthRangeSelect from './MonthRangeSelect';
 import CustomSelect from '../../../shared-components/CustomSelect';
@@ -19,6 +18,7 @@ import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../uti
 import API_CONFIG from '../../../config/api-config';
 import { getStoredCurrencyPreference, persistCurrencyPreference } from '../../../shared-components/CurrencyTabs';
 import { CURRENCY_OPTIONS, stripCurrencyTag, withCurrencyTag } from '../utils/currencyTag';
+import { fetchCategorias } from '../../../shared-services/categoriasService';
 
 const tableRowStyle = {
   backgroundColor: 'rgba(255, 255, 255, 0.02)',
@@ -137,21 +137,21 @@ export default function PresupuestoNuevo() {
     { categoria: 'Marketing', tipo: 'Egreso', regla: { modo: 'AJUSTE', importe: 80000, porcentaje: 5 } },
     { categoria: 'Operaciones', tipo: 'Egreso', regla: { modo: 'FIJO', importe: 120000 } },
   ]);
-  const [categoriasOptions, setCategoriasOptions] = React.useState(TODAS_LAS_CATEGORIAS);
+  const [categoriasOptions, setCategoriasOptions] = React.useState([]);
 
   React.useEffect(() => {
-    const fetchCategorias = async () => {
+    const cargarCategorias = async () => {
       try {
-        const response = await http.get(`${API_CONFIG.REGISTRO}/api/categorias`);
-        if (response.data && response.data.length > 0) {
-          setCategoriasOptions(response.data);
+        const lista = await fetchCategorias();
+        if (Array.isArray(lista) && lista.length > 0) {
+          setCategoriasOptions(lista);
         }
       } catch (error) {
         console.error("Error fetching categories, using fallback", error);
       }
     };
 
-    fetchCategorias();
+    cargarCategorias();
   }, []);
 
   // Paso 3: tabla generada + editable

@@ -219,16 +219,14 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
         </Box>
       </Box>
 
-      {/* 6️⃣ Categoría */}
+      {/* 6: Categoria */}
       <Box sx={{ flex: 1 }}>
-        <FormLabel>Categoría *</FormLabel>
-        <CustomSingleAutoComplete
-          options={["Productos", "Servicios", "Mantenimiento", "Consultoría"]}
+        <FormLabel>Categoria *</FormLabel>
+        <CategoriaAutoComplete
           value={formData.categoria || ""}
-          onChange={(valor) =>
-            setFormData((p) => ({ ...p, categoria: valor }))
-          }
+          onChange={(valor) => setFormData((p) => ({ ...p, categoria: valor }))}
           error={!!errors.categoria}
+          helperText={errors.categoria}
         />
         {errors.categoria && (
           <FormHelperText error>{errors.categoria}</FormHelperText>

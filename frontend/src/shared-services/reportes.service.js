@@ -1,6 +1,6 @@
-import axios from 'axios';
 import dayjs from 'dayjs';
 import API_CONFIG from '../config/api-config';
+import http from '../api/http';
 
 const URL_REPORTE = API_CONFIG.REPORTE;
 const URL_REGISTRO = API_CONFIG.REGISTRO;
@@ -64,7 +64,7 @@ export const getResumenMensual = async (anio, mes, categorias = []) => {
     }
 
     const headers = getUsuarioHeaders();
-    const response = await axios.get(`${URL_REPORTE}/resumen`, { params, headers });
+    const response = await http.get(`${URL_REPORTE}/resumen`, { params, headers });
     return response.data;
   } catch (error) {
     console.error('Error al obtener resumen mensual:', error);
@@ -106,7 +106,7 @@ export const getMovimientosPorRango = async ({
 
     while (!last) {
       const queryString = buildQueryString(page);
-      const response = await axios.get(
+      const response = await http.get(
         `${URL_REGISTRO}/movimientos?${queryString}`,
         { headers }
       );

@@ -1,10 +1,34 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
-  Box, Typography, Chip, IconButton, Dialog, DialogTitle, DialogContent, 
-  DialogActions, Button, Grid, TextField, Alert, FormLabel, FormHelperText, OutlinedInput, Snackbar, LinearProgress
+  Box,
+  Typography,
+  Chip,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Grid,
+  TextField,
+  Alert,
+  FormLabel,
+  FormHelperText,
+  OutlinedInput,
+  Snackbar,
+  LinearProgress,
 } from "@mui/material";
 import { useTheme, useMediaQuery } from "@mui/material";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import EditIcon from "@mui/icons-material/Edit";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -12,12 +36,9 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import WalletIcon from "@mui/icons-material/Wallet";
-import axios from "axios";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import API_CONFIG from "../../config/api-config";
 import CustomSelect from "../../shared-components/CustomSelect";
-import CustomDatePicker from "../../shared-components/CustomDatePicker";
-import CustomSingleAutoComplete from "../../shared-components/CustomSingleAutoComplete";
-import { TODAS_LAS_CATEGORIAS } from "../../shared-components/categorias";
 import dayjs from "dayjs";
 import FormIngreso from "../carga-general/components/forms/FormIngreso";
 import FormEgreso from "../carga-general/components/forms/FormEgreso";
@@ -29,6 +50,12 @@ import VerDeuda from "./components/VerDeuda";
 import VerAcreencia from "./components/VerAcreencia";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
+import ExportadorSimple from "../../shared-components/ExportadorSimple";
+import { exportToExcel } from "../../utils/exportExcelUtils";
+import { exportPdfReport } from "../../utils/exportPdfUtils";
+
+// ✅ IMPORTANTE: usar tu cliente central con interceptors
+import http from "../../api/http";
 import CurrencyTabs, {
   getStoredCurrencyPreference,
   persistCurrencyPreference,
@@ -39,12 +66,14 @@ export default function TablaRegistrosV2() {
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  
+
   // Paginación del servidor
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
   const [rowCount, setRowCount] = useState(0);
   const [currency, setCurrency] = useState(getStoredCurrencyPreference());
-  
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("view"); // "view" o "edit"
@@ -53,18 +82,69 @@ export default function TablaRegistrosV2() {
   const [errors, setErrors] = useState({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [movimientoToDelete, setMovimientoToDelete] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
-  const [successSnackbar, setSuccessSnackbar] = useState({ open: false, message: "" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [successSnackbar, setSuccessSnackbar] = useState({
+    open: false,
+    message: "",
+  });
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const [pendingEditId, setPendingEditId] = useState(null);
   const dialogContentRef = useRef(null);
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState(null);
+  const [fechaHasta, setFechaHasta] = useState(null);
+  const searchDateISO = useMemo(() => {
+    if (!searchText) return null;
+    const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
+    return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
+  }, [searchText]);
+
+  useEffect(() => {
+    const handler = setTimeout(
+      () => setDebouncedSearch(searchText.trim().toLowerCase()),
+      250,
+    );
+    return () => clearTimeout(handler);
+  }, [searchText]);
+
+  useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch("/logo512.png");
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
+
+  useEffect(() => {
+    // Cuando se busca, siempre arrancar desde la primera página para evitar resultados vacíos
+    setPaginationModel((prev) =>
+      prev.page === 0 ? prev : { ...prev, page: 0 },
+    );
+  }, [debouncedSearch, fechaDesde, fechaHasta]);
 
   const clearDeepLink = useCallback(() => {
     const hasQuery = searchParams.has("editMovementId");
     const state = location.state || {};
-    const { editMovementId: _omitId, editMovementMeta: _omitMeta, ...restState } = state;
+    const {
+      editMovementId: _omitId,
+      editMovementMeta: _omitMeta,
+      ...restState
+    } = state;
     const hasStateLink =
       Object.prototype.hasOwnProperty.call(state, "editMovementId") ||
       Object.prototype.hasOwnProperty.call(state, "editMovementMeta");
@@ -82,8 +162,12 @@ export default function TablaRegistrosV2() {
       },
       {
         replace: true,
-        state: hasStateLink ? (Object.keys(restState).length ? restState : undefined) : state,
-      }
+        state: hasStateLink
+          ? Object.keys(restState).length
+            ? restState
+            : undefined
+          : state,
+      },
     );
   }, [location.pathname, location.state, navigate, searchParams]);
 
@@ -111,11 +195,11 @@ export default function TablaRegistrosV2() {
     const sub = sessionStorage.getItem("sub");
     if (sub) {
       fetch(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
-        headers: { "X-Usuario-Sub": sub }
+        headers: { "X-Usuario-Sub": sub },
       })
-        .then(res => res.json())
-        .then(data => setUsuarioRol(data.rol))
-        .catch(err => console.error("Error cargando rol:", err));
+        .then((res) => res.json())
+        .then((data) => setUsuarioRol(data.rol))
+        .catch((err) => console.error("Error cargando rol:", err));
     }
   };
 
@@ -130,13 +214,15 @@ export default function TablaRegistrosV2() {
     setLoading(true);
     try {
       const usuarioSub = sessionStorage.getItem("sub");
-      
+
       if (!usuarioSub) {
         console.error("No se encontró sub de usuario en la sesión");
         alert("Error: No se encontró usuario en la sesión");
         return;
       }
 
+      // ✅ Seguimos mandando X-Usuario-Sub explícito
+      // ✅ Authorization lo agrega http.js (interceptor)
       const headers = { "X-Usuario-Sub": usuarioSub };
       const params = {
         page: paginationModel.page,
@@ -144,16 +230,38 @@ export default function TablaRegistrosV2() {
         sortBy: "fechaEmision",
         sortDir: "desc",
         moneda: currency,
+        // Si es fecha, usamos searchDate y no enviamos el texto para evitar condición AND que vacía resultados
+        search: searchDateISO ? undefined : debouncedSearch || undefined,
+        searchDate: searchDateISO || undefined,
+        fechaDesde: fechaDesde
+          ? dayjs(fechaDesde).format("YYYY-MM-DD")
+          : undefined,
+        fechaHasta: fechaHasta
+          ? dayjs(fechaHasta).format("YYYY-MM-DD")
+          : undefined,
       };
 
-      console.log("📡 Obteniendo movimientos para usuario:", usuarioSub, "página:", paginationModel.page, "tamaño:", paginationModel.pageSize);
-      
-      const response = await axios.get(`${API_BASE}/movimientos`, { headers, params });
-      
+      console.log("[Movimientos] Obteniendo movimientos", {
+        usuarioSub,
+        page: paginationModel.page,
+        size: paginationModel.pageSize,
+        search: debouncedSearch,
+        searchDate: searchDateISO,
+      });
+
+      const response = await http.get(`${API_BASE}/movimientos`, {
+        headers,
+        params,
+      });
+
       console.log("📊 Datos recibidos del backend:", response.data);
-      
+
       // Manejar respuesta paginada del backend
-      if (response.data && typeof response.data === 'object' && 'content' in response.data) {
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "content" in response.data
+      ) {
         setMovimientos(response.data.content || []);
         setRowCount(response.data.totalElements || 0);
       } else {
@@ -164,20 +272,18 @@ export default function TablaRegistrosV2() {
       }
     } catch (error) {
       console.error("Error cargando movimientos:", error);
-      alert("Error al cargar movimientos: " + (error.response?.data?.mensaje || error.message));
+      // Si falla (por ejemplo, fecha inválida), dejamos la tabla vacía sin alertas
       setMovimientos([]);
       setRowCount(0);
     } finally {
       setLoading(false);
     }
-  }, [currency, paginationModel]);
+  }, [currency, paginationModel, debouncedSearch, searchDateISO, fechaDesde, fechaHasta]);
 
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (initializedRef.current) {
-      return;
-    }
+    if (initializedRef.current) return;
     initializedRef.current = true;
     cargarMovimientos();
     cargarRolUsuario();
@@ -201,13 +307,15 @@ export default function TablaRegistrosV2() {
   // Abrir dialog para EDITAR movimiento
   const handleEditarMovimiento = (movimiento) => {
     setSelectedMovimiento(movimiento);
-    
+
     // Convertir datos del movimiento al formato que esperan los formularios
     // El tipo se mantiene en selectedMovimiento para determinar qué formulario renderizar
     const formDataConvertido = {
       montoTotal: movimiento.montoTotal || "",
       moneda: movimiento.moneda || "ARS", // Valor por defecto para moneda
-      fechaEmision: movimiento.fechaEmision ? dayjs(movimiento.fechaEmision) : null,
+      fechaEmision: movimiento.fechaEmision
+        ? dayjs(movimiento.fechaEmision)
+        : null,
       categoria: movimiento.categoria || "",
       origenNombre: movimiento.origenNombre || "",
       origenCuit: movimiento.origenCuit || "",
@@ -215,10 +323,10 @@ export default function TablaRegistrosV2() {
       destinoCuit: movimiento.destinoCuit || "",
       descripcion: movimiento.descripcion || "",
       medioPago: movimiento.medioPago || "", // Mantener string vacío para el formulario
-      estado: movimiento.estado || ""
+      estado: movimiento.estado || "",
       // NO incluir 'tipo' aquí para que no se pueda modificar en el formulario
     };
-    
+
     console.log("📝 Datos convertidos para edición:", formDataConvertido);
     setFormData(formDataConvertido);
     setDialogMode("edit");
@@ -228,14 +336,18 @@ export default function TablaRegistrosV2() {
   useEffect(() => {
     if (!pendingEditId || loading) return;
     const targetMovimiento = movimientos.find(
-      (movimiento) => String(movimiento.id) === String(pendingEditId)
+      (movimiento) => String(movimiento.id) === String(pendingEditId),
     );
     if (targetMovimiento) {
       handleEditarMovimiento(targetMovimiento);
       setPendingEditId(null);
       clearDeepLink();
     } else {
-      setSnackbar({ open: true, message: "No se encontro el movimiento para editar.", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "No se encontro el movimiento para editar.",
+        severity: "error",
+      });
       setPendingEditId(null);
       clearDeepLink();
     }
@@ -244,7 +356,9 @@ export default function TablaRegistrosV2() {
   useEffect(() => {
     if (dialogOpen && dialogMode === "edit") {
       const timer = setTimeout(() => {
-        const firstField = dialogContentRef.current?.querySelector("input, textarea, [tabindex='0']");
+        const firstField = dialogContentRef.current?.querySelector(
+          "input, textarea, [tabindex='0']",
+        );
         if (firstField && typeof firstField.focus === "function") {
           firstField.focus();
         }
@@ -253,15 +367,15 @@ export default function TablaRegistrosV2() {
     }
   }, [dialogOpen, dialogMode]);
 
-  // Función para validar campos obligatorios
   const validarCamposObligatorios = () => {
     const tipoMovimiento = selectedMovimiento?.tipo || "Movimiento";
-    const requiredFields = requiredFieldsMap[tipoMovimiento] || requiredFieldsMap["Movimiento"];
+    const requiredFields =
+      requiredFieldsMap[tipoMovimiento] || requiredFieldsMap["Movimiento"];
     const newErrors = {};
 
     requiredFields.forEach((field) => {
       const value = formData[field];
-      if (!value || (typeof value === 'string' && value.trim() === "")) {
+      if (!value || (typeof value === "string" && value.trim() === "")) {
         newErrors[field] = "Campo obligatorio";
       }
     });
@@ -270,9 +384,7 @@ export default function TablaRegistrosV2() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Guardar cambios al editar
   const handleGuardarCambios = async () => {
-    // Validar campos obligatorios antes de enviar
     if (!validarCamposObligatorios()) {
       alert("⚠️ Por favor completa todos los campos obligatorios");
       return;
@@ -281,70 +393,102 @@ export default function TablaRegistrosV2() {
     try {
       const usuarioSub = sessionStorage.getItem("sub");
       const headers = { "X-Usuario-Sub": usuarioSub };
-      
+
       // Convertir datos del formulario al formato del backend
       // IMPORTANTE: Incluir el tipo del selectedMovimiento para que no se envíe vacío
       const { tipo, ...formDataSinTipo } = formData;
-      
+
       const datosParaBackend = {
         ...formDataSinTipo,
-        tipo: selectedMovimiento.tipo, // ✅ Usar el tipo original del movimiento
-        // Preservar fecha y hora tal como se eligieron en el formulario
+        tipo: selectedMovimiento.tipo,
         fechaEmision: formData.fechaEmision
-          ? formData.fechaEmision.format('YYYY-MM-DDTHH:mm:ss')
+          ? formData.fechaEmision.format("YYYY-MM-DDTHH:mm:ss")
           : null,
         // Limpiar campos vacíos que pueden causar problemas con enums
-        medioPago: formData.medioPago && formData.medioPago.trim() !== "" ? formData.medioPago : null,
-        categoria: formData.categoria && formData.categoria.trim() !== "" ? formData.categoria : null,
-        origenNombre: formData.origenNombre && formData.origenNombre.trim() !== "" ? formData.origenNombre : null,
-        origenCuit: formData.origenCuit && formData.origenCuit.trim() !== "" ? formData.origenCuit : null,
-        destinoNombre: formData.destinoNombre && formData.destinoNombre.trim() !== "" ? formData.destinoNombre : null,
-        destinoCuit: formData.destinoCuit && formData.destinoCuit.trim() !== "" ? formData.destinoCuit : null,
-        descripcion: formData.descripcion && formData.descripcion.trim() !== "" ? formData.descripcion : null,
-        estado: formData.estado && formData.estado.trim() !== "" ? formData.estado : null
+        medioPago:
+          formData.medioPago && formData.medioPago.trim() !== ""
+            ? formData.medioPago
+            : null,
+        categoria:
+          formData.categoria && formData.categoria.trim() !== ""
+            ? formData.categoria
+            : null,
+        origenNombre:
+          formData.origenNombre && formData.origenNombre.trim() !== ""
+            ? formData.origenNombre
+            : null,
+        origenCuit:
+          formData.origenCuit && formData.origenCuit.trim() !== ""
+            ? formData.origenCuit
+            : null,
+        destinoNombre:
+          formData.destinoNombre && formData.destinoNombre.trim() !== ""
+            ? formData.destinoNombre
+            : null,
+        destinoCuit:
+          formData.destinoCuit && formData.destinoCuit.trim() !== ""
+            ? formData.destinoCuit
+            : null,
+        descripcion:
+          formData.descripcion && formData.descripcion.trim() !== ""
+            ? formData.descripcion
+            : null,
+        estado:
+          formData.estado && formData.estado.trim() !== ""
+            ? formData.estado
+            : null,
       };
-      
+
       console.log("📤 Enviando datos al backend:", datosParaBackend);
-      
-      await axios.put(
+
+      await http.put(
         `${API_BASE}/movimientos/${selectedMovimiento.id}`,
         datosParaBackend,
-        { headers }
+        { headers },
       );
-      setSuccessSnackbar({ open: true, message: "Movimiento actualizado correctamente." });
+      setSuccessSnackbar({
+        open: true,
+        message: "Movimiento actualizado correctamente.",
+      });
       setDialogOpen(false);
-      setErrors({}); // Limpiar errores
-      cargarMovimientos(); // Recargar datos
+      setErrors({});
+      cargarMovimientos();
     } catch (error) {
       console.error("Error actualizando movimiento:", error);
       console.error("Datos enviados:", formData);
-      alert("❌ Error al actualizar: " + (error.response?.data?.mensaje || error.message));
+      alert(
+        "❌ Error al actualizar: " +
+          (error.response?.data?.mensaje || error.message),
+      );
     }
   };
 
-  // Abrir confirmación de eliminación
   const handleEliminarClick = (movimiento) => {
     setMovimientoToDelete(movimiento);
     setDeleteConfirmOpen(true);
   };
 
-  // Confirmar eliminación
   const handleConfirmarEliminacion = async () => {
     try {
       const usuarioSub = sessionStorage.getItem("sub");
       const headers = { "X-Usuario-Sub": usuarioSub };
-      
-      await axios.delete(
-        `${API_BASE}/movimientos/${movimientoToDelete.id}`,
-        { headers }
-      );
-      setSuccessSnackbar({ open: true, message: "Movimiento eliminado correctamente." });
+
+      await http.delete(`${API_BASE}/movimientos/${movimientoToDelete.id}`, {
+        headers,
+      });
+      setSuccessSnackbar({
+        open: true,
+        message: "Movimiento eliminado correctamente.",
+      });
       setDeleteConfirmOpen(false);
       setMovimientoToDelete(null);
-      cargarMovimientos(); // Recargar datos
+      cargarMovimientos();
     } catch (error) {
       console.error("Error eliminando movimiento:", error);
-      alert("❌ Error al eliminar: " + (error.response?.data?.mensaje || error.message));
+      alert(
+        "❌ Error al eliminar: " +
+          (error.response?.data?.mensaje || error.message),
+      );
     }
   };
 
@@ -352,7 +496,7 @@ export default function TablaRegistrosV2() {
     setDialogOpen(false);
     setSelectedMovimiento(null);
     setFormData({});
-    setErrors({}); // Limpiar errores al cerrar
+    setErrors({});
   };
 
   const handleCloseSnackbar = (_event, reason) => {
@@ -360,19 +504,13 @@ export default function TablaRegistrosV2() {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  // Función para renderizar el formulario correcto según el tipo de movimiento
   const renderFormularioMovimiento = () => {
     if (!selectedMovimiento) return null;
 
-    console.log("🔍 Renderizando movimiento:", selectedMovimiento);
-    console.log("🔍 Tipo de movimiento:", selectedMovimiento.tipo);
-    console.log("🔍 Modo del diálogo:", dialogMode);
-
-    // Si es modo "view", usar componentes de visualización
     if (dialogMode === "view") {
       const tipoUpper = selectedMovimiento.tipo?.toUpperCase();
       console.log("🔍 Tipo normalizado:", tipoUpper);
-      
+
       switch (tipoUpper) {
         case "INGRESO":
           return <VerIngreso movimiento={selectedMovimiento} />;
@@ -383,11 +521,15 @@ export default function TablaRegistrosV2() {
         case "ACREENCIA":
           return <VerAcreencia movimiento={selectedMovimiento} />;
         default:
-          console.error("❌ Tipo de movimiento no reconocido:", selectedMovimiento.tipo);
+          console.error(
+            "❌ Tipo de movimiento no reconocido:",
+            selectedMovimiento.tipo,
+          );
           return (
             <Box sx={{ p: 2 }}>
               <Typography color="error">
-                Visualización no disponible para este tipo de movimiento: "{selectedMovimiento.tipo}"
+                Visualización no disponible para este tipo de movimiento: "
+                {selectedMovimiento.tipo}"
               </Typography>
               <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
                 Tipos soportados: INGRESO, EGRESO, DEUDA, ACREENCIA
@@ -397,19 +539,17 @@ export default function TablaRegistrosV2() {
       }
     }
 
-    // Si es modo "edit", usar formularios editables
-    // Convertir fechaEmision a dayjs si es necesario
     const movimientoConFechaConvertida = {
       ...selectedMovimiento,
-      fechaEmision: selectedMovimiento.fechaEmision 
-        ? (typeof selectedMovimiento.fechaEmision === 'string' 
-            ? dayjs(selectedMovimiento.fechaEmision) 
-            : selectedMovimiento.fechaEmision)
-        : null
+      fechaEmision: selectedMovimiento.fechaEmision
+        ? typeof selectedMovimiento.fechaEmision === "string"
+          ? dayjs(selectedMovimiento.fechaEmision)
+          : selectedMovimiento.fechaEmision
+        : null,
     };
 
     const tipoUpperEdit = selectedMovimiento.tipo?.toUpperCase();
-    
+
     switch (tipoUpperEdit) {
       case "INGRESO":
         return (
@@ -456,18 +596,21 @@ export default function TablaRegistrosV2() {
           />
         );
       default:
-        console.error("❌ Formulario no disponible para tipo:", selectedMovimiento.tipo);
+        console.error(
+          "❌ Formulario no disponible para tipo:",
+          selectedMovimiento.tipo,
+        );
         return (
           <Box sx={{ p: 2 }}>
             <Typography color="error">
-              Formulario no disponible para este tipo de movimiento: "{selectedMovimiento.tipo}"
+              Formulario no disponible para este tipo de movimiento: "
+              {selectedMovimiento.tipo}"
             </Typography>
           </Box>
         );
     }
   };
 
-  // Helpers para chips estilizados
   const COLOR_INGRESO = "#2e7d32";
   const COLOR_EGRESO = "#d32f2f";
   const COLOR_DEUDA = "#1565c0";
@@ -496,16 +639,56 @@ export default function TablaRegistrosV2() {
     return "#757575";
   };
 
+  const buildExportParams = () => ({
+    page: 0,
+    size: Math.max(rowCount || movimientos.length || 500, 500),
+    sortBy: "fechaEmision",
+    sortDir: "desc",
+    search: searchDateISO ? undefined : debouncedSearch || undefined,
+    searchDate: searchDateISO || undefined,
+    fechaDesde: fechaDesde ? dayjs(fechaDesde).format("YYYY-MM-DD") : undefined,
+    fechaHasta: fechaHasta ? dayjs(fechaHasta).format("YYYY-MM-DD") : undefined,
+    moneda: currency,
+  });
+
+  const fetchMovimientosParaExportar = async () => {
+    const usuarioSub = sessionStorage.getItem("sub");
+    if (!usuarioSub) {
+      alert("No se encontró usuario en la sesión.");
+      return [];
+    }
+
+    const headers = { "X-Usuario-Sub": usuarioSub };
+    const params = buildExportParams();
+
+    try {
+      const response = await http.get(`${API_BASE}/movimientos`, {
+        headers,
+        params,
+      });
+      if (
+        response.data &&
+        typeof response.data === "object" &&
+        "content" in response.data
+      ) {
+        return response.data.content || [];
+      }
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("Error al exportar movimientos:", error);
+      alert("No se pudieron obtener los movimientos para exportar.");
+      return [];
+    }
+  };
+
   // Formatear fecha (solo día/mes/año)
   const formatearFecha = (fecha) => {
     if (!fecha) return "-";
     try {
-      // Formato [YYYY, MM, DD] que puede venir del backend
       if (Array.isArray(fecha)) {
         const [year, month, day] = fecha;
         return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
       }
-
       const d = dayjs(fecha);
       if (!d.isValid()) return "-";
       return d.format("DD/MM/YYYY");
@@ -514,15 +697,16 @@ export default function TablaRegistrosV2() {
     }
   };
 
-  // Formatear monto
   const formatearMonto = (monto, moneda = "ARS") => {
     if (monto === null || monto === undefined) return "$0";
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: moneda === "USD" ? "USD" : moneda === "EUR" ? "EUR" : "ARS",
-      minimumFractionDigits: 2
+      minimumFractionDigits: 2,
     }).format(Math.abs(monto));
   };
+
+  const paginationMode = "server";
 
   // Definir columnas para DataGrid
   const columns = useMemo(() => {
@@ -533,7 +717,8 @@ export default function TablaRegistrosV2() {
       minWidth: 120,
       renderCell: (params) => {
         const tipo = params.value;
-        if (!tipo) return <Chip label="Sin tipo" size="small" sx={{ height: "24px" }} />;
+        if (!tipo)
+          return <Chip label="Sin tipo" size="small" sx={{ height: "24px" }} />;
         const icon = getTipoIcon(tipo);
         const color = getTipoColor(tipo);
         return (
@@ -547,7 +732,7 @@ export default function TablaRegistrosV2() {
               fontWeight: 600,
               border: `1px solid ${color}`,
               fontSize: "0.8125rem",
-              height: "24px", // Altura fija para alineación
+              height: "24px",
             }}
           />
         );
@@ -575,19 +760,10 @@ export default function TablaRegistrosV2() {
                 : tipo === "Acreencia"
                   ? COLOR_ACREENCIA
                   : "#424242";
-        const signo =
-          tipo === "Egreso" && valor !== 0
-            ? "-"
-            : "";
+        const signo = tipo === "Egreso" && valor !== 0 ? "-" : "";
         return (
-          <Typography
-            variant="body2"
-            fontWeight={600}
-            sx={{ lineHeight: "24px", color }}
-          >
-            {`${signo}${new Intl.NumberFormat("es-AR", {
-              minimumFractionDigits: 2,
-            }).format(Math.abs(valor))} ${moneda}`}
+          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: "24px", color }}>
+            {`${signo}${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(Math.abs(valor))} ${moneda}`}
           </Typography>
         );
       },
@@ -598,13 +774,11 @@ export default function TablaRegistrosV2() {
       headerName: "Fecha",
       flex: 0.7,
       minWidth: 110,
-      renderCell: (params) => {
-        return (
-          <Typography variant="body2" sx={{ lineHeight: "24px" }}>
-            {formatearFecha(params.value)}
-          </Typography>
-        );
-      },
+      renderCell: (params) => (
+        <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+          {formatearFecha(params.value)}
+        </Typography>
+      ),
     };
 
     const estadoColumn = {
@@ -614,7 +788,12 @@ export default function TablaRegistrosV2() {
       minWidth: 120,
       hide: true,
       renderCell: (params) => {
-        if (!params.value) return <Typography variant="body2" sx={{ lineHeight: "24px" }}>-</Typography>;
+        if (!params.value)
+          return (
+            <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+              -
+            </Typography>
+          );
         const estado = params.value;
         const getEstadoColor = () => {
           if (params.row.tipo === "Ingreso") return COLOR_INGRESO;
@@ -636,7 +815,7 @@ export default function TablaRegistrosV2() {
               color: getEstadoColor(),
               fontWeight: 600,
               border: `1px solid ${getEstadoColor()}`,
-              height: "24px", // Altura fija para alineación
+              height: "24px",
             }}
           />
         );
@@ -649,7 +828,12 @@ export default function TablaRegistrosV2() {
       flex: 1,
       minWidth: 130,
       renderCell: (params) => {
-        if (!params.value) return <Typography variant="body2" sx={{ lineHeight: "24px" }}>-</Typography>;
+        if (!params.value)
+          return (
+            <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+              -
+            </Typography>
+          );
         return (
           <Chip
             label={params.value}
@@ -668,7 +852,11 @@ export default function TablaRegistrosV2() {
       flex: 1,
       minWidth: 130,
       renderCell: (params) => {
-        return <Typography variant="body2" sx={{ lineHeight: "24px" }}>{params.value || "-"}</Typography>;
+        return (
+          <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+            {params.value || "-"}
+          </Typography>
+        );
       },
     };
 
@@ -678,7 +866,11 @@ export default function TablaRegistrosV2() {
       flex: 1,
       minWidth: 130,
       renderCell: (params) => {
-        return <Typography variant="body2" sx={{ lineHeight: "24px" }}>{params.value || "-"}</Typography>;
+        return (
+          <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+            {params.value || "-"}
+          </Typography>
+        );
       },
     };
 
@@ -688,7 +880,11 @@ export default function TablaRegistrosV2() {
       flex: 1.2,
       minWidth: 150,
       renderCell: (params) => {
-        return <Typography variant="body2" sx={{ lineHeight: "24px" }}>{params.value || "-"}</Typography>;
+        return (
+          <Typography variant="body2" sx={{ lineHeight: "24px" }}>
+            {params.value || "-"}
+          </Typography>
+        );
       },
     };
 
@@ -703,30 +899,15 @@ export default function TablaRegistrosV2() {
         const isAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
         return (
           <Box sx={{ display: "flex", gap: 0.5 }}>
-            <IconButton
-              size="small"
-              color="info"
-              onClick={() => handleVerMovimiento(params.row)}
-              title="Ver detalles"
-            >
+            <IconButton size="small" color="info" onClick={() => handleVerMovimiento(params.row)} title="Ver detalles">
               <VisibilityIcon fontSize="small" />
             </IconButton>
             {isAdmin && (
               <>
-                <IconButton
-                  size="small"
-                  color="primary"
-                  onClick={() => handleEditarMovimiento(params.row)}
-                  title="Editar"
-                >
+                <IconButton size="small" color="primary" onClick={() => handleEditarMovimiento(params.row)} title="Editar">
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleEliminarClick(params.row)}
-                  title="Eliminar"
-                >
+                <IconButton size="small" color="error" onClick={() => handleEliminarClick(params.row)} title="Eliminar">
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </>
@@ -736,9 +917,7 @@ export default function TablaRegistrosV2() {
       },
     };
 
-    if (isMobile) {
-      return [tipoColumn, montoColumn, accionesColumn];
-    }
+    if (isMobile) return [tipoColumn, montoColumn, accionesColumn];
 
     return [
       tipoColumn,
@@ -751,7 +930,103 @@ export default function TablaRegistrosV2() {
       descripcionColumn,
       accionesColumn,
     ];
-  }, [isMobile, usuarioRol]);
+  }, [isMobile, usuarioRol, currency]);
+
+  const exportColumns = React.useMemo(
+    () => columns.filter((col) => col.field !== "acciones"),
+    [columns],
+  );
+
+  const formatValorExport = (row, field) => {
+    if (field === "montoTotal") {
+      const tipo = row.tipo || "";
+      const moneda = row.moneda || "ARS";
+      const multiplicador = tipo === "Egreso" ? -1 : 1;
+      const valor = Number(row.montoTotal || 0) * multiplicador;
+      const signo = valor < 0 ? "-" : "";
+      return `${signo}${new Intl.NumberFormat("es-AR", {
+        minimumFractionDigits: 2,
+      }).format(Math.abs(valor))} ${moneda}`;
+    }
+
+    if (field === "fechaEmision") {
+      return formatearFecha(row.fechaEmision);
+    }
+
+    const value = row[field];
+    if (value === null || value === undefined) return "-";
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
+  const handleExportExcel = async () => {
+    const registros = await fetchMovimientosParaExportar();
+    if (!registros.length) return;
+
+    const headers = exportColumns.map((c) => c.headerName);
+    const excelData = [
+      headers,
+      ...registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field))),
+    ];
+
+    const colsConfig = exportColumns.map(() => ({ wch: 18 }));
+
+    exportToExcel(
+      excelData,
+      "Movimientos",
+      "Movimientos",
+      colsConfig,
+      [],
+      [],
+      {
+        headerRows: [0],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      },
+    );
+  };
+
+  const handleExportPdf = async () => {
+    const registros = await fetchMovimientosParaExportar();
+    if (!registros.length) return;
+
+    const head = [exportColumns.map((c) => c.headerName)];
+    const body = registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field)));
+
+    const categorias = new Set(
+      registros
+        .map((r) => r.categoria)
+        .filter(Boolean),
+    );
+
+    await exportPdfReport({
+      title: "Movimientos financieros",
+      subtitle: "Exportaci?n",
+      charts: [],
+      table: { head, body },
+      fileName: "Movimientos",
+      footerOnFirstPage: false,
+      cover: {
+        show: true,
+        subtitle: "Listado actualizado",
+        logo: logoDataUrl,
+        meta: [
+          { label: "Registros", value: registros.length },
+          { label: "Columnas", value: exportColumns.length },
+          { label: "Generado", value: new Date().toLocaleDateString("es-AR") },
+        ],
+        kpis: [
+          { label: "Registros", value: registros.length.toString() },
+          { label: "Categorias", value: categorias.size.toString() },
+          { label: "Orden", value: "Fecha desc" },
+        ],
+        summary: [
+          "Incluye filtros y rango de fechas aplicados.",
+        ],
+      },
+    });
+  };
 
   return (
     <Box
@@ -759,6 +1034,7 @@ export default function TablaRegistrosV2() {
         width: "100%",
         px: { xs: 2, md: 3 },
         pt: { xs: 1.5, md: 2 },
+        pb: 3,
       }}
     >
       <CurrencyTabs
@@ -766,52 +1042,139 @@ export default function TablaRegistrosV2() {
         onChange={handleCurrencyChange}
         sx={{ justifyContent: "center", mb: 1.5 }}
       />
-      <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 2, fontWeight: 600, color: 'text.primary' }}>
+      <Typography
+        variant="h4"
+        component="h1"
+        gutterBottom
+        sx={{ mb: 2, fontWeight: 600, color: "text.primary" }}
+      >
         Movimientos Financieros
       </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+          mb: 2,
+          flexWrap: "wrap",
+        }}
+      >
+        <TextField
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          placeholder="Buscar"
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <SearchRoundedIcon
+                fontSize="small"
+                sx={{ color: "text.secondary", mr: 0.5 }}
+              />
+            ),
+          }}
+          sx={{ minWidth: 280, maxWidth: 420, flex: "1 1 280px" }}
+        />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <DatePicker
+            label="Desde"
+            value={fechaDesde ? dayjs(fechaDesde) : null}
+            format="DD/MM/YYYY"
+            onChange={(newValue) => setFechaDesde(newValue)}
+            slotProps={{
+              textField: {
+                size: "small",
+                placeholder: "dd/mm/aaaa",
+                sx: { backgroundColor: "white", borderRadius: "8px" },
+              },
+              openPickerButton: {
+                size: "small",
+                sx: {
+                  p: 0.5,
+                  border: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                },
+              },
+              openPickerIcon: { sx: { fontSize: 18 } },
+            }}
+            sx={{ width: 150, flex: "0 0 140px" }}
+          />
+          <DatePicker
+            label="Hasta"
+            value={fechaHasta ? dayjs(fechaHasta) : null}
+            format="DD/MM/YYYY"
+            onChange={(newValue) => setFechaHasta(newValue)}
+            slotProps={{
+              textField: {
+                size: "small",
+                placeholder: "dd/mm/aaaa",
+                sx: { backgroundColor: "white", borderRadius: "8px" },
+              },
+              openPickerButton: {
+                size: "small",
+                sx: {
+                  p: 0.5,
+                  border: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                },
+              },
+              openPickerIcon: { sx: { fontSize: 18 } },
+            }}
+            sx={{ width: 140, flex: "0 0 140px" }}
+          />
+        </LocalizationProvider>
+        {(fechaDesde || fechaHasta) && (
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => {
+              setFechaDesde(null);
+              setFechaHasta(null);
+            }}
+            sx={{ ml: { xs: 0, md: "auto" } }}
+          >
+            Limpiar
+          </Button>
+        )}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: { xs: 0, md: "auto" } }}>
+          <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
+        </Box>
+      </Box>
 
       <Box sx={{ height: 700, width: "100%" }}>
         <DataGrid
           rows={movimientos}
           columns={columns}
           loading={loading}
-          
           // Paginación del servidor
-          paginationMode="server"
+          paginationMode={paginationMode}
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           rowCount={rowCount}
           pageSizeOptions={[10, 25, 50, 100]}
-          
           initialState={{
             sorting: { sortModel: [{ field: "fechaEmision", sort: "desc" }] },
-            columns: {
-              columnVisibilityModel: {
-                estado: false,
-              },
-            },
+            columns: { columnVisibilityModel: { estado: false } },
           }}
-          slots={{ 
+          slots={{
             toolbar: GridToolbar,
             loadingOverlay: () => (
-              <LinearProgress 
-                sx={{ 
-                  position: 'absolute',
+              <LinearProgress
+                sx={{
+                  position: "absolute",
                   top: 0,
                   left: 0,
                   right: 0,
                   zIndex: 1,
                   height: 4,
-                  borderRadius: 0
-                }} 
+                  borderRadius: 0,
+                }}
               />
-            )
+            ),
           }}
           slotProps={{
-            toolbar: {
-              showQuickFilter: true,
-              quickFilterProps: { debounceMs: 500 },
-            },
+            toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } },
           }}
           disableRowSelectionOnClick
           autoHeight={false}
@@ -823,9 +1186,7 @@ export default function TablaRegistrosV2() {
               display: "flex",
               alignItems: "center",
             },
-            "& .MuiDataGrid-cell:last-of-type": {
-              borderRight: "none",
-            },
+            "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" },
             "& .MuiDataGrid-columnHeaders": {
               backgroundColor: "#f5f5f5",
               fontSize: "0.95rem",
@@ -840,26 +1201,12 @@ export default function TablaRegistrosV2() {
               justifyContent: "space-between",
               boxSizing: "border-box",
             },
-            "& .MuiDataGrid-columnHeader:first-of-type": {
-              borderLeft: "none",
-            },
-            "& .MuiDataGrid-columnHeader:last-of-type": {
-              borderRight: "none",
-            },
-            "& .MuiDataGrid-columnHeaderTitle": {
-              fontWeight: 700,
-            },
-            "& .MuiDataGrid-columnSeparator": {
-              opacity: 1,
-              visibility: "visible",
-              color: "#d5d5d5",
-            },
-            "& .MuiDataGrid-row:hover": {
-              backgroundColor: "rgba(0, 0, 0, 0.02)",
-            },
-            "& .MuiDataGrid-sortIcon": {
-              display: "none",
-            },
+            "& .MuiDataGrid-columnHeader:first-of-type": { borderLeft: "none" },
+            "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
+            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
+            "& .MuiDataGrid-columnSeparator": { opacity: 1, visibility: "visible", color: "#d5d5d5" },
+            "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(0, 0, 0, 0.02)" },
+            "& .MuiDataGrid-sortIcon": { display: "none" },
             "& .MuiDataGrid-columnHeaderTitleContainer": {
               paddingRight: "8px",
               display: "flex",
@@ -883,26 +1230,30 @@ export default function TablaRegistrosV2() {
               fontSize: "16px",
               display: "block !important",
             },
-            "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])": {
-              display: "none",
-            },
+            "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
+              {
+                display: "none",
+              },
           }}
         />
       </Box>
 
-      {/* Dialog para VER o EDITAR - Estilo exacto del formulario original */}
-      <Dialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 600 }}>
-          {dialogMode === "edit" ? "Editar movimiento" : "Detalle de movimiento"}
+          {dialogMode === "edit"
+            ? "Editar movimiento"
+            : "Detalle de movimiento"}
         </DialogTitle>
         <DialogContent dividers sx={{ p: 3 }} ref={dialogContentRef}>
           {selectedMovimiento && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                width: "100%",
+              }}
+            >
               {renderFormularioMovimiento()}
             </Box>
           )}
@@ -919,11 +1270,7 @@ export default function TablaRegistrosV2() {
         </DialogActions>
       </Dialog>
 
-      {/* Dialog de confirmación para ELIMINAR */}
-      <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
-      >
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
         <DialogTitle>⚠️ Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -935,26 +1282,32 @@ export default function TablaRegistrosV2() {
                 <strong>Tipo:</strong> {movimientoToDelete.tipo}
               </Typography>
               <Typography variant="body2">
-                <strong>Monto:</strong> {formatearMonto(movimientoToDelete.montoTotal, movimientoToDelete.moneda)}
+                <strong>Monto:</strong>{" "}
+                {formatearMonto(
+                  movimientoToDelete.montoTotal,
+                  movimientoToDelete.moneda,
+                )}
               </Typography>
               <Typography variant="body2">
-                <strong>Fecha:</strong> {formatearFecha(movimientoToDelete.fechaEmision)}
+                <strong>Fecha:</strong>{" "}
+                {formatearFecha(movimientoToDelete.fechaEmision)}
               </Typography>
             </Box>
           )}
-          <Alert severity="error" sx={{ mt: 2 }}>
-            Esta acción no se puede deshacer.
-          </Alert>
+          <Alert severity="error" sx={{ mt: 2 }}>Esta acción no se puede deshacer.</Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleConfirmarEliminacion} variant="contained" color="error">
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
+          <Button
+            onClick={handleConfirmarEliminacion}
+            variant="contained"
+            color="error"
+          >
             Eliminar
           </Button>
         </DialogActions>
       </Dialog>
+
       <SuccessSnackbar
         open={successSnackbar.open}
         message={successSnackbar.message}
@@ -966,7 +1319,11 @@ export default function TablaRegistrosV2() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

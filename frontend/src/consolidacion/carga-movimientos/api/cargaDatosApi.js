@@ -1,5 +1,5 @@
-import axios from 'axios';
-import { API_CONFIG } from '../../config/apiConfig';
+import http from "../../api/http";
+import API_CONFIG from "../../config/api-config";
 
 const API_BASE_URL = API_CONFIG.REGISTRO;
 
@@ -9,15 +9,34 @@ const API_BASE_URL = API_CONFIG.REGISTRO;
  * Soporta múltiples métodos: formulario, excel, voz, audio
  */
 
-// Obtener headers comunes
+// Obtener headers comunes (sin pisar lo que mete el interceptor)
 const getHeaders = () => {
-  const usuarioSub = localStorage.getItem('usuario_sub');
-  const organizacionId = localStorage.getItem('organizacion_id');
-  
-  return {
-    'X-Usuario-Sub': usuarioSub,
-    'X-Organizacion-Id': organizacionId,
-  };
+  const headers = {};
+
+  // SUB: priorizar sessionStorage (como el resto del front)
+  try {
+    const usuarioSub =
+      sessionStorage.getItem("sub") ||
+      localStorage.getItem("usuario_sub") ||
+      localStorage.getItem("sub");
+
+    if (usuarioSub) headers["X-Usuario-Sub"] = usuarioSub;
+  } catch {
+    /* noop */
+  }
+
+  // Organización (si existe)
+  try {
+    const organizacionId =
+      localStorage.getItem("organizacion_id") ||
+      sessionStorage.getItem("organizacionId");
+
+    if (organizacionId) headers["X-Organizacion-Id"] = organizacionId;
+  } catch {
+    /* noop */
+  }
+
+  return headers;
 };
 
 /**
@@ -28,87 +47,65 @@ const getHeaders = () => {
  * @param {string} tipoMovimiento - Opcional: "Ingreso", "Egreso", "Deuda", "Acreencia"
  */
 export const cargarDatos = async (tipo, metodo, datos, tipoMovimiento = null) => {
-  try {
-    const payload = {
-      tipo,
-      metodo,
-      datos,
-      ...(tipoMovimiento && { tipoMovimiento })
-    };
+  const payload = {
+    tipo,
+    metodo,
+    datos,
+    ...(tipoMovimiento && { tipoMovimiento }),
+  };
 
-    const response = await axios.post(
-      `${API_BASE_URL}/api/carga-datos`,
-      payload,
-      { headers: getHeaders() }
-    );
+  // ✅ IMPORTANTE: sin "/api" extra
+  const response = await http.post(`${API_BASE_URL}/carga-datos`, payload, {
+    headers: getHeaders(),
+  });
 
-    return response.data;
-  } catch (error) {
-    console.error('Error al cargar datos:', error);
-    throw error;
-  }
+  return response.data;
 };
 
 /**
  * Obtener preview de archivo Excel
  * @param {File} file - Archivo Excel
  * @param {string} tipo - "factura" o "movimiento"
- * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander"
+ * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander", "galicia", "uala", "nacion"
  */
-export const previewExcel = async (file, tipo = 'movimiento', tipoOrigen = 'mycfo') => {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('tipo', tipo);
-    formData.append('tipoOrigen', tipoOrigen);
+export const previewExcel = async (file, tipo = "movimiento", tipoOrigen = "mycfo") => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("tipo", tipo);
+  formData.append("tipoOrigen", tipoOrigen);
 
-    const response = await axios.post(
-      `${API_BASE_URL}/api/carga-datos/excel/preview`,
-      formData,
-      {
-        headers: {
-          ...getHeaders(),
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+  // ✅ IMPORTANTE: sin "/api" extra
+  const response = await http.post(`${API_BASE_URL}/carga-datos/excel/preview`, formData, {
+    headers: {
+      ...getHeaders(),
+      "Content-Type": "multipart/form-data",
+    },
+  });
 
-    return response.data;
-  } catch (error) {
-    console.error('Error al obtener preview de Excel:', error);
-    throw error;
-  }
+  return response.data;
 };
 
 /**
  * Importar archivo Excel directamente
  * @param {File} file - Archivo Excel
  * @param {string} tipo - "factura" o "movimiento"
- * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander"
+ * @param {string} tipoOrigen - "mycfo", "mercado-pago", "santander", "galicia", "uala", "nacion"
  */
-export const importarExcel = async (file, tipo = 'movimiento', tipoOrigen = 'mycfo') => {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('tipo', tipo);
-    formData.append('tipoOrigen', tipoOrigen);
+export const importarExcel = async (file, tipo = "movimiento", tipoOrigen = "mycfo") => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("tipo", tipo);
+  formData.append("tipoOrigen", tipoOrigen);
 
-    const response = await axios.post(
-      `${API_BASE_URL}/api/carga-datos/excel`,
-      formData,
-      {
-        headers: {
-          ...getHeaders(),
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+  // ✅ IMPORTANTE: sin "/api" extra
+  const response = await http.post(`${API_BASE_URL}/carga-datos/excel`, formData, {
+    headers: {
+      ...getHeaders(),
+      "Content-Type": "multipart/form-data",
+    },
+  });
 
-    return response.data;
-  } catch (error) {
-    console.error('Error al importar Excel:', error);
-    throw error;
-  }
+  return response.data;
 };
 
 /**
@@ -118,25 +115,19 @@ export const importarExcel = async (file, tipo = 'movimiento', tipoOrigen = 'myc
  * @param {string} tipoMovimiento - Opcional: "Ingreso", "Egreso", "Deuda", "Acreencia"
  */
 export const procesarVoz = async (tipo, datos, tipoMovimiento = null) => {
-  try {
-    const payload = {
-      tipo,
-      metodo: 'voz',
-      datos,
-      ...(tipoMovimiento && { tipoMovimiento })
-    };
+  const payload = {
+    tipo,
+    metodo: "voz",
+    datos,
+    ...(tipoMovimiento && { tipoMovimiento }),
+  };
 
-    const response = await axios.post(
-      `${API_BASE_URL}/api/carga-datos/voz`,
-      payload,
-      { headers: getHeaders() }
-    );
+  // ✅ IMPORTANTE: sin "/api" extra
+  const response = await http.post(`${API_BASE_URL}/carga-datos/voz`, payload, {
+    headers: getHeaders(),
+  });
 
-    return response.data;
-  } catch (error) {
-    console.error('Error al procesar voz:', error);
-    throw error;
-  }
+  return response.data;
 };
 
 /**
@@ -145,27 +136,19 @@ export const procesarVoz = async (tipo, datos, tipoMovimiento = null) => {
  * @param {string} tipo - "factura", "recibo", "pagare", "movimiento"
  */
 export const procesarAudio = async (audioFile, tipo) => {
-  try {
-    const formData = new FormData();
-    formData.append('file', audioFile);
-    formData.append('tipo', tipo);
+  const formData = new FormData();
+  formData.append("file", audioFile);
+  formData.append("tipo", tipo);
 
-    const response = await axios.post(
-      `${API_BASE_URL}/api/carga-datos/audio`,
-      formData,
-      {
-        headers: {
-          ...getHeaders(),
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+  // ✅ IMPORTANTE: sin "/api" extra
+  const response = await http.post(`${API_BASE_URL}/carga-datos/audio`, formData, {
+    headers: {
+      ...getHeaders(),
+      "Content-Type": "multipart/form-data",
+    },
+  });
 
-    return response.data;
-  } catch (error) {
-    console.error('Error al procesar audio:', error);
-    throw error;
-  }
+  return response.data;
 };
 
 export default {
@@ -175,4 +158,3 @@ export default {
   procesarVoz,
   procesarAudio,
 };
-

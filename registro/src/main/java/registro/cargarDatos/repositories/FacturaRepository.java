@@ -34,14 +34,25 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
             AND (:tipoFactura IS NULL OR f.tipoFactura = :tipoFactura)
             AND (:estadoPago IS NULL OR f.estadoPago = :estadoPago)
             AND (:moneda IS NULL OR f.moneda = :moneda)
+            AND (:search IS NULL OR
+                 LOWER(f.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.tipoFactura, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.vendedorNombre, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.compradorNombre, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.vendedorCuit, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.compradorCuit, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                 )
+            AND (:searchDate IS NULL OR DATE(f.fechaEmision) = :searchDate)
             """)
     Page<Factura> buscarFacturas(@Param("organizacionId") Long organizacionId,
                                  @Param("usuarioId") String usuarioId,
-                                 @Param("desde") java.time.LocalDate desde,
-                                 @Param("hasta") java.time.LocalDate hasta,
+                                 @Param("desde") java.time.LocalDateTime desde,
+                                 @Param("hasta") java.time.LocalDateTime hasta,
                                  @Param("tipoFactura") String tipoFactura,
                                  @Param("estadoPago") registro.cargarDatos.models.EstadoPago estadoPago,
                                  @Param("moneda") TipoMoneda moneda,
+                                 @Param("search") String search,
+                                 @Param("searchDate") java.time.LocalDate searchDate,
                                  Pageable pageable);
 
     @Query("""
@@ -53,12 +64,23 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
             AND (:tipoFactura IS NULL OR f.tipoFactura = :tipoFactura)
             AND (:estadoPago IS NULL OR f.estadoPago = :estadoPago)
             AND (:moneda IS NULL OR f.moneda = :moneda)
+            AND (:search IS NULL OR
+                 LOWER(f.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.tipoFactura, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.vendedorNombre, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.compradorNombre, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.vendedorCuit, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(COALESCE(f.compradorCuit, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                 )
+            AND (:searchDate IS NULL OR DATE(f.fechaEmision) = :searchDate)
             """)
     List<Factura> buscarFacturas(@Param("organizacionId") Long organizacionId,
                                  @Param("usuarioId") String usuarioId,
-                                 @Param("desde") java.time.LocalDate desde,
-                                 @Param("hasta") java.time.LocalDate hasta,
+                                 @Param("desde") java.time.LocalDateTime desde,
+                                 @Param("hasta") java.time.LocalDateTime hasta,
                                  @Param("tipoFactura") String tipoFactura,
                                  @Param("estadoPago") registro.cargarDatos.models.EstadoPago estadoPago,
-                                 @Param("moneda") TipoMoneda moneda);
+                                 @Param("moneda") TipoMoneda moneda,
+                                 @Param("search") String search,
+                                 @Param("searchDate") java.time.LocalDate searchDate);
 }
