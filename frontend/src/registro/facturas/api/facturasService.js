@@ -47,9 +47,6 @@ export const fetchFacturas = async ({
   if (moneda) params.append("moneda", moneda);
   if (search) params.append("search", search);
   if (searchDate) params.append("searchDate", searchDate);
-  if (moneda) params.append("moneda", moneda);
-  if (search) params.append("search", search);
-  if (searchDate) params.append("searchDate", searchDate);
 
   const response = await http.get(
     `${BASE_URL}/facturas/buscar?${params.toString()}`,

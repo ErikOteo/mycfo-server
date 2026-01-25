@@ -96,6 +96,8 @@ public class FacturaService {
                         null,
                         null,
                         moneda,
+                        null,
+                        null,
                         pageable
                 );
 
