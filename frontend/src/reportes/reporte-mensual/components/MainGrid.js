@@ -10,6 +10,7 @@ import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#19C9FF'];
 
@@ -24,7 +25,13 @@ export default function MainGrid() {
     const [exportingPdf, setExportingPdf] = React.useState(false);
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
-    const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
+    const [currency, setCurrency] = usePreferredCurrency("ARS");
+
+    // Formateo de moneda dependiente de la preferencia seleccionada
+    const formatCurrency = React.useCallback(
+        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        [currency]
+    );
 
     React.useEffect(() => {
         const baseUrl = API_CONFIG.REPORTE;
@@ -33,6 +40,7 @@ export default function MainGrid() {
         const params = new URLSearchParams();
         params.set('anio', Number(selectedYear));
         params.set('mes', Number(selectedMonth) + 1);
+        if (currency) params.set('moneda', currency);
 
         if (Array.isArray(selectedCategoria) && selectedCategoria.length > 0) {
             selectedCategoria.forEach((c) => params.append('categoria', c));
@@ -58,7 +66,7 @@ export default function MainGrid() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [selectedYear, selectedMonth, selectedCategoria]);
+    }, [currency, selectedYear, selectedMonth, selectedCategoria]);
 
     // Cargar logo para la carátula del PDF
     React.useEffect(() => {
@@ -131,7 +139,7 @@ export default function MainGrid() {
 
         exportToExcel(
             excelData,
-            `reporte-mensual-${mesNombre}-${selectedYear}`,
+            `reporte-mensual-${mesNombre}-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
             "Resumen Mensual",
             colsConfig,
             mergesConfig,
@@ -162,15 +170,15 @@ export default function MainGrid() {
             const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
 
             if (detalleIngresos.length > 0) {
-                body.push(["Ingresos", "", currency(totalIngresos)]);
+                body.push(["Ingresos", "", formatCurrency(totalIngresos)]);
                 detalleIngresos.forEach(item => {
-                    body.push(["", item.categoria ?? 'Sin categoria', currency(Number(item.total) || 0)]);
+                    body.push(["", item.categoria ?? 'Sin categoria', formatCurrency(Number(item.total) || 0)]);
                 });
             }
             if (detalleEgresos.length > 0) {
-                body.push(["Egresos", "", currency(totalEgresos)]);
+                body.push(["Egresos", "", formatCurrency(totalEgresos)]);
                 detalleEgresos.forEach(item => {
-                    body.push(["", item.categoria ?? 'Sin categoria', currency(Math.abs(Number(item.total) || 0))]);
+                    body.push(["", item.categoria ?? 'Sin categoria', formatCurrency(Math.abs(Number(item.total) || 0))]);
                 });
             }
 
@@ -183,16 +191,16 @@ export default function MainGrid() {
                     forcePageBreakAfter: true, // cada grafica en su propia pagina
                 })),
                 table: { head, body },
-                fileName: `reporte-mensual-${getNombreMes(selectedMonth)}-${selectedYear}`,
+                fileName: `reporte-mensual-${getNombreMes(selectedMonth)}-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
                 cover: {
                     show: true,
                     subtitle: `${getNombreMes(selectedMonth)} ${selectedYear}`,
                     logo: logoDataUrl,
                     meta: [{ label: "Generado", value: new Date().toLocaleDateString('es-AR') }],
                     kpis: [
-                        { label: "Ingresos", value: currency(totalIngresos) },
-                        { label: "Egresos", value: currency(totalEgresos) },
-                        { label: "Neto", value: currency(totalIngresos - totalEgresos) },
+                        { label: "Ingresos", value: formatCurrency(totalIngresos) },
+                        { label: "Egresos", value: formatCurrency(totalEgresos) },
+                        { label: "Neto", value: formatCurrency(totalIngresos - totalEgresos) },
                     ],
                 },
             });
@@ -234,7 +242,8 @@ export default function MainGrid() {
     }
 
     return (
-        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, p: 3 }}>
+        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, px: { xs: 2, md: 3 }, pt: { xs: 1.5, md: 2 }, pb: 3 }}>
+            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography component="h2" variant="h4">
                     Resumen mensual
@@ -296,7 +305,7 @@ export default function MainGrid() {
                                                 <Cell key={`cell-${index}`} fill={totalIngresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v) => currency(v)} />
+                                        <Tooltip formatter={(v, n) => [formatCurrency(v), n]} />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>
@@ -334,7 +343,7 @@ export default function MainGrid() {
                                                 <Cell key={`cell-egr-${index}`} fill={totalEgresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v) => currency(v)} />
+                                        <Tooltip formatter={(v, n) => [formatCurrency(v), n]} />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>

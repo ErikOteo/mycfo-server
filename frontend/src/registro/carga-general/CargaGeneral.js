@@ -181,7 +181,6 @@ export default function CargaGeneral() {
         normalizados[clave] = valor;
       }
     });
-    normalizados.moneda = "ARS";
     const merged = { ...formData, ...normalizados };
     const transcript =
       respuesta.transcript ||

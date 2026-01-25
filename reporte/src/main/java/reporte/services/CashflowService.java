@@ -44,16 +44,32 @@ public class CashflowService {
                 .collect(Collectors.toList());
     }
 
-    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String authorization) {
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub) {
+        return obtenerRegistrosPorAnio(anio, userSub, null, null);
+    }
+
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String moneda) {
+        return obtenerRegistrosPorAnio(anio, userSub, moneda, null);
+    }
+
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String moneda, String authorization) {
         LocalDate desde = LocalDate.of(anio, 1, 1);
         LocalDate hasta = LocalDate.of(anio, 12, 31);
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
                 "&fechaHasta=" + hasta +
                 "&tipos=Ingreso&tipos=Egreso&page=0&size=1000&sortBy=fechaEmision&sortDir=asc";
 
+        if (moneda != null && !moneda.isBlank()) {
+            url = url + "&moneda=" + moneda;
+        }
+
         HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Usuario-Sub", userSub);
-        headers.add("Authorization", authorization);
+        if (userSub != null) {
+            headers.add("X-Usuario-Sub", userSub);
+        }
+        if (authorization != null && !authorization.isBlank()) {
+            headers.add("Authorization", authorization);
+        }
 
         ResponseEntity<reporte.dtos.PageResponse<RegistroDTO>> response;
         try {

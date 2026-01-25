@@ -33,7 +33,14 @@ public class ConciliacionService {
      */
     @Transactional(readOnly = true)
     public Page<MovimientoDTO> obtenerMovimientosSinConciliar(Pageable pageable) {
-        Page<Movimiento> registros = movimientoRepository.findByDocumentoComercialIsNull(pageable);
+        return obtenerMovimientosSinConciliar(pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovimientoDTO> obtenerMovimientosSinConciliar(Pageable pageable, TipoMoneda moneda) {
+        Page<Movimiento> registros = moneda != null
+                ? movimientoRepository.findByDocumentoComercialIsNullAndMoneda(moneda, pageable)
+                : movimientoRepository.findByDocumentoComercialIsNull(pageable);
         
         return registros.map(this::convertirAMovimientoDTO);
     }
@@ -43,7 +50,14 @@ public class ConciliacionService {
      */
     @Transactional(readOnly = true)
     public Page<MovimientoDTO> obtenerTodosLosMovimientos(Pageable pageable) {
-        Page<Movimiento> registros = movimientoRepository.findAll(pageable);
+        return obtenerTodosLosMovimientos(pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MovimientoDTO> obtenerTodosLosMovimientos(Pageable pageable, TipoMoneda moneda) {
+        Page<Movimiento> registros = moneda != null
+                ? movimientoRepository.findByMoneda(moneda, pageable)
+                : movimientoRepository.findAll(pageable);
         
         return registros.map(this::convertirAMovimientoDTO);
     }
@@ -53,7 +67,14 @@ public class ConciliacionService {
      */
     @Transactional(readOnly = true)
     public List<MovimientoDTO> obtenerMovimientosSinConciliar() {
-        List<Movimiento> registros = movimientoRepository.findByDocumentoComercialIsNull();
+        return obtenerMovimientosSinConciliarPorMoneda(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MovimientoDTO> obtenerMovimientosSinConciliarPorMoneda(TipoMoneda moneda) {
+        List<Movimiento> registros = moneda != null
+                ? movimientoRepository.findByDocumentoComercialIsNullAndMoneda(moneda)
+                : movimientoRepository.findByDocumentoComercialIsNull();
         
         return registros.stream()
                 .map(this::convertirAMovimientoDTO)
@@ -65,7 +86,14 @@ public class ConciliacionService {
      */
     @Transactional(readOnly = true)
     public List<MovimientoDTO> obtenerTodosLosMovimientos() {
-        List<Movimiento> registros = movimientoRepository.findAll();
+        return obtenerTodosLosMovimientosPorMoneda(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MovimientoDTO> obtenerTodosLosMovimientosPorMoneda(TipoMoneda moneda) {
+        List<Movimiento> registros = moneda != null
+                ? movimientoRepository.findByMoneda(moneda)
+                : movimientoRepository.findAll();
         
         return registros.stream()
                 .map(this::convertirAMovimientoDTO)
@@ -79,8 +107,15 @@ public class ConciliacionService {
      */
     @Transactional(readOnly = true)
     public List<DocumentoSugeridoDTO> sugerirDocumentos(Long movimientoId) {
+        return sugerirDocumentos(movimientoId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DocumentoSugeridoDTO> sugerirDocumentos(Long movimientoId, TipoMoneda monedaFiltro) {
         Movimiento movimiento = movimientoRepository.findById(movimientoId)
                 .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
+
+        TipoMoneda monedaMovimiento = movimiento.getMoneda() != null ? movimiento.getMoneda() : monedaFiltro;
 
         System.out.println("\n========== INICIANDO BÚSQUEDA DE SUGERENCIAS ==========");
         System.out.println("Movimiento ID: " + movimientoId);
@@ -94,7 +129,7 @@ public class ConciliacionService {
         List<DocumentoSugeridoDTO> sugerencias = new ArrayList<>();
         
         // PASO 1: Filtrar documentos candidatos por tipo Y (monto O fecha O descripción)
-        List<DocumentoComercial> candidatos = filtrarDocumentosCandidatos(movimiento);
+        List<DocumentoComercial> candidatos = filtrarDocumentosCandidatos(movimiento, monedaMovimiento);
         
         System.out.println("\n--- CANDIDATOS ENCONTRADOS: " + candidatos.size() + " ---");
         
@@ -134,7 +169,7 @@ public class ConciliacionService {
      * Esto reduce significativamente el espacio de búsqueda antes de aplicar scoring
      * Carga EAGER de todos los datos para evitar lazy loading
      */
-    private List<DocumentoComercial> filtrarDocumentosCandidatos(Movimiento movimiento) {
+    private List<DocumentoComercial> filtrarDocumentosCandidatos(Movimiento movimiento, TipoMoneda monedaMovimiento) {
         List<DocumentoComercial> candidatos = new ArrayList<>();
         
         // Determinar el tipo de movimiento (INGRESO/EGRESO)
@@ -142,9 +177,30 @@ public class ConciliacionService {
         
         // Obtener todos los documentos de la base de datos
         // findAll() carga todos los registros de forma eager
-        List<Factura> facturas = facturaRepository.findAll();
-        List<Pagare> pagares = pagareRepository.findAll();
-        List<Recibo> recibos = reciboRepository.findAll();
+        List<Factura> facturas = monedaMovimiento != null ? facturaRepository.findByMoneda(monedaMovimiento) : facturaRepository.findAll();
+        // Salvaguarda: si por alguna razón el repository no devuelve por moneda, filtrar manualmente
+        if (monedaMovimiento != null && (facturas == null || facturas.isEmpty())) {
+            facturas = facturaRepository.findAll()
+                    .stream()
+                    .filter(f -> monedaMovimiento.equals(f.getMoneda()))
+                    .collect(Collectors.toList());
+        }
+
+        List<Pagare> pagares = monedaMovimiento != null ? pagareRepository.findByMoneda(monedaMovimiento) : pagareRepository.findAll();
+        if (monedaMovimiento != null && (pagares == null || pagares.isEmpty())) {
+            pagares = pagareRepository.findAll()
+                    .stream()
+                    .filter(p -> monedaMovimiento.equals(p.getMoneda()))
+                    .collect(Collectors.toList());
+        }
+
+        List<Recibo> recibos = monedaMovimiento != null ? reciboRepository.findByMoneda(monedaMovimiento) : reciboRepository.findAll();
+        if (monedaMovimiento != null && (recibos == null || recibos.isEmpty())) {
+            recibos = reciboRepository.findAll()
+                    .stream()
+                    .filter(r -> monedaMovimiento.equals(r.getMoneda()))
+                    .collect(Collectors.toList());
+        }
         
         System.out.println("\n--- INICIANDO FILTRADO DE CANDIDATOS ---");
         System.out.println("Total facturas en BD: " + (facturas != null ? facturas.size() : 0));
@@ -176,6 +232,10 @@ public class ConciliacionService {
                     factura.getMontoTotal();
                     factura.getFechaEmision();
                     factura.getCategoria();
+                    // Asegurar que coincida la moneda cuando viene filtrada
+                    if (monedaMovimiento != null && !monedaMovimiento.equals(factura.getMoneda())) {
+                        continue;
+                    }
                     
                     boolean cumple = cumpleCriteriosFiltrado(movimiento, factura, tipoMovimiento);
                     
@@ -205,6 +265,9 @@ public class ConciliacionService {
                     pagare.getMontoTotal();
                     pagare.getFechaEmision();
                     pagare.getCategoria();
+                    if (monedaMovimiento != null && !monedaMovimiento.equals(pagare.getMoneda())) {
+                        continue;
+                    }
                     
                     if (cumpleCriteriosFiltrado(movimiento, pagare, tipoMovimiento)) {
                         candidatos.add(pagare);
@@ -223,6 +286,9 @@ public class ConciliacionService {
                     recibo.getMontoTotal();
                     recibo.getFechaEmision();
                     recibo.getCategoria();
+                    if (monedaMovimiento != null && !monedaMovimiento.equals(recibo.getMoneda())) {
+                        continue;
+                    }
                     
                     if (cumpleCriteriosFiltrado(movimiento, recibo, tipoMovimiento)) {
                         candidatos.add(recibo);
@@ -814,4 +880,3 @@ public class ConciliacionService {
         facturaRepository.save(factura);
     }
 }
-

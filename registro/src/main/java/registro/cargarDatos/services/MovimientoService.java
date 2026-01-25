@@ -32,6 +32,7 @@ import registro.cargarDatos.dtos.MontosPorCategoriaResponse;
 import registro.cargarDatos.dtos.MovimientosPresupuestoResponse;
 import registro.cargarDatos.dtos.PuntoMontoMensual;
 import registro.cargarDatos.dtos.ResumenMensualResponse;
+import registro.cargarDatos.models.TipoMoneda;
 
 @Service
 @RequiredArgsConstructor
@@ -225,6 +226,34 @@ public class MovimientoService {
             LocalDate searchDate,
             Pageable pageable
     ) {
+        return obtenerMovimientos(
+                organizacionId,
+                usuarioId,
+                fechaDesde,
+                fechaHasta,
+                tipos,
+                conciliado,
+                nombreRelacionado,
+                null,
+                search,
+                searchDate,
+                pageable
+        );
+    }
+
+    public Page<Movimiento> obtenerMovimientos(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            List<TipoMovimiento> tipos,
+            Boolean conciliado,
+            String nombreRelacionado,
+            TipoMoneda moneda,
+            String search,
+            LocalDate searchDate,
+            Pageable pageable
+    ) {
         LocalDateTime fechaDesdeTime = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
         LocalDateTime fechaHastaTime = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay() : null;
         
@@ -234,6 +263,7 @@ public class MovimientoService {
                 fechaDesdeTime,
                 fechaHastaTime,
                 tipos,
+                moneda,
                 conciliado,
                 nombreRelacionado,
                 search,
@@ -258,6 +288,32 @@ public class MovimientoService {
             String search,
             LocalDate searchDate
     ) {
+        return obtenerTodosLosMovimientos(
+                organizacionId,
+                usuarioId,
+                fechaDesde,
+                fechaHasta,
+                tipos,
+                conciliado,
+                nombreRelacionado,
+                null,
+                search,
+                searchDate
+        );
+    }
+
+    public List<Movimiento> obtenerTodosLosMovimientos(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaDesde,
+            LocalDate fechaHasta,
+            List<TipoMovimiento> tipos,
+            Boolean conciliado,
+            String nombreRelacionado,
+            TipoMoneda moneda,
+            String search,
+            LocalDate searchDate
+    ) {
         LocalDateTime fechaDesdeTime = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
         LocalDateTime fechaHastaTime = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay() : null;
         
@@ -268,6 +324,7 @@ public class MovimientoService {
                 fechaDesdeTime,
                 fechaHastaTime,
                 tipos,
+                moneda,
                 conciliado,
                 nombreRelacionado,
                 search,
@@ -301,6 +358,7 @@ public class MovimientoService {
                 tipos,
                 conciliado,
                 nombreRelacionado,
+                null,
                 search,
                 searchDate
         );
@@ -314,6 +372,10 @@ public class MovimientoService {
     }
 
     public ResumenMensualResponse obtenerResumenMensual(Long organizacionId, String usuarioId, LocalDate fechaReferencia) {
+        return obtenerResumenMensual(organizacionId, usuarioId, fechaReferencia, null);
+    }
+
+    public ResumenMensualResponse obtenerResumenMensual(Long organizacionId, String usuarioId, LocalDate fechaReferencia, TipoMoneda moneda) {
         if (organizacionId == null && (usuarioId == null || usuarioId.isBlank())) {
             throw new IllegalArgumentException("Se requiere Organizacion o usuario para calcular el resumen mensual");
         }
@@ -323,11 +385,11 @@ public class MovimientoService {
         LocalDate inicio = periodo.atDay(1);
         LocalDate fin = periodo.atEndOfMonth();
 
-        QueryResult result = calcularSumas(organizacionId, usuarioId, inicio, fin);
+        QueryResult result = calcularSumas(organizacionId, usuarioId, inicio, fin, moneda);
         boolean coincideUsuario = result.totalMovimientos > 0;
 
         if (!coincideUsuario && organizacionId != null) {
-            QueryResult soloOrganizacion = calcularSumas(organizacionId, null, inicio, fin);
+            QueryResult soloOrganizacion = calcularSumas(organizacionId, null, inicio, fin, moneda);
             if (soloOrganizacion.totalMovimientos > 0) {
                 result = soloOrganizacion;
             }
@@ -354,9 +416,19 @@ public class MovimientoService {
             LocalDate fechaReferencia,
             int meses
     ) {
+        return obtenerIngresosMensuales(organizacionId, usuarioId, fechaReferencia, meses, null);
+    }
+
+    public MontosMensualesResponse obtenerIngresosMensuales(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaReferencia,
+            int meses,
+            TipoMoneda moneda
+    ) {
         // Para el dashboard queremos la serie a nivel empresa, no por usuario individual
         // Por eso ignoramos usuarioId y agregamos solo por organizacionId
-        return obtenerMontosMensuales(organizacionId, null, fechaReferencia, meses, TipoMovimiento.Ingreso);
+        return obtenerMontosMensuales(organizacionId, null, fechaReferencia, meses, TipoMovimiento.Ingreso, moneda);
     }
 
     public MontosMensualesResponse obtenerEgresosMensuales(
@@ -365,8 +437,18 @@ public class MovimientoService {
             LocalDate fechaReferencia,
             int meses
     ) {
+        return obtenerEgresosMensuales(organizacionId, usuarioId, fechaReferencia, meses, null);
+    }
+
+    public MontosMensualesResponse obtenerEgresosMensuales(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaReferencia,
+            int meses,
+            TipoMoneda moneda
+    ) {
         // Igual que en ingresos, agregamos egresos solo a nivel empresa
-        return obtenerMontosMensuales(organizacionId, null, fechaReferencia, meses, TipoMovimiento.Egreso);
+        return obtenerMontosMensuales(organizacionId, null, fechaReferencia, meses, TipoMovimiento.Egreso, moneda);
     }
 
     private MontosMensualesResponse obtenerMontosMensuales(
@@ -374,7 +456,8 @@ public class MovimientoService {
             String usuarioId,
             LocalDate fechaReferencia,
             int meses,
-            TipoMovimiento tipo
+            TipoMovimiento tipo,
+            TipoMoneda moneda
     ) {
         // Para las series usadas en el dashboard solo requerimos la organización.
         // usuarioId puede ser null para que el query agregue todos los usuarios de esa empresa.
@@ -395,6 +478,7 @@ public class MovimientoService {
             Double total = movimientoRepository.sumMontoByOrganizacionOrUsuarioAndTipoAndFechaBetween(
                     organizacionId,
                     usuarioId,
+                    moneda,
                     tipo,
                     inicio.atStartOfDay(),
                     fin.plusDays(1).atStartOfDay()
@@ -421,7 +505,17 @@ public class MovimientoService {
             LocalDate fechaReferencia
     ) {
         // Para el dashboard, los montos por categoría se calculan a nivel empresa
-        return obtenerMontosPorCategoria(organizacionId, null, fechaReferencia, TipoMovimiento.Ingreso);
+        return obtenerIngresosPorCategoria(organizacionId, usuarioId, fechaReferencia, null);
+    }
+
+    public MontosPorCategoriaResponse obtenerIngresosPorCategoria(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaReferencia,
+            TipoMoneda moneda
+    ) {
+        // Para el dashboard, los montos por categoría se calculan a nivel empresa
+        return obtenerMontosPorCategoria(organizacionId, null, fechaReferencia, TipoMovimiento.Ingreso, moneda);
     }
 
     public MontosPorCategoriaResponse obtenerEgresosPorCategoria(
@@ -430,14 +524,25 @@ public class MovimientoService {
             LocalDate fechaReferencia
     ) {
         // Igual que ingresos, egresos por categoría se agregan a nivel empresa
-        return obtenerMontosPorCategoria(organizacionId, null, fechaReferencia, TipoMovimiento.Egreso);
+        return obtenerEgresosPorCategoria(organizacionId, usuarioId, fechaReferencia, null);
+    }
+
+    public MontosPorCategoriaResponse obtenerEgresosPorCategoria(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaReferencia,
+            TipoMoneda moneda
+    ) {
+        // Igual que ingresos, egresos por categoría se agregan a nivel empresa
+        return obtenerMontosPorCategoria(organizacionId, null, fechaReferencia, TipoMovimiento.Egreso, moneda);
     }
 
     private MontosPorCategoriaResponse obtenerMontosPorCategoria(
             Long organizacionId,
             String usuarioId,
             LocalDate fechaReferencia,
-            TipoMovimiento tipo
+            TipoMovimiento tipo,
+            TipoMoneda moneda
     ) {
         // OPTIMIZADO: Usa GROUP BY en BD en lugar de traer todos y agrupar en memoria
         if (organizacionId == null) {
@@ -453,6 +558,7 @@ public class MovimientoService {
         List<Object[]> resultados = movimientoRepository.sumMontosPorCategoria(
                 organizacionId,
                 tipo,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -478,6 +584,15 @@ public class MovimientoService {
             String usuarioId,
             LocalDate fechaReferencia
     ) {
+        return obtenerResumenConciliacion(organizacionId, usuarioId, fechaReferencia, null);
+    }
+
+    public ConciliacionResumenResponse obtenerResumenConciliacion(
+            Long organizacionId,
+            String usuarioId,
+            LocalDate fechaReferencia,
+            TipoMoneda moneda
+    ) {
         if (organizacionId == null && (usuarioId == null || usuarioId.isBlank())) {
             throw new IllegalArgumentException("Organizacion o usuario son requeridos para el resumen de conciliacion");
         }
@@ -490,6 +605,7 @@ public class MovimientoService {
         long total = movimientoRepository.countByOrganizacionOrUsuarioAndFechaEmisionBetween(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -497,6 +613,7 @@ public class MovimientoService {
         long conciliados = movimientoRepository.countConciliadosByOrganizacionOrUsuarioAndFechaEmisionBetween(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -504,6 +621,7 @@ public class MovimientoService {
         long pendientes = movimientoRepository.countPendientesByOrganizacionOrUsuarioAndFechaEmisionBetween(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -513,6 +631,7 @@ public class MovimientoService {
         LocalDateTime ultimaConciliacionDateTime = movimientoRepository.findUltimaConciliacion(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -524,6 +643,7 @@ public class MovimientoService {
         LocalDateTime ultimoPendienteDateTime = movimientoRepository.findUltimoMovimientoPendiente(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -535,6 +655,7 @@ public class MovimientoService {
         List<Object[]> porTipoRaw = movimientoRepository.obtenerResumenConciliacionPorTipo(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -588,10 +709,11 @@ public class MovimientoService {
                 .build();
     }
 
-    private QueryResult calcularSumas(Long organizacionId, String usuarioId, LocalDate inicio, LocalDate fin) {
+    private QueryResult calcularSumas(Long organizacionId, String usuarioId, LocalDate inicio, LocalDate fin, TipoMoneda moneda) {
         Double ingresos = movimientoRepository.sumMontoByOrganizacionOrUsuarioAndTipoAndFechaBetween(
                 organizacionId,
                 usuarioId,
+                moneda,
                 TipoMovimiento.Ingreso,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
@@ -600,6 +722,7 @@ public class MovimientoService {
         Double egresos = movimientoRepository.sumMontoByOrganizacionOrUsuarioAndTipoAndFechaBetween(
                 organizacionId,
                 usuarioId,
+                moneda,
                 TipoMovimiento.Egreso,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
@@ -608,6 +731,7 @@ public class MovimientoService {
         long totalMovimientos = movimientoRepository.countByOrganizacionOrUsuarioAndFechaEmisionBetween(
                 organizacionId,
                 usuarioId,
+                moneda,
                 inicio.atStartOfDay(),
                 fin.plusDays(1).atStartOfDay()
         );
@@ -622,6 +746,10 @@ public class MovimientoService {
     private record QueryResult(double ingresos, double egresos, long totalMovimientos) {}
 
     public Double obtenerSaldoTotalEmpresa(Long organizacionId) {
+        return obtenerSaldoTotalEmpresa(organizacionId, null);
+    }
+
+    public Double obtenerSaldoTotalEmpresa(Long organizacionId, TipoMoneda moneda) {
         if (organizacionId == null) {
             throw new IllegalArgumentException("Se requiere organizacionId para calcular el saldo total");
         }
@@ -636,6 +764,7 @@ public class MovimientoService {
         Double ingresos = movimientoRepository.sumMontoByOrganizacionOrUsuarioAndTipoAndFechaBetween(
                 organizacionId,
                 null,
+                moneda,
                 TipoMovimiento.Ingreso,
                 inicio,
                 fin
@@ -644,6 +773,7 @@ public class MovimientoService {
         Double egresos = movimientoRepository.sumMontoByOrganizacionOrUsuarioAndTipoAndFechaBetween(
                 organizacionId,
                 null,
+                moneda,
                 TipoMovimiento.Egreso,
                 inicio,
                 fin
@@ -660,9 +790,9 @@ public class MovimientoService {
      * Obtiene movimientos agrupados mensualmente para presupuestos con caché
      * Reemplaza las múltiples llamadas individuales por mes
      */
-    @Cacheable(value = "movimientosPresupuesto", key = "#organizacionId + '_' + #fechaDesde + '_' + #fechaHasta")
+    @Cacheable(value = "movimientosPresupuesto", key = "#organizacionId + '_' + #fechaDesde + '_' + #fechaHasta + '_' + (#moneda != null ? #moneda.name() : 'ALL')")
     public MovimientosPresupuestoResponse obtenerMovimientosParaPresupuesto(
-            Long organizacionId, LocalDate fechaDesde, LocalDate fechaHasta) {
+            Long organizacionId, LocalDate fechaDesde, LocalDate fechaHasta, TipoMoneda moneda) {
         
         if (organizacionId == null) {
             throw new IllegalArgumentException("Se requiere organizacionId");
@@ -674,9 +804,12 @@ public class MovimientoService {
         LocalDateTime inicioDateTime = fechaDesde.atStartOfDay();
         LocalDateTime finDateTime = fechaHasta.atTime(23, 59, 59);
 
-        // Obtener todos los movimientos del rango
-        List<Movimiento> movimientos = movimientoRepository.findByOrganizacionIdAndFechaEmisionBetween(
-                organizacionId, inicioDateTime, finDateTime);
+        // Obtener todos los movimientos del rango filtrados por moneda si corresponde
+        List<Movimiento> movimientos = (moneda == null)
+                ? movimientoRepository.findByOrganizacionIdAndFechaEmisionBetween(
+                        organizacionId, inicioDateTime, finDateTime)
+                : movimientoRepository.findByOrganizacionIdAndFechaEmisionBetweenAndMoneda(
+                        organizacionId, inicioDateTime, finDateTime, moneda);
 
         // Agrupar por mes
         Map<String, List<Movimiento>> movimientosPorMes = movimientos.stream()
@@ -813,8 +946,5 @@ public class MovimientoService {
                 .build();
     }
 }
-
-
-
 
 

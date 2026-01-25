@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import registro.cargarDatos.models.Movimiento;
+import registro.cargarDatos.models.TipoMoneda;
 import registro.cargarDatos.models.TipoMovimiento;
 
 import java.time.LocalDateTime;
@@ -35,6 +36,7 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
 
     // Buscar por organización y rango de fechas
     List<Movimiento> findByOrganizacionIdAndFechaEmisionBetween(Long organizacionId, LocalDateTime inicio, LocalDateTime fin);
+    List<Movimiento> findByOrganizacionIdAndFechaEmisionBetweenAndMoneda(Long organizacionId, LocalDateTime inicio, LocalDateTime fin, TipoMoneda moneda);
 
     List<Movimiento> findByOrganizacionIdAndUsuarioIdAndTipoAndFechaEmisionBetween(
             Long organizacionId,
@@ -47,11 +49,13 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT COALESCE(SUM(m.montoTotal), 0) FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.tipo = :tipo " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin")
     Double sumMontoByOrganizacionOrUsuarioAndTipoAndFechaBetween(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("tipo") TipoMovimiento tipo,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
@@ -60,10 +64,12 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT COUNT(m) FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin")
     long countByOrganizacionOrUsuarioAndFechaEmisionBetween(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -71,11 +77,13 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT COUNT(m) FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin " +
             "AND m.documentoComercial IS NOT NULL")
     long countConciliadosByOrganizacionOrUsuarioAndFechaEmisionBetween(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -83,11 +91,13 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT COUNT(m) FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin " +
             "AND m.documentoComercial IS NULL")
     long countPendientesByOrganizacionOrUsuarioAndFechaEmisionBetween(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -95,11 +105,13 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT MAX(COALESCE(m.fechaActualizacion, m.fechaEmision)) FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin " +
             "AND m.documentoComercial IS NOT NULL")
     LocalDateTime findUltimaConciliacion(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -107,11 +119,13 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT MAX(m.fechaEmision) FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin " +
             "AND m.documentoComercial IS NULL")
     LocalDateTime findUltimoMovimientoPendiente(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -123,11 +137,13 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
             "FROM Movimiento m " +
             "WHERE (:organizacionId IS NULL OR m.organizacionId = :organizacionId) " +
             "AND (:usuarioId IS NULL OR m.usuarioId = :usuarioId) " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
             "AND m.fechaEmision BETWEEN :inicio AND :fin " +
             "GROUP BY m.tipo")
     List<Object[]> obtenerResumenConciliacionPorTipo(
             @Param("organizacionId") Long organizacionId,
             @Param("usuarioId") String usuarioId,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -139,6 +155,7 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
            "AND (:fechaDesde IS NULL OR m.fechaEmision >= :fechaDesde) " +
            "AND (:fechaHasta IS NULL OR m.fechaEmision <= :fechaHasta) " +
            "AND (:tipos IS NULL OR m.tipo IN :tipos) " +
+           "AND (:moneda IS NULL OR m.moneda = :moneda) " +
            "AND (:conciliado IS NULL OR " +
            "     (CASE WHEN :conciliado = true THEN m.documentoComercial IS NOT NULL " +
            "           ELSE m.documentoComercial IS NULL END)) " +
@@ -160,6 +177,7 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
             @Param("fechaDesde") LocalDateTime fechaDesde,
             @Param("fechaHasta") LocalDateTime fechaHasta,
             @Param("tipos") List<TipoMovimiento> tipos,
+            @Param("moneda") TipoMoneda moneda,
             @Param("conciliado") Boolean conciliado,
             @Param("nombreRelacionado") String nombreRelacionado,
             @Param("search") String search,
@@ -171,13 +189,15 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     @Query("SELECT COALESCE(m.categoria, 'Sin categoria'), SUM(m.montoTotal) " +
            "FROM Movimiento m " +
            "WHERE m.organizacionId = :organizacionId " +
-           "AND m.tipo = :tipo " +
+            "AND m.tipo = :tipo " +
+            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
            "AND m.fechaEmision BETWEEN :inicio AND :fin " +
            "GROUP BY m.categoria " +
-           "ORDER BY SUM(m.montoTotal) DESC")
+            "ORDER BY SUM(m.montoTotal) DESC")
     List<Object[]> sumMontosPorCategoria(
             @Param("organizacionId") Long organizacionId,
             @Param("tipo") TipoMovimiento tipo,
+            @Param("moneda") TipoMoneda moneda,
             @Param("inicio") LocalDateTime inicio,
             @Param("fin") LocalDateTime fin
     );
@@ -188,4 +208,10 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
     
     List<Movimiento> findByDocumentoComercialIsNotNull();
     Page<Movimiento> findByDocumentoComercialIsNotNull(Pageable pageable);
+
+    // Métodos filtrados por moneda para conciliación
+    Page<Movimiento> findByDocumentoComercialIsNullAndMoneda(TipoMoneda moneda, Pageable pageable);
+    List<Movimiento> findByDocumentoComercialIsNullAndMoneda(TipoMoneda moneda);
+    Page<Movimiento> findByMoneda(TipoMoneda moneda, Pageable pageable);
+    List<Movimiento> findByMoneda(TipoMoneda moneda);
 }

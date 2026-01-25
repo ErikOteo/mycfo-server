@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import MonthRangeSelect from './MonthRangeSelect';
+import CustomSelect from '../../../shared-components/CustomSelect';
 import { useNavigate } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -15,6 +16,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import http from '../../../api/http';
 import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../utils/currency';
 import API_CONFIG from '../../../config/api-config';
+import { getStoredCurrencyPreference, persistCurrencyPreference } from '../../../shared-components/CurrencyTabs';
+import { CURRENCY_OPTIONS, stripCurrencyTag, withCurrencyTag } from '../utils/currencyTag';
 import { fetchCategorias } from '../../../shared-services/categoriasService';
 
 const tableRowStyle = {
@@ -123,7 +126,8 @@ export default function PresupuestoNuevo() {
   const [creating, setCreating] = React.useState(false);
 
   // Paso 1
-  const [nombre, setNombre] = React.useState('Presupuesto Demo');
+  const [currency, setCurrency] = React.useState(() => getStoredCurrencyPreference('ARS'));
+  const [nombreBase, setNombreBase] = React.useState(() => stripCurrencyTag('Presupuesto Demo'));
   const [fechaDesde, setFechaDesde] = React.useState('2025-01');
   const [fechaHasta, setFechaHasta] = React.useState('2025-06');
 
@@ -196,7 +200,7 @@ export default function PresupuestoNuevo() {
 
   // Validaciones básicas
   const validarPaso1 = () => {
-    if (!nombre) return 'Ingresá un nombre para el presupuesto.';
+    if (!nombreBase || !nombreBase.trim()) return 'Ingresá un nombre para el presupuesto.';
     if (!fechaDesde || !fechaHasta) return 'Completá los meses.';
     if (fechaDesde > fechaHasta) return 'El mes "Desde" no puede ser posterior a "Hasta".';
     return null;
@@ -511,6 +515,7 @@ export default function PresupuestoNuevo() {
 
     setCreating(true);
     try {
+      const nombreFinal = withCurrencyTag(nombreBase, currency || 'ARS');
       // Normalizo meses a YYYY-MM (ya vienen así desde el input type="month")
       const dDesde = fechaDesde;
       const dHasta = fechaHasta;
@@ -554,7 +559,7 @@ export default function PresupuestoNuevo() {
       });
 
       const payload = {
-        nombre,
+        nombre: nombreFinal,
         desde: dDesde,
         hasta: dHasta,
         autogenerarCeros: false,
@@ -566,7 +571,7 @@ export default function PresupuestoNuevo() {
         payload
       );
 
-      const nombreFuente = res?.data?.nombre || nombre;
+      const nombreFuente = res?.data?.nombre || nombreFinal;
       const slug = encodeURIComponent(
         nombreFuente.trim().toLowerCase().replace(/\s+/g, '-')
       );
@@ -600,13 +605,31 @@ export default function PresupuestoNuevo() {
       {step === 0 && (
         <>
           <Box sx={{ display: 'flex', gap: 2, mb: 3, flexDirection: 'column' }}>
-            <TextField 
-              label="Nombre del presupuesto" 
-              value={nombre} 
-              onChange={e => setNombre(e.target.value)} 
-              fullWidth 
-              variant="outlined" 
-            />
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <TextField 
+                label="Nombre del presupuesto" 
+                value={nombreBase} 
+                onChange={e => setNombreBase(stripCurrencyTag(e.target.value))} 
+                fullWidth 
+                variant="outlined"
+                sx={{ flex: 1, minWidth: 260 }}
+              />
+              <Box sx={{ minWidth: 220 }}>
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Moneda</Typography>
+                <CustomSelect
+                  value={currency}
+                  size="small"
+                  fullWidth
+                  options={CURRENCY_OPTIONS}
+                  width="100%"
+                  onChange={(val) => {
+                    const next = val || 'ARS';
+                    setCurrency(next);
+                    persistCurrencyPreference(next);
+                  }}
+                />
+              </Box>
+            </Box>
             <Box sx={{ maxWidth: 300 }}>
               <MonthRangeSelect
                 value={{

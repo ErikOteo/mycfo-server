@@ -18,12 +18,13 @@ function getUsuarioHeaders() {
  * - No enviar sortBy/sortDir (evita 400 por validación).
  * - Devuelve `data` (puede venir paginado en `data.content` o como array).
  */
-export async function getMovimientosPorRango({ fechaDesde, fechaHasta, tipos }) {
+export async function getMovimientosPorRango({ fechaDesde, fechaHasta, tipos, moneda }) {
   const params = new URLSearchParams();
   params.set('page', 0);
   params.set('size', 500);
   if (fechaDesde) params.set('fechaDesde', fechaDesde); // YYYY-MM-DD
   if (fechaHasta) params.set('fechaHasta', fechaHasta);
+  if (moneda) params.set('moneda', moneda);
 
   // CSV: evita &tipos=INGRESO&tipos=EGRESO → 400
   if (Array.isArray(tipos) && tipos.length > 0) {
@@ -44,13 +45,13 @@ export async function getMovimientosPorRango({ fechaDesde, fechaHasta, tipos }) 
  * - Devuelve datos agrupados por mes con totales y categorías
  * - Incluye caché en el servidor para mejor performance
  */
-export async function getMovimientosParaPresupuesto({ fechaDesde, fechaHasta }) {
+export async function getMovimientosParaPresupuesto({ fechaDesde, fechaHasta, moneda }) {
   const params = new URLSearchParams();
   if (fechaDesde) params.set('fechaDesde', fechaDesde);
   if (fechaHasta) params.set('fechaHasta', fechaHasta);
+  if (moneda) params.set('moneda', moneda);
 
   const url = `${URL_REGISTRO}/movimientos/presupuesto/datos-completos?${params.toString()}`;
   const { data } = await axios.get(url, { headers: getUsuarioHeaders() });
   return data;
 }
-
