@@ -2,33 +2,19 @@ name: Deploy MyCFO to Azure
 
 on:
   push:
-    branches: [ "main" ] # Se activa cuando haces push a tu nuevo repo
+    branches: [ "main" ]
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Mostrar IP del runner
-        run: curl -s https://api.ipify.org
-        
-      - name: Conectar a Azure por SSH y actualizar
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd ~/mycfo
-            # 1. Vincular el servidor con TU nuevo repo
-            git remote set-url origin https://github.com/ErikOteo/mycfo-server.git
-            
-            # 2. Bajar tus cambios
-            git fetch origin
-            git reset --hard origin/main
-            
-            # 3. Asegurar memoria (vital por los 4GB de RAM)
-            sudo swapon /swapfile || true
-            
-            # 4. Reconstruir todo con Docker
-            docker compose up -d --build
-            docker image prune -f
+      - uses: actions/checkout@v4
+
+      - name: Build & deploy
+        run: |
+          cd ~/mycfo
+          git fetch origin
+          git reset --hard origin/main
+          sudo swapon /swapfile || true
+          docker compose up -d --build
+          docker image prune -f
