@@ -24,6 +24,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import FormFactura from "../carga-general/components/forms/FormFactura";
 import {
@@ -49,6 +50,7 @@ const FacturaListPage = () => {
   const [filters, setFilters] = useState({});
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const navigate = useNavigate();
 
   // Paginación del servidor
   const [paginationModel, setPaginationModel] = useState({
@@ -855,7 +857,18 @@ const FacturaListPage = () => {
             Limpiar
           </Button>
         )}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: { xs: 0, md: "auto" } }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            ml: { xs: 0, md: "auto" },
+            flexWrap: "wrap",
+          }}
+        >
+          <Button variant="contained" onClick={() => navigate("/carga/factura")}>
+            Cargar factura
+          </Button>
           <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
         </Box>
       </Box>
