@@ -40,12 +40,10 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(error);
             }
 
-            // 2. Verificar si el email ya existe en Cognito
-            if (cognitoService.existeUsuarioEnCognito(dto.getEmail())) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "Este correo electrónico ya está registrado en el sistema. Por favor, ingresa un correo diferente o inicia sesión.");
-                return ResponseEntity.badRequest().body(error);
-            }
+            // 2. (ELIMINADO) Verificar si el email ya existe en Cognito
+            // Se elimina esta verificación previa porque requiere permisos de administrador (AdminGetUser)
+            // que fallan en local si no hay credenciales AWS válidas.
+            // Dejamos que cognitoService.registrarUsuario falle con UsernameExistsException si ya existe.
 
             // 3. PRIMERO: Crear usuario en Cognito con todos los atributos
             String sub = cognitoService.registrarUsuario(
@@ -135,7 +133,7 @@ public class AuthController {
         }
 
         // Fallback genérico
-        return "No pudimos crear la cuenta. Revisá los datos e intentá nuevamente.";
+        return "No pudimos crear la cuenta. Revisá los datos e intentá nuevamente. Error: " + raw;
     }
 
     /**
@@ -187,4 +185,3 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 }
-
