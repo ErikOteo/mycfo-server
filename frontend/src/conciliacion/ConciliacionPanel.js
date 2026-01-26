@@ -57,7 +57,7 @@ export default function ConciliacionPanel() {
   const [filtroTipo, setFiltroTipo] = useState("todos"); // 'todos', 'Ingreso', 'Egreso'
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
   const [paginaSugerencias, setPaginaSugerencias] = useState(1);
-  const documentosPorPagina = isMobile ? 1 : 5;
+  const documentosPorPagina = 3;
 
   useEffect(() => {
     setPaginaActual(0);
