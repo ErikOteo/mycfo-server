@@ -1230,7 +1230,7 @@ export default function MesDetalle() {
       {tab === 0 && (
         <>
           <Grid container spacing={3} mb={2}>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.ingresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'success.main', mx: 'auto', mb: 1 }}>+</Avatar>
                 <Typography variant="h6">Ingresos</Typography>
@@ -1241,7 +1241,7 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.egresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'error.main', mx: 'auto', mb: 1 }}>-</Avatar>
                 <Typography variant="h6">Egresos</Typography>
@@ -1252,7 +1252,7 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: resultado >= 0 ? kpiColors.resultadoPos : kpiColors.resultadoNeg, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: resultado >= 0 ? 'info.main' : 'warning.main', mx: 'auto', mb: 1 }}>
                   {resultado >= 0 ? '?' : '?'}
@@ -1451,7 +1451,7 @@ export default function MesDetalle() {
                 </Button>
               ) : (
                 <Grid container spacing={1} alignItems="center">
-                  <Grid item xs={12} md={4} sx={{ minWidth: 240 }}>
+                  <Grid size={{ xs: 12, md: 4 }} sx={{ minWidth: 240 }}>
                     <Autocomplete
                       size="small"
                       fullWidth
@@ -1503,7 +1503,7 @@ export default function MesDetalle() {
                       )}
                     />
                   </Grid>
-                  <Grid item xs={12} md={2}>
+                  <Grid size={{ xs: 12, md: 2 }}>
                     <FormControl fullWidth size="small" sx={buildTipoSelectSx(nueva.tipo)}>
                       <InputLabel>Tipo</InputLabel>
                       <Select
@@ -1517,7 +1517,7 @@ export default function MesDetalle() {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} md={3}>
+                  <Grid size={{ xs: 12, md: 3 }}>
                     <TextField
                       label="Estimado"
                       type="text"
@@ -1532,7 +1532,7 @@ export default function MesDetalle() {
                       inputProps={{ inputMode: 'numeric' }}
                     />
                   </Grid>
-                  <Grid item xs={12} md={3} display="flex" gap={1} justifyContent="flex-end">
+                  <Grid size={{ xs: 12, md: 3 }} display="flex" gap={1} justifyContent="flex-end">
                     <Button variant="outlined" onClick={() => { setAgregando(false); setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' }); }}>
                       Cancelar
                     </Button>
