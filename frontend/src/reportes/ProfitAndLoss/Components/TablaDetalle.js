@@ -1,8 +1,6 @@
 import * as React from 'react';
-import {
-  Box, Typography, Grid, Paper,
-  TableContainer, Table, TableHead, TableRow, TableCell, TableBody
-} from '@mui/material';
+import { Box, Typography, Grid, Paper, useTheme } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
 
 // Utilidad de moneda con separador de miles y símbolo "$"
 const formatCurrency = (value) => {
@@ -12,9 +10,80 @@ const formatCurrency = (value) => {
 };
 
 export default function TablaDetalle({ year, ingresos, egresos }) {
+  const theme = useTheme();
+
   const totalIngresos = ingresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const totalEgresos = egresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
   const balance = totalIngresos - totalEgresos;
+
+  // Columns definition
+  const columns = [
+    { field: 'id', headerName: 'Nº', width: 70 },
+    { field: 'categoria', headerName: 'Categoría', flex: 1 },
+    {
+      field: 'total',
+      headerName: 'Monto',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (value) => formatCurrency(value),
+    },
+  ];
+
+  // Styles copied EXACTLY from TablaRegistrosV2.js to ensure 100% parity
+  const dataGridStyles = {
+    backgroundColor: "background.paper",
+    borderRadius: 2,
+    border: (theme) => `1px solid ${theme.palette.divider}`,
+    "& .MuiDataGrid-cell": {
+      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+      display: "flex",
+      alignItems: "center",
+      fontSize: "0.875rem",
+    },
+    "& .MuiDataGrid-columnHeaders": {
+      backgroundColor: (theme) =>
+        theme.palette.mode === "dark"
+          ? "rgba(255, 255, 255, 0.05)"
+          : "#f5f5f5",
+      color: "text.primary",
+      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+    },
+    "& .MuiDataGrid-columnHeader": {
+      "&:focus": { outline: "none" },
+    },
+    "& .MuiDataGrid-sortIcon": {
+      display: "none",
+    },
+    "& .MuiDataGrid-menuIcon": {
+      display: "none",
+    },
+    "& .MuiDataGrid-iconButtonContainer": {
+      display: "none",
+    },
+    "& .MuiDataGrid-row:hover": {
+      backgroundColor: (theme) => theme.palette.action.hover,
+    },
+    "& .MuiDataGrid-footerContainer": {
+      borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+    }
+  };
+
+  // Prepare rows
+  const rowsIngresos = ingresos.map((row, index) => ({
+    id: index + 1,
+    ...row,
+    categoria: row.categoria && String(row.categoria).trim().length ? row.categoria : "Sin categoría",
+    total: Number(row.total) || 0
+  }));
+
+  const rowsEgresos = egresos.map((row, index) => ({
+    id: index + 1,
+    ...row,
+    categoria: row.categoria && String(row.categoria).trim().length ? row.categoria : "Sin categoría",
+    total: Math.abs(Number(row.total) || 0)
+  }));
+
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -44,78 +113,37 @@ export default function TablaDetalle({ year, ingresos, egresos }) {
       <Typography variant="h6" gutterBottom>
         Detalle de Ingresos ({year})
       </Typography>
-      <TableContainer component={Paper} sx={{ mb: 4, maxHeight: 360, overflowY: 'auto', overflowX: 'auto' }}>
-        <Table
-          stickyHeader
-          sx={{
-            '& .MuiTableCell-root': {
-              border: '1px solid rgba(224, 224, 224, 1)',
-            },
-            '& .MuiTableHead-root .MuiTableCell-root': {
-              fontWeight: 700,
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell scope="col">Nº</TableCell>
-              <TableCell scope="col">Categoría</TableCell>
-              <TableCell scope="col" align="right">Monto</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {ingresos.map((row, index) => (
-              <TableRow
-                key={index}
-                sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', cursor: 'pointer' } }}
-              >
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{(row.categoria && String(row.categoria).trim().length) ? row.categoria : 'Sin categoría'}</TableCell>
-                <TableCell align="right">{formatCurrency(Number(row.total) || 0)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Box sx={{ width: '100%', mb: 4 }}>
+        <DataGrid
+          rows={rowsIngresos}
+          columns={columns}
+          density="standard"
+          autoHeight
+          hideFooter
+          disableColumnMenu
+          disableColumnResize
+          disableRowSelectionOnClick
+          sx={dataGridStyles}
+        />
+      </Box>
 
       {/* Tabla de Egresos */}
       <Typography variant="h6" gutterBottom>
         Detalle de Egresos ({year})
       </Typography>
-      <TableContainer component={Paper} sx={{ maxHeight: 360, overflowY: 'auto', overflowX: 'auto' }}>
-        <Table
-          stickyHeader
-          sx={{
-            '& .MuiTableCell-root': {
-              border: '1px solid rgba(224, 224, 224, 1)',
-            },
-            '& .MuiTableHead-root .MuiTableCell-root': {
-              fontWeight: 700,
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell scope="col">Nº</TableCell>
-              <TableCell scope="col">Categoría</TableCell>
-              <TableCell scope="col" align="right">Monto</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {egresos.map((row, index) => (
-              <TableRow
-                key={index}
-                sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.08)', cursor: 'pointer' } }}
-              >
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{(row.categoria && String(row.categoria).trim().length) ? row.categoria : 'Sin categoría'}</TableCell>
-                <TableCell align="right">{formatCurrency(Math.abs(Number(row.total) || 0))}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Box sx={{ width: '100%' }}>
+        <DataGrid
+          rows={rowsEgresos}
+          columns={columns}
+          density="standard"
+          autoHeight
+          hideFooter
+          disableColumnMenu
+          disableColumnResize
+          disableRowSelectionOnClick
+          sx={dataGridStyles}
+        />
+      </Box>
     </Box>
   );
 }
-
