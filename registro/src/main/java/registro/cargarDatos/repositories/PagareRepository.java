@@ -11,4 +11,7 @@ import java.util.List;
 public interface PagareRepository extends JpaRepository<Pagare, Long> {
 
     List<Pagare> findByMoneda(TipoMoneda moneda);
+
+    List<Pagare> findByOrganizacionId(Long organizacionId);
+    List<Pagare> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda);
 }

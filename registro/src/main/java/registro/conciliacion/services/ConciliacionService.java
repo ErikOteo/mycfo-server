@@ -3,8 +3,10 @@ package registro.conciliacion.services;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import registro.cargarDatos.models.*;
 import registro.cargarDatos.repositories.FacturaRepository;
 import registro.cargarDatos.repositories.MovimientoRepository;
@@ -32,15 +34,10 @@ public class ConciliacionService {
      * Obtiene movimientos sin conciliar con paginación
      */
     @Transactional(readOnly = true)
-    public Page<MovimientoDTO> obtenerMovimientosSinConciliar(Pageable pageable) {
-        return obtenerMovimientosSinConciliar(pageable, null);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<MovimientoDTO> obtenerMovimientosSinConciliar(Pageable pageable, TipoMoneda moneda) {
+    public Page<MovimientoDTO> obtenerMovimientosSinConciliar(Pageable pageable, Long empresaId, TipoMoneda moneda) {
         Page<Movimiento> registros = moneda != null
-                ? movimientoRepository.findByDocumentoComercialIsNullAndMoneda(moneda, pageable)
-                : movimientoRepository.findByDocumentoComercialIsNull(pageable);
+                ? movimientoRepository.findByOrganizacionIdAndDocumentoComercialIsNullAndMoneda(empresaId, moneda, pageable)
+                : movimientoRepository.findByOrganizacionIdAndDocumentoComercialIsNull(empresaId, pageable);
         
         return registros.map(this::convertirAMovimientoDTO);
     }
@@ -49,15 +46,10 @@ public class ConciliacionService {
      * Obtiene todos los movimientos (conciliados y sin conciliar) con paginación
      */
     @Transactional(readOnly = true)
-    public Page<MovimientoDTO> obtenerTodosLosMovimientos(Pageable pageable) {
-        return obtenerTodosLosMovimientos(pageable, null);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<MovimientoDTO> obtenerTodosLosMovimientos(Pageable pageable, TipoMoneda moneda) {
+    public Page<MovimientoDTO> obtenerTodosLosMovimientos(Pageable pageable, Long empresaId, TipoMoneda moneda) {
         Page<Movimiento> registros = moneda != null
-                ? movimientoRepository.findByMoneda(moneda, pageable)
-                : movimientoRepository.findAll(pageable);
+                ? movimientoRepository.findByOrganizacionIdAndMoneda(empresaId, moneda, pageable)
+                : movimientoRepository.findByOrganizacionId(empresaId, pageable);
         
         return registros.map(this::convertirAMovimientoDTO);
     }
@@ -66,15 +58,10 @@ public class ConciliacionService {
      * Obtiene todos los movimientos sin conciliar (sin paginación) - para compatibilidad
      */
     @Transactional(readOnly = true)
-    public List<MovimientoDTO> obtenerMovimientosSinConciliar() {
-        return obtenerMovimientosSinConciliarPorMoneda(null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<MovimientoDTO> obtenerMovimientosSinConciliarPorMoneda(TipoMoneda moneda) {
+    public List<MovimientoDTO> obtenerMovimientosSinConciliarPorMoneda(Long empresaId, TipoMoneda moneda) {
         List<Movimiento> registros = moneda != null
-                ? movimientoRepository.findByDocumentoComercialIsNullAndMoneda(moneda)
-                : movimientoRepository.findByDocumentoComercialIsNull();
+                ? movimientoRepository.findByOrganizacionIdAndDocumentoComercialIsNullAndMoneda(empresaId, moneda)
+                : movimientoRepository.findByOrganizacionIdAndDocumentoComercialIsNull(empresaId);
         
         return registros.stream()
                 .map(this::convertirAMovimientoDTO)
@@ -85,15 +72,10 @@ public class ConciliacionService {
      * Obtiene todos los movimientos (conciliados y sin conciliar) - para compatibilidad
      */
     @Transactional(readOnly = true)
-    public List<MovimientoDTO> obtenerTodosLosMovimientos() {
-        return obtenerTodosLosMovimientosPorMoneda(null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<MovimientoDTO> obtenerTodosLosMovimientosPorMoneda(TipoMoneda moneda) {
+    public List<MovimientoDTO> obtenerTodosLosMovimientosPorMoneda(Long empresaId, TipoMoneda moneda) {
         List<Movimiento> registros = moneda != null
-                ? movimientoRepository.findByMoneda(moneda)
-                : movimientoRepository.findAll();
+                ? movimientoRepository.findByOrganizacionIdAndMoneda(empresaId, moneda)
+                : movimientoRepository.findByOrganizacionId(empresaId);
         
         return registros.stream()
                 .map(this::convertirAMovimientoDTO)
@@ -106,14 +88,13 @@ public class ConciliacionService {
      * PASO 2: Aplica reglas de scoring solo sobre documentos filtrados
      */
     @Transactional(readOnly = true)
-    public List<DocumentoSugeridoDTO> sugerirDocumentos(Long movimientoId) {
-        return sugerirDocumentos(movimientoId, null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<DocumentoSugeridoDTO> sugerirDocumentos(Long movimientoId, TipoMoneda monedaFiltro) {
+    public List<DocumentoSugeridoDTO> sugerirDocumentos(Long movimientoId, Long empresaId, TipoMoneda monedaFiltro) {
         Movimiento movimiento = movimientoRepository.findById(movimientoId)
                 .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
+
+        if (!movimiento.getOrganizacionId().equals(empresaId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Movimiento no pertenece a la empresa");
+        }
 
         TipoMoneda monedaMovimiento = movimiento.getMoneda() != null ? movimiento.getMoneda() : monedaFiltro;
 
@@ -129,7 +110,7 @@ public class ConciliacionService {
         List<DocumentoSugeridoDTO> sugerencias = new ArrayList<>();
         
         // PASO 1: Filtrar documentos candidatos por tipo Y (monto O fecha O descripción)
-        List<DocumentoComercial> candidatos = filtrarDocumentosCandidatos(movimiento, monedaMovimiento);
+        List<DocumentoComercial> candidatos = filtrarDocumentosCandidatos(movimiento, empresaId, monedaMovimiento);
         
         System.out.println("\n--- CANDIDATOS ENCONTRADOS: " + candidatos.size() + " ---");
         
@@ -169,7 +150,7 @@ public class ConciliacionService {
      * Esto reduce significativamente el espacio de búsqueda antes de aplicar scoring
      * Carga EAGER de todos los datos para evitar lazy loading
      */
-    private List<DocumentoComercial> filtrarDocumentosCandidatos(Movimiento movimiento, TipoMoneda monedaMovimiento) {
+    private List<DocumentoComercial> filtrarDocumentosCandidatos(Movimiento movimiento, Long empresaId, TipoMoneda monedaMovimiento) {
         List<DocumentoComercial> candidatos = new ArrayList<>();
         
         // Determinar el tipo de movimiento (INGRESO/EGRESO)
@@ -177,26 +158,32 @@ public class ConciliacionService {
         
         // Obtener todos los documentos de la base de datos
         // findAll() carga todos los registros de forma eager
-        List<Factura> facturas = monedaMovimiento != null ? facturaRepository.findByMoneda(monedaMovimiento) : facturaRepository.findAll();
+        List<Factura> facturas = monedaMovimiento != null
+                ? facturaRepository.findByOrganizacionIdAndMoneda(empresaId, monedaMovimiento)
+                : facturaRepository.findByOrganizacionId(empresaId);
         // Salvaguarda: si por alguna razón el repository no devuelve por moneda, filtrar manualmente
         if (monedaMovimiento != null && (facturas == null || facturas.isEmpty())) {
-            facturas = facturaRepository.findAll()
+            facturas = facturaRepository.findByOrganizacionId(empresaId)
                     .stream()
                     .filter(f -> monedaMovimiento.equals(f.getMoneda()))
                     .collect(Collectors.toList());
         }
 
-        List<Pagare> pagares = monedaMovimiento != null ? pagareRepository.findByMoneda(monedaMovimiento) : pagareRepository.findAll();
+        List<Pagare> pagares = monedaMovimiento != null
+                ? pagareRepository.findByOrganizacionIdAndMoneda(empresaId, monedaMovimiento)
+                : pagareRepository.findByOrganizacionId(empresaId);
         if (monedaMovimiento != null && (pagares == null || pagares.isEmpty())) {
-            pagares = pagareRepository.findAll()
+            pagares = pagareRepository.findByOrganizacionId(empresaId)
                     .stream()
                     .filter(p -> monedaMovimiento.equals(p.getMoneda()))
                     .collect(Collectors.toList());
         }
 
-        List<Recibo> recibos = monedaMovimiento != null ? reciboRepository.findByMoneda(monedaMovimiento) : reciboRepository.findAll();
+        List<Recibo> recibos = monedaMovimiento != null
+                ? reciboRepository.findByOrganizacionIdAndMoneda(empresaId, monedaMovimiento)
+                : reciboRepository.findByOrganizacionId(empresaId);
         if (monedaMovimiento != null && (recibos == null || recibos.isEmpty())) {
-            recibos = reciboRepository.findAll()
+            recibos = reciboRepository.findByOrganizacionId(empresaId)
                     .stream()
                     .filter(r -> monedaMovimiento.equals(r.getMoneda()))
                     .collect(Collectors.toList());
@@ -420,15 +407,23 @@ public class ConciliacionService {
      * Vincula un movimiento con un documento
      */
     @Transactional
-    public MovimientoDTO vincularMovimientoConDocumento(Long movimientoId, Long documentoId) {
+    public MovimientoDTO vincularMovimientoConDocumento(Long movimientoId, Long documentoId, Long empresaId) {
         Movimiento movimiento = movimientoRepository.findById(movimientoId)
                 .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
 
+        if (!movimiento.getOrganizacionId().equals(empresaId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Movimiento no pertenece a la empresa");
+        }
+
         // Buscar el documento en todas las tablas
-        DocumentoComercial documento = buscarDocumento(documentoId);
+        DocumentoComercial documento = buscarDocumento(documentoId, empresaId);
         
         if (documento == null) {
             throw new RuntimeException("Documento no encontrado");
+        }
+
+        if (!empresaId.equals(documento.getOrganizacionId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Documento no pertenece a la empresa");
         }
 
         movimiento.setDocumentoComercial(documento);
@@ -436,7 +431,7 @@ public class ConciliacionService {
         
         // Actualizar estado de pago si el documento es una Factura
         if (documento instanceof Factura) {
-            actualizarEstadoPagoFactura((Factura) documento);
+            actualizarEstadoPagoFactura((Factura) documento, empresaId);
         }
 
         return convertirAMovimientoDTO(guardado);
@@ -446,9 +441,13 @@ public class ConciliacionService {
      * Desvincula un movimiento de su documento
      */
     @Transactional
-    public MovimientoDTO desvincularMovimiento(Long movimientoId) {
+    public MovimientoDTO desvincularMovimiento(Long movimientoId, Long empresaId) {
         Movimiento movimiento = movimientoRepository.findById(movimientoId)
                 .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
+
+        if (!movimiento.getOrganizacionId().equals(empresaId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Movimiento no pertenece a la empresa");
+        }
 
         DocumentoComercial documento = movimiento.getDocumentoComercial();
         movimiento.setDocumentoComercial(null);
@@ -456,7 +455,7 @@ public class ConciliacionService {
         
         // Actualizar estado de pago si el documento era una Factura
         if (documento instanceof Factura) {
-            actualizarEstadoPagoFactura((Factura) documento);
+            actualizarEstadoPagoFactura((Factura) documento, empresaId);
         }
 
         return convertirAMovimientoDTO(guardado);
@@ -677,20 +676,21 @@ public class ConciliacionService {
     /**
      * Busca un documento por ID en todas las tablas
      */
-    private DocumentoComercial buscarDocumento(Long documentoId) {
+    private DocumentoComercial buscarDocumento(Long documentoId, Long empresaId) {
         // Intentar buscar en facturas
         return facturaRepository.findById(documentoId)
-                .map(f -> (DocumentoComercial) f)
-                .orElseGet(() -> 
-                    // Si no es factura, buscar en pagarés
-                    pagareRepository.findById(documentoId)
-                            .map(p -> (DocumentoComercial) p)
-                            .orElseGet(() -> 
-                                // Si no es pagaré, buscar en recibos
-                                reciboRepository.findById(documentoId)
-                                        .map(r -> (DocumentoComercial) r)
-                                        .orElse(null)
-                            )
+                .filter(f -> empresaId.equals(f.getOrganizacionId()))
+                .<DocumentoComercial>map(f -> f)
+                .orElseGet(() ->
+                        pagareRepository.findById(documentoId)
+                                .filter(p -> empresaId.equals(p.getOrganizacionId()))
+                                .<DocumentoComercial>map(p -> p)
+                                .orElseGet(() ->
+                                        reciboRepository.findById(documentoId)
+                                                .filter(r -> empresaId.equals(r.getOrganizacionId()))
+                                                .<DocumentoComercial>map(r -> r)
+                                                .orElse(null)
+                                )
                 );
     }
 
@@ -839,9 +839,9 @@ public class ConciliacionService {
     /**
      * Actualiza el estado de pago de una factura basado en los movimientos conciliados
      */
-    private void actualizarEstadoPagoFactura(Factura factura) {
+    private void actualizarEstadoPagoFactura(Factura factura, Long empresaId) {
         // Obtener todos los movimientos conciliados con esta factura
-        List<Movimiento> movimientos = movimientoRepository.findAll().stream()
+        List<Movimiento> movimientos = movimientoRepository.findByOrganizacionId(empresaId).stream()
                 .filter(r -> r.getDocumentoComercial() != null && 
                             r.getDocumentoComercial().getIdDocumento().equals(factura.getIdDocumento()))
                 .collect(Collectors.toList());

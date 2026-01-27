@@ -1084,7 +1084,28 @@ export default function TablaRegistrosV2() {
               textField: {
                 size: "small",
                 placeholder: "dd/mm/aaaa",
-                sx: { backgroundColor: "white", borderRadius: "8px" },
+                sx: (theme) => ({
+                  borderRadius: "8px",
+                  backgroundColor: theme.vars
+                    ? `rgba(${theme.vars.palette.background.paperChannel} / 1)`
+                    : theme.palette.background.paper,
+                  "& .MuiInputBase-input": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+                      : theme.palette.text.primary,
+                    "&::placeholder": {
+                      color: theme.vars
+                        ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                        : theme.palette.text.secondary,
+                      opacity: 0.8,
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                      : theme.palette.text.secondary,
+                  },
+                }),
               },
               openPickerButton: {
                 size: "small",
@@ -1108,7 +1129,28 @@ export default function TablaRegistrosV2() {
               textField: {
                 size: "small",
                 placeholder: "dd/mm/aaaa",
-                sx: { backgroundColor: "white", borderRadius: "8px" },
+                sx: (theme) => ({
+                  borderRadius: "8px",
+                  backgroundColor: theme.vars
+                    ? `rgba(${theme.vars.palette.background.paperChannel} / 1)`
+                    : theme.palette.background.paper,
+                  "& .MuiInputBase-input": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+                      : theme.palette.text.primary,
+                    "&::placeholder": {
+                      color: theme.vars
+                        ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                        : theme.palette.text.secondary,
+                      opacity: 0.8,
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                      : theme.palette.text.secondary,
+                  },
+                }),
               },
               openPickerButton: {
                 size: "small",

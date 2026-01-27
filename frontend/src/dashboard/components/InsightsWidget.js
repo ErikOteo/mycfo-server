@@ -71,7 +71,17 @@ const InsightsWidget = () => {
 
   return (
     <Card variant="outlined" sx={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
-      <CardHeader title="Análisis IA" subheader="Diagnóstico automático de tu situación" />
+      <CardHeader
+        title="Análisis IA"
+        subheader="Diagnóstico automático de tu situación"
+        subheaderTypographyProps={{
+          sx: (theme) => ({
+            color: theme.vars
+              ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+              : theme.palette.text.primary,
+          }),
+        }}
+      />
       <CardContent sx={{ flexGrow: 1 }}>
         {loading ? (
           <Skeleton variant="rectangular" height={180} />
@@ -143,7 +153,14 @@ const InsightsWidget = () => {
             ) : null}
           </Stack>
         ) : (
-          <Typography variant="body2" color="text.secondary">
+          <Typography
+            variant="body2"
+            sx={(theme) => ({
+              color: theme.vars
+                ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+                : theme.palette.text.primary,
+            })}
+          >
             Presiona "Interpretar situación" para obtener el análisis con IA.
           </Typography>
         )}
@@ -158,4 +175,3 @@ const InsightsWidget = () => {
 };
 
 export default InsightsWidget;
-
