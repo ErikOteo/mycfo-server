@@ -42,7 +42,7 @@ const Header = React.memo(function Header({ onToggleSidebar }) {
             alignItems="center"
             spacing={1}
             sx={{
-              display: { xs: 'inline-flex', md: 'none' },
+              display: { xs: 'inline-flex', lg: 'none' },
               textDecoration: 'none',
               color: 'inherit',
             }}
@@ -51,7 +51,7 @@ const Header = React.memo(function Header({ onToggleSidebar }) {
           </Stack>
         )}
         {/* Desktop: breadcrumbs */}
-        <NavbarBreadcrumbs sx={{ display: { xs: 'none', md: 'flex' } }} />
+        <NavbarBreadcrumbs sx={{ display: { xs: 'none', lg: 'flex' } }} />
       </Stack>
 
       {/* Columna derecha */}
