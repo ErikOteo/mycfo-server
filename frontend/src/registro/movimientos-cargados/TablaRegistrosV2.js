@@ -1229,6 +1229,13 @@ export default function TablaRegistrosV2() {
           slotProps={{
             toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } },
           }}
+          localeText={{
+            columnMenuSortAsc: "Ordenar Ascendente",
+            columnMenuSortDesc: "Ordenar Descendente",
+            columnMenuFilter: "Filtrar",
+            columnMenuHideColumn: "Ocultar columna",
+            columnMenuManageColumns: "Administrar columnas",
+          }}
           disableRowSelectionOnClick
           autoHeight={false}
           sx={{

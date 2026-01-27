@@ -104,6 +104,13 @@ export default function TablaDinamica({
       pageSizeOptions={[10, 20, 50]}
       disableColumnResize
       density="compact"
+      localeText={{
+        columnMenuSortAsc: "Ordenar Ascendente",
+        columnMenuSortDesc: "Ordenar Descendente",
+        columnMenuFilter: "Filtrar",
+        columnMenuHideColumn: "Ocultar columna",
+        columnMenuManageColumns: "Administrar columnas",
+      }}
       sx={{
         backgroundColor: "background.paper",
         borderRadius: 2,

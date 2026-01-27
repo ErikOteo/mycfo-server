@@ -961,6 +961,13 @@ const FacturaListPage = () => {
               quickFilterProps: { debounceMs: 500 },
             },
           }}
+          localeText={{
+            columnMenuSortAsc: "Ordenar Ascendente",
+            columnMenuSortDesc: "Ordenar Descendente",
+            columnMenuFilter: "Filtrar",
+            columnMenuHideColumn: "Ocultar columna",
+            columnMenuManageColumns: "Administrar columnas",
+          }}
           disableRowSelectionOnClick
           sx={{
             backgroundColor: "background.paper",
