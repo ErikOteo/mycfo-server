@@ -33,12 +33,12 @@ export default function InvitarColaboradores({ empresaNombre, esAdministrador })
       console.log('📧 Emails a enviar:', emailsInvitacion);
       console.log('👤 Usuario invitador:', sub);
       console.log('🏢 Empresa:', empresaNombre);
-      
+
       const response = await axios.post(
         `${API_URL_NOTIFICACIONES}/api/invitaciones/enviar`,
         emailsInvitacion,
         {
-          headers: { 
+          headers: {
             "X-Usuario-Sub": sub,
             "Content-Type": "application/json"
           }
@@ -50,12 +50,12 @@ export default function InvitarColaboradores({ empresaNombre, esAdministrador })
       console.log('📄 Data:', response.data);
 
       if (response.status === 200) {
-        setMensaje({ 
-          tipo: 'success', 
-          texto: `¡Invitaciones enviadas exitosamente a ${emailsInvitacion.length} colaborador${emailsInvitacion.length > 1 ? 'es' : ''}!` 
+        setMensaje({
+          tipo: 'success',
+          texto: `¡Invitaciones enviadas exitosamente a ${emailsInvitacion.length} colaborador${emailsInvitacion.length > 1 ? 'es' : ''}!`
         });
         setEmailsInvitacion([]);
-        
+
         // Limpiar mensaje después de 5 segundos
         setTimeout(() => {
           setMensaje({ tipo: '', texto: '' });
@@ -66,15 +66,15 @@ export default function InvitarColaboradores({ empresaNombre, esAdministrador })
       console.error("📊 Error response:", error.response);
       console.error("📄 Error data:", error.response?.data);
       console.error("🔢 Error status:", error.response?.status);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          error.message || 
-                          'Error desconocido al enviar las invitaciones';
-      
-      setMensaje({ 
-        tipo: 'error', 
-        texto: `Error al enviar las invitaciones: ${errorMessage}` 
+
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Error desconocido al enviar las invitaciones';
+
+      setMensaje({
+        tipo: 'error',
+        texto: `Error al enviar las invitaciones: ${errorMessage}`
       });
     } finally {
       setLoading(false);
@@ -90,10 +90,10 @@ export default function InvitarColaboradores({ empresaNombre, esAdministrador })
       <Typography variant="h5" gutterBottom sx={{ mt: 6, mb: 2 }}>
         Invitar nuevos miembros
       </Typography>
-      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+      <Typography variant="body2" color="text.primary" sx={{ mb: 2 }}>
         Ingresa las direcciones de correo electrónico de las personas que deseas invitar a tu organización
       </Typography>
-      
+
       <CustomMultiLine
         value={emailsInvitacion}
         onChange={setEmailsInvitacion}
