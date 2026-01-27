@@ -217,7 +217,6 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
 
     // Métodos filtrados por empresa (multi-tenant)
     Page<Movimiento> findByOrganizacionId(Long organizacionId, Pageable pageable);
-    List<Movimiento> findByOrganizacionId(Long organizacionId);
 
     Page<Movimiento> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda, Pageable pageable);
     List<Movimiento> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda);

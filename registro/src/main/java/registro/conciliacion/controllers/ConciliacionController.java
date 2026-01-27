@@ -7,7 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import registro.cargarDatos.services.AdministracionService;
+import registro.services.AdministracionService;
 import registro.conciliacion.dtos.ConciliacionRequestDTO;
 import registro.conciliacion.dtos.DocumentoSugeridoDTO;
 import registro.conciliacion.dtos.MovimientoDTO;
