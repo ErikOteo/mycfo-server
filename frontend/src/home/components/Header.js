@@ -69,26 +69,7 @@ const Header = React.memo(function Header({ onToggleSidebar }) {
           // Modo desktop: theme, perfil, organización, notificaciones
           <>
             <ColorModeIconDropdown />
-            <Tooltip title="Perfil">
-              <IconButton
-                size="small"
-                color="primary"
-                sx={{
-                  transition: 'color 0.2s, background-color 0.2s',
-                  color: 'text.primary',
-                  '&:hover': {
-                    backgroundColor:
-                      (theme.vars || theme).palette.mode === 'light'
-                        ? '#fff'
-                        : 'rgba(255,255,255,0.08)',
-                    color: 'text.primary',
-                  },
-                }}
-                onClick={() => navigate('/perfil')}
-              >
-                <PersonRoundedIcon />
-              </IconButton>
-            </Tooltip>
+            {/* Botón Perfil eliminado en Desktop - movido al sidebar */}
             <Tooltip title="Organización">
               <IconButton
                 size="small"
