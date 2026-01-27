@@ -55,7 +55,7 @@ export const cargarDatos = async (tipo, metodo, datos, tipoMovimiento = null) =>
   };
 
   // ✅ IMPORTANTE: sin "/api" extra
-  const response = await http.post(`${API_BASE_URL}/carga-datos`, payload, {
+  const response = await http.post(`${API_BASE_URL}/api/carga-datos`, payload, {
     headers: getHeaders(),
   });
 
@@ -75,7 +75,7 @@ export const previewExcel = async (file, tipo = "movimiento", tipoOrigen = "mycf
   formData.append("tipoOrigen", tipoOrigen);
 
   // ✅ IMPORTANTE: sin "/api" extra
-  const response = await http.post(`${API_BASE_URL}/carga-datos/excel/preview`, formData, {
+  const response = await http.post(`${API_BASE_URL}/api/carga-datos/excel/preview`, formData, {
     headers: {
       ...getHeaders(),
       "Content-Type": "multipart/form-data",
@@ -98,7 +98,7 @@ export const importarExcel = async (file, tipo = "movimiento", tipoOrigen = "myc
   formData.append("tipoOrigen", tipoOrigen);
 
   // ✅ IMPORTANTE: sin "/api" extra
-  const response = await http.post(`${API_BASE_URL}/carga-datos/excel`, formData, {
+  const response = await http.post(`${API_BASE_URL}/api/carga-datos/excel`, formData, {
     headers: {
       ...getHeaders(),
       "Content-Type": "multipart/form-data",
@@ -123,7 +123,7 @@ export const procesarVoz = async (tipo, datos, tipoMovimiento = null) => {
   };
 
   // ✅ IMPORTANTE: sin "/api" extra
-  const response = await http.post(`${API_BASE_URL}/carga-datos/voz`, payload, {
+  const response = await http.post(`${API_BASE_URL}/api/carga-datos/voz`, payload, {
     headers: getHeaders(),
   });
 
@@ -141,7 +141,7 @@ export const procesarAudio = async (audioFile, tipo) => {
   formData.append("tipo", tipo);
 
   // ✅ IMPORTANTE: sin "/api" extra
-  const response = await http.post(`${API_BASE_URL}/carga-datos/audio`, formData, {
+  const response = await http.post(`${API_BASE_URL}/api/carga-datos/audio`, formData, {
     headers: {
       ...getHeaders(),
       "Content-Type": "multipart/form-data",

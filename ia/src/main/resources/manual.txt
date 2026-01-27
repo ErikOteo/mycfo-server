@@ -1,0 +1,30 @@
+MANUAL DE USUARIO - MYCFO
+
+1. INTRODUCCIÓN
+MyCFO es una plataforma integral para la gestión financiera de empresas.
+
+2. MÓDULO DASHBOARD
+El Dashboard es la pantalla principal donde se visualizan los indicadores clave de rendimiento (KPIs).
+Aquí podrás ver:
+- Resumen de ingresos y egresos del mes.
+- Gráficos de evolución financiera.
+- Alertas de presupuesto.
+
+3. MÓDULO REPORTES
+En la sección de Reportes puedes generar informes detallados en PDF y Excel.
+Funcionalidades:
+- Reporte de Flujo de Caja.
+- Estado de Resultados.
+- Balance General.
+Para generar un reporte, selecciona el rango de fechas y haz clic en "Generar".
+
+4. MÓDULO CONFIGURACIÓN
+Aquí puedes ajustar los parámetros de tu cuenta y empresa.
+Opciones disponibles:
+- Gestión de usuarios y roles.
+- Configuración de alertas.
+- Integración con bancos.
+
+5. MÓDULO PRONÓSTICO (FORECAST)
+Este módulo utiliza inteligencia artificial para proyectar tus finanzas futuras.
+Puedes ver la proyección a 3, 6 y 12 meses basada en tu historial.
