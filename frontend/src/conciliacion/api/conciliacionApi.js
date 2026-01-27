@@ -17,7 +17,7 @@ export const conciliacionApi = {
     sortDir = "desc",
     moneda
   ) => {
-    const response = await http.get(`${API_BASE_URL}/api/movimientos/sin-conciliar`, {
+    const response = await http.get(`${API_BASE_URL}/movimientos/sin-conciliar`, {
       params: { page, size, sortBy, sortDir, moneda },
     });
     return response.data;
@@ -33,7 +33,7 @@ export const conciliacionApi = {
     sortDir = "desc",
     moneda
   ) => {
-    const response = await http.get(`${API_BASE_URL}/api/movimientos`, {
+    const response = await http.get(`${API_BASE_URL}/movimientos`, {
       params: { page, size, sortBy, sortDir, moneda },
     });
     return response.data;
@@ -43,7 +43,7 @@ export const conciliacionApi = {
    * Obtiene sugerencias de documentos para un movimiento
    */
   obtenerSugerencias: async (movimientoId, moneda) => {
-    const response = await http.get(`${API_BASE_URL}/api/movimientos/${movimientoId}/sugerencias`, {
+    const response = await http.get(`${API_BASE_URL}/movimientos/${movimientoId}/sugerencias`, {
       params: { moneda },
     });
     return response.data;
@@ -53,7 +53,7 @@ export const conciliacionApi = {
    * Vincula un movimiento con un documento
    */
   vincularMovimiento: async (movimientoId, documentoId) => {
-    const response = await http.post(`${API_BASE_URL}/api/vincular`, {
+    const response = await http.post(`${API_BASE_URL}/vincular`, {
       movimientoId,
       documentoId,
     });
@@ -64,7 +64,7 @@ export const conciliacionApi = {
    * Desvincula un movimiento de su documento
    */
   desvincularMovimiento: async (movimientoId) => {
-    const response = await http.post(`${API_BASE_URL}/api/desvincular/${movimientoId}`);
+    const response = await http.post(`${API_BASE_URL}/desvincular/${movimientoId}`);
     return response.data;
   },
 
@@ -72,7 +72,7 @@ export const conciliacionApi = {
    * Obtiene estadísticas de conciliación
    */
   obtenerEstadisticas: async (moneda) => {
-    const response = await http.get(`${API_BASE_URL}/api/estadisticas`, {
+    const response = await http.get(`${API_BASE_URL}/estadisticas`, {
       params: { moneda },
     });
     return response.data;

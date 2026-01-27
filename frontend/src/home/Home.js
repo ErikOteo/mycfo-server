@@ -10,7 +10,6 @@ import AppTheme from "../shared-theme/AppTheme";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./components/Header";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import ChatbotWidget from "../shared-components/ChatbotWidget";
 
 const Home = React.memo(function Home(props) {
   const location = useLocation();
@@ -19,12 +18,6 @@ const Home = React.memo(function Home(props) {
 
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [desktopMenuExpanded, setDesktopMenuExpanded] = React.useState(false);
-
-  // Determinar el módulo actual basado en la ruta
-  const currentModule = React.useMemo(() => {
-    const path = location.pathname.split('/')[1];
-    return path || 'dashboard';
-  }, [location.pathname]);
 
   React.useEffect(() => {
     setMobileMenuOpen(false);
@@ -127,9 +120,6 @@ const Home = React.memo(function Home(props) {
               <Outlet />
             </Box>
           </Stack>
-          
-          {/* Chatbot Widget integrado globalmente en el layout autenticado */}
-          <ChatbotWidget currentModule={currentModule} />
         </Box>
       </Box>
     </AppTheme>
