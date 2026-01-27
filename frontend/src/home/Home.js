@@ -10,6 +10,7 @@ import AppTheme from "../shared-theme/AppTheme";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./components/Header";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import ChatbotIaWidget from "../shared-components/ChatbotIAWidget"; // Corregido: ChatbotIAWidget con IA en mayúsculas
 
 const Home = React.memo(function Home(props) {
   const location = useLocation();
@@ -18,6 +19,12 @@ const Home = React.memo(function Home(props) {
 
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [desktopMenuExpanded, setDesktopMenuExpanded] = React.useState(false);
+
+  // Determinar el módulo actual basado en la ruta
+  const currentModule = React.useMemo(() => {
+    const path = location.pathname.split('/')[1]; // Obtiene la primera parte de la ruta (ej. "dashboard")
+    return path || 'dashboard'; // Si la ruta es solo "/", usa "dashboard" como default
+  }, [location.pathname]);
 
   React.useEffect(() => {
     setMobileMenuOpen(false);
@@ -120,6 +127,9 @@ const Home = React.memo(function Home(props) {
               <Outlet />
             </Box>
           </Stack>
+          
+          {/* Chatbot Widget integrado globalmente en el layout autenticado */}
+          <ChatbotIaWidget currentModule={currentModule} />
         </Box>
       </Box>
     </AppTheme>
