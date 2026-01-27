@@ -1,4 +1,4 @@
-import * as React from "react";
+import * as React from 'react';
 import {
   Box,
   Typography,
@@ -28,7 +28,9 @@ import {
   Pagination,
   CircularProgress,
   Divider,
+  useMediaQuery,
 } from "@mui/material";
+import { DataGrid } from '@mui/x-data-grid';
 import { alpha, useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import http from "../../../api/http";
@@ -129,6 +131,8 @@ const HeaderLabelAligned = ({ label, ghost }) => (
 
 export default function MainGrid() {
   const theme = useTheme();
+  // Sidebar disappears on lg, so we consider "mobile" (no sidebar) as down('lg')
+  const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
   const isLightMode = theme.palette.mode === "light";
   const paletteVars = theme.vars?.palette ?? theme.palette;
   const tabsLabelColor = isLightMode
@@ -695,7 +699,7 @@ export default function MainGrid() {
   const firstMain = React.useMemo(
     () =>
       Array.isArray(presupuestosPage?.content) &&
-      presupuestosPage.content.length
+        presupuestosPage.content.length
         ? presupuestosPage.content[0]
         : null,
     [presupuestosPage?.content],
@@ -704,8 +708,8 @@ export default function MainGrid() {
   const firstSearchRow = React.useMemo(
     () =>
       searchPage &&
-      Array.isArray(searchPage.content) &&
-      searchPage.content.length
+        Array.isArray(searchPage.content) &&
+        searchPage.content.length
         ? searchPage.content[0]
         : null,
     [searchPage],
@@ -726,6 +730,146 @@ export default function MainGrid() {
       firstSearchRow?.deletedAt || "2025-10-14T20:21:43Z",
     ),
   };
+
+  // --- DataGrid Styles (copied from reports for consistency) ---
+  const dataGridStyles = {
+    backgroundColor: "background.paper",
+    borderRadius: 2,
+    border: (theme) => `1px solid ${theme.palette.divider}`,
+    "& .MuiDataGrid-cell": {
+      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+      display: "flex",
+      alignItems: "center",
+      fontSize: "0.875rem",
+    },
+    "& .MuiDataGrid-columnHeaders": {
+      backgroundColor: (theme) =>
+        theme.palette.mode === "dark"
+          ? "rgba(255, 255, 255, 0.05)"
+          : "#f5f5f5",
+      color: "text.primary",
+      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+    },
+    "& .MuiDataGrid-columnHeader": {
+      "&:focus": { outline: "none" },
+    },
+    "& .MuiDataGrid-sortIcon": {
+      display: "none",
+    },
+    "& .MuiDataGrid-menuIcon": {
+      display: "none",
+    },
+    "& .MuiDataGrid-iconButtonContainer": {
+      display: "none",
+    },
+    "& .MuiDataGrid-row:hover": {
+      backgroundColor: (theme) => theme.palette.action.hover,
+    },
+    "& .MuiDataGrid-footerContainer": {
+      borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+    },
+    // Hide default footer since we use custom pagination below
+    "& .MuiDataGrid-footerContainer": {
+      display: "none"
+    }
+  };
+
+  const columns = React.useMemo(() => {
+    const cols = [
+      {
+        field: 'nombre',
+        headerName: 'Nombre',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        renderCell: (params) => (
+          <Typography variant="body2">{params.value}</Typography>
+        )
+      },
+      {
+        field: 'desde',
+        headerName: 'Desde',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        valueFormatter: (value) => monthName(value)
+      },
+      {
+        field: 'hasta',
+        headerName: 'Hasta',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        valueFormatter: (value) => monthName(value)
+      }
+    ];
+
+    if (statusFilter === 'deleted') {
+      cols.push({
+        field: 'deletedAt',
+        headerName: 'Eliminados',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        valueFormatter: (value) => formatDeletedAt(value)
+      });
+    }
+
+    cols.push({
+      field: 'acciones',
+      headerName: 'Acciones',
+      flex: 1,
+      align: 'center',
+      headerAlign: 'center',
+      sortable: false,
+      renderCell: (params) => {
+        const p = params.row;
+        const isDeleted = statusFilter === "deleted";
+        const slug = encodeURIComponent(
+          (p.nombre || "").trim().toLowerCase().replace(/\s+/g, "-"),
+        );
+        const esAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
+
+        if (isDeleted) {
+          return (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RestoreFromTrashIcon />}
+              onClick={() => handleRestore(p)}
+            >
+              Restaurar
+            </Button>
+          );
+        }
+
+        return (
+          <Box sx={{ display: "flex", justifyContent: "center", gap: 1, width: '100%' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => navigate(`/presupuestos/${slug}`)}
+              sx={isLightMode ? undefined : { color: "#42897f" }}
+            >
+              Ver detalle
+            </Button>
+            {esAdmin && (
+              <Tooltip title="Más acciones">
+                <IconButton
+                  size="small"
+                  onClick={(event) => openActionsMenu(event, p)}
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        );
+      }
+    });
+
+    return cols;
+  }, [statusFilter, usuarioRol, monthName, handleRestore, navigate, isLightMode, openActionsMenu]);
 
   return (
     <Box sx={{ width: "100%", p: 3 }}>
@@ -854,6 +998,8 @@ export default function MainGrid() {
           {searchError}
         </Alert>
       )}
+
+      {/* --- Search Results Table --- */}
       {hasActiveSearch && (
         <>
           <Box sx={{ mt: 4, mb: 2 }}>
@@ -862,132 +1008,29 @@ export default function MainGrid() {
             </Typography>
             <Divider />
           </Box>
-          <Paper
-            sx={(theme) => ({
-              width: "100%",
-              mb: 3,
-              overflowX: "auto",
-              p: 0,
-              bgcolor: alpha(
-                theme.palette.primary.main,
-                theme.palette.mode === "dark" ? 0.12 : 0.06,
-              ),
-              border: `1px solid ${(theme.vars || theme).palette.divider}`,
-            })}
-          >
+          <Paper sx={{ width: "100%", mb: 3 }}>
             {loadingSearch ? (
               <LoadingSpinner message="Cargando presupuestos..." />
             ) : searchPage &&
               Array.isArray(searchPage.content) &&
               searchPage.content.length > 0 ? (
               <>
-                <Table>
-                  <TableHead>
-                    <TableRow sx={tableRowStyle}>
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).nombre,
-                        })}
-                        align="left"
-                      >
-                        <HeaderLabelAligned
-                          label="Nombre"
-                          ghost={headerGhostSearch.nombre}
-                        />
-                      </TableCell>
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).desde,
-                        })}
-                        align="left"
-                      >
-                        <HeaderLabelAligned
-                          label="Desde"
-                          ghost={headerGhostSearch.desde}
-                        />
-                      </TableCell>
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).hasta,
-                        })}
-                        align="left"
-                      >
-                        <HeaderLabelAligned
-                          label="Hasta"
-                          ghost={headerGhostSearch.hasta}
-                        />
-                      </TableCell>
-                      {statusFilter === "deleted" && (
-                        <TableCell
-                          sx={(theme) => ({
-                            ...headerCellStyle(theme),
-                            ...getColumnWidth(statusFilter).eliminado,
-                          })}
-                          align="left"
-                        >
-                          <HeaderLabelAligned
-                            label="Eliminados"
-                            ghost={headerGhostSearch.eliminado}
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).acciones,
-                        })}
-                        align="right"
-                      >
-                        {/* Wrapper que replica el ancho del bloque de acciones */}
-                        <Box
-                          sx={{ position: "relative", display: "inline-flex" }}
-                        >
-                          {/* Contenido “fantasma” para medir ancho del bloque real */}
-                          <Box
-                            aria-hidden
-                            sx={{
-                              visibility: "hidden",
-                              pointerEvents: "none",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              sx={darkActionButtonSx}
-                            >
-                              Ver detalle
-                            </Button>
-                            <IconButton size="small">
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                          {/* Texto centrado exactamente sobre ese ancho */}
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              inset: 0,
-                              display: "grid",
-                              placeItems: "center",
-                              whiteSpace: "nowrap",
-                              fontWeight: 600,
-                            }}
-                          >
-                            Acciones
-                          </Box>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>{renderRows(searchPage.content)}</TableBody>
-                </Table>
+                <DataGrid
+                  rows={searchPage.content}
+                  columns={columns}
+                  autoHeight
+                  density="standard"
+                  hideFooter
+                  disableColumnMenu
+                  disableRowSelectionOnClick
+                  columnVisibilityModel={{
+                    desde: !isMobile,
+                    hasta: !isMobile,
+                  }}
+                  sx={dataGridStyles}
+                />
                 {searchTotalPages > 1 && (
-                  <Box mt={2} display="flex" justifyContent="center">
+                  <Box mt={2} mb={2} display="flex" justifyContent="center">
                     <Pagination
                       color="primary"
                       size="small"
@@ -996,19 +1039,6 @@ export default function MainGrid() {
                       onChange={handleSearchPageChange}
                       siblingCount={0}
                       boundaryCount={1}
-                      aria-label="Paginacion de resultados de presupuestos"
-                      getItemAriaLabel={(type, page) => {
-                        switch (type) {
-                          case "page":
-                            return `Ir a la pagina ${page} de resultados`;
-                          case "previous":
-                            return "Pagina anterior de resultados";
-                          case "next":
-                            return "Pagina siguiente de resultados";
-                          default:
-                            return `Ir a la pagina ${page} de resultados`;
-                        }
-                      }}
                     />
                   </Box>
                 )}
@@ -1023,6 +1053,8 @@ export default function MainGrid() {
           </Paper>
         </>
       )}
+
+      {/* --- Main List Table --- */}
       <Box sx={{ mt: 4, mb: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
           Listado completo
@@ -1034,146 +1066,31 @@ export default function MainGrid() {
           {listError}
         </Alert>
       )}
-      <Paper sx={{ width: "100%", overflowX: "auto" }}>
+      <Paper sx={{ width: "100%" }}>
         {loadingAll ? (
           <LoadingSpinner message="Cargando presupuestos..." />
         ) : (
-          <Table>
-            <TableHead>
-              <TableRow sx={tableRowStyle}>
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).nombre,
-                  })}
-                  align="left"
-                >
-                  <HeaderLabelAligned
-                    label="Nombre"
-                    ghost={headerGhostMain.nombre}
-                  />
-                </TableCell>
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).desde,
-                  })}
-                  align="left"
-                >
-                  <HeaderLabelAligned
-                    label="Desde"
-                    ghost={headerGhostMain.desde}
-                  />
-                </TableCell>
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).hasta,
-                  })}
-                  align="left"
-                >
-                  <HeaderLabelAligned
-                    label="Hasta"
-                    ghost={headerGhostMain.hasta}
-                  />
-                </TableCell>
-                {statusFilter === "deleted" && (
-                  <TableCell
-                    sx={(theme) => ({
-                      ...headerCellStyle(theme),
-                      ...getColumnWidth(statusFilter).eliminado,
-                    })}
-                    align="left"
-                  >
-                    <HeaderLabelAligned
-                      label="Eliminados"
-                      ghost={headerGhostMain.eliminado}
-                    />
-                  </TableCell>
-                )}
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).acciones,
-                  })}
-                  align="right"
-                >
-                  {/* Wrapper que replica el ancho del bloque de acciones */}
-                  <Box sx={{ position: "relative", display: "inline-flex" }}>
-                    {/* Contenido “fantasma” para medir ancho del bloque real */}
-                    <Box
-                      aria-hidden
-                      sx={{
-                        visibility: "hidden",
-                        pointerEvents: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 1,
-                      }}
-                    >
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        sx={darkActionButtonSx}
-                      >
-                        Ver detalle
-                      </Button>
-                      <IconButton size="small">
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                    {/* Texto centrado exactamente sobre ese ancho */}
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "grid",
-                        placeItems: "center",
-                        whiteSpace: "nowrap",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Acciones
-                    </Box>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {visiblePresupuestos.length > 0 &&
-                renderRows(visiblePresupuestos)}
-              {visiblePresupuestos.length === 0 && !listError && (
-                <TableRow>
-                  <TableCell
-                    colSpan={columnsCount}
-                    sx={(theme) => ({
-                      ...tableCellStyle(theme),
-                      textAlign: "center",
-                      py: 3,
-                    })}
-                  >
-                    No hay presupuestos para mostrar.
-                  </TableCell>
-                </TableRow>
-              )}
-              {listError && (
-                <TableRow>
-                  <TableCell
-                    colSpan={columnsCount}
-                    sx={(theme) => ({
-                      ...tableCellStyle(theme),
-                      textAlign: "center",
-                      py: 3,
-                    })}
-                  >
-                    <Alert severity="error">{listError}</Alert>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <>
+            <DataGrid
+              rows={presupuestosPage.content || []}
+              columns={columns}
+              autoHeight
+              density="standard"
+              hideFooter
+              disableColumnMenu
+              disableRowSelectionOnClick
+              columnVisibilityModel={{
+                desde: !isMobile,
+                hasta: !isMobile,
+              }}
+              sx={dataGridStyles}
+              localeText={{ noRowsLabel: "No hay presupuestos para mostrar." }}
+            />
+          </>
         )}
       </Paper>
+
+      {/* --- Pagination --- */}
       {mainTotalPages > 1 && (
         <Box mt={2} display="flex" justifyContent="center">
           <Pagination
@@ -1185,21 +1102,10 @@ export default function MainGrid() {
             siblingCount={0}
             boundaryCount={1}
             aria-label="Paginacion de presupuestos"
-            getItemAriaLabel={(type, page) => {
-              switch (type) {
-                case "page":
-                  return `Ir a la pagina ${page} de presupuestos`;
-                case "previous":
-                  return "Pagina anterior de presupuestos";
-                case "next":
-                  return "Pagina siguiente de presupuestos";
-                default:
-                  return `Ir a la pagina ${page} de presupuestos`;
-              }
-            }}
           />
         </Box>
       )}
+
       <Box mt={3}>
         <Button
           variant="contained"
@@ -1208,6 +1114,8 @@ export default function MainGrid() {
           Crear nuevo presupuesto
         </Button>
       </Box>
+
+      {/* --- Dialogs & Menus (Same as before) --- */}
       <Menu
         id="presupuesto-actions-menu"
         anchorEl={menuState.anchorEl}
@@ -1216,11 +1124,6 @@ export default function MainGrid() {
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         keepMounted
-        MenuListProps={{
-          "aria-labelledby": menuState.presupuesto
-            ? `acciones-presupuesto-${menuState.presupuesto.id}`
-            : undefined,
-        }}
       >
         <MenuItem
           onClick={handleSelectDelete}

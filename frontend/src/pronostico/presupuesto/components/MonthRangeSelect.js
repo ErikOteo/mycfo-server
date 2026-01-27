@@ -4,25 +4,12 @@ import {
   Button,
   Popover,
   Typography,
-  styled
+  OutlinedInput,
+  InputAdornment,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 const SHORT_MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-const SelectButton = styled(Button)(({ theme }) => ({
-  width: '100%',
-  justifyContent: 'flex-start',
-  textTransform: 'none',
-  color: (theme.vars || theme).palette.text.primary,
-  backgroundColor: (theme.vars || theme).palette.background.default,
-  border: `1px solid ${(theme.vars || theme).palette.divider}`,
-  '&:hover': {
-    backgroundColor: (theme.vars || theme).palette.action.hover,
-  },
-  padding: theme.spacing(1),
-}));
 
 function formatMonthLabel(ym) {
   if (!ym) return '';
@@ -41,7 +28,7 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [tempSelection, setTempSelection] = React.useState({ from: value.from, to: value.to });
   const [yearOffset, setYearOffset] = React.useState(0);
-  
+
   // Reset temp selection when value changes externally
   React.useEffect(() => {
     setTempSelection({ from: value.from, to: value.to });
@@ -65,7 +52,7 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
       // Complete selection
       const fromDate = new Date(tempSelection.from + '-01');
       const clickedDate = new Date(yearMonth + '-01');
-      
+
       if (clickedDate < fromDate) {
         // If clicking before current from, restart selection
         setTempSelection({ from: yearMonth, to: null });
@@ -103,31 +90,31 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
     return key > from && key < to;
   };
 
+  // Determine if placeholder style should be applied
+  const isPlaceholder = !value.from && !value.to;
+
   return (
     <>
-      <SelectButton 
+      <OutlinedInput
+        value={formatRangeLabel(value.from, value.to)}
         onClick={handleOpen}
-        endIcon={<ArrowDropDownIcon />}
+        readOnly
+        fullWidth
+        size="small"
+        endAdornment={
+          <InputAdornment position="end">
+            <ArrowDropDownIcon sx={{ color: 'action.active' }} />
+          </InputAdornment>
+        }
         sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          '& .MuiButton-endIcon': {
-            marginLeft: 'auto',
-            marginRight: 0
+          cursor: 'pointer',
+          '& .MuiOutlinedInput-input': {
+            cursor: 'pointer',
+            color: isPlaceholder ? 'text.secondary' : 'text.primary',
           }
         }}
-      >
-        <Typography
-          sx={{
-            color: (!value.from && !value.to) ? 'text.secondary' : 'text.primary',
-            flex: 1,
-            textAlign: 'left'
-          }}
-        >
-          {formatRangeLabel(value.from, value.to)}
-        </Typography>
-      </SelectButton>
-      
+      />
+
       <Popover
         open={Boolean(anchorEl)}
         anchorEl={anchorEl}
@@ -143,7 +130,7 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
         slotProps={{
           paper: {
             sx: {
-              width: 'fit-content',
+              width: 'fit-content', // allow auto width
               minWidth: 'unset',
               maxWidth: 'none',
               p: 1.5,
@@ -157,7 +144,7 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
             fullWidth
             size="small"
             onClick={() => handleNavigateYears('up')}
-            sx={{ 
+            sx={{
               borderRadius: 1,
               minHeight: '20px',
               height: '20px',
@@ -170,9 +157,9 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
 
           {/* Años visibles */}
           {years.map(year => (
-            <Box 
-              key={year} 
-              sx={{ 
+            <Box
+              key={year}
+              sx={{
                 mb: 0.5,
                 animation: 'fadeIn 0.3s ease-in-out',
                 '@keyframes fadeIn': {
@@ -194,7 +181,7 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
                 {Array.from({ length: 12 }, (_, monthIndex) => {
                   const month = String(monthIndex + 1).padStart(2, '0');
                   const yearMonth = `${year}-${month}`;
-                  
+
                   return (
                     <Button
                       key={monthIndex}
@@ -206,24 +193,24 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
                         { minWidth: 72 },
                         isBetween(yearMonth, tempSelection.from, tempSelection.to)
                           ? ((t) => {
-                              const p = (t.vars || t).palette;
-                              const dark = t.palette.mode === 'dark';
+                            const p = (t.vars || t).palette;
+                            const dark = t.palette.mode === 'dark';
 
-                              // 1) Mejor caso: usar el canal para rgba(... / opacity)
-                              const bg =
-                                p.primary && p.primary.mainChannel
-                                  ? `rgba(${p.primary.mainChannel} / ${dark ? 0.22 : 0.15})`
-                                  // 2) Fallback seguro sin alpha() (usa un seleccionado neutro del theme)
-                                  : p.action?.selected ?? (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)');
+                            // 1) Mejor caso: usar el canal para rgba(... / opacity)
+                            const bg =
+                              p.primary && p.primary.mainChannel
+                                ? `rgba(${p.primary.mainChannel} / ${dark ? 0.22 : 0.15})`
+                                // 2) Fallback seguro sin alpha() (usa un seleccionado neutro del theme)
+                                : p.action?.selected ?? (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)');
 
-                              return {
-                                bgcolor: bg,
-                                color: p.primary.main,        // soporta var(...)
-                                borderColor: p.primary.main,  // soporta var(...)
-                                // resalta el “marco” en dark sin romper layout
-                                boxShadow: `inset 0 0 0 1.5px ${p.primary.main}`,
-                              };
-                            })
+                            return {
+                              bgcolor: bg,
+                              color: p.primary.main,        // soporta var(...)
+                              borderColor: p.primary.main,  // soporta var(...)
+                              // resalta el “marco” en dark sin romper layout
+                              boxShadow: `inset 0 0 0 1.5px ${p.primary.main}`,
+                            };
+                          })
                           : {}
                       ]}
                     >
@@ -240,7 +227,7 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
             fullWidth
             size="small"
             onClick={() => handleNavigateYears('down')}
-            sx={{ 
+            sx={{
               borderRadius: 1,
               minHeight: '20px',
               height: '20px',
@@ -252,16 +239,16 @@ export default function MonthRangeSelect({ value = {}, onChange }) {
           </Button>
 
           {/* Botones de acción siempre visibles */}
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 1, 
-            mt: 1, 
+          <Box sx={{
+            display: 'flex',
+            gap: 1,
+            mt: 1,
             justifyContent: 'flex-end',
             borderTop: 1,
             borderColor: 'divider',
             pt: 1
           }}>
-            <Button 
+            <Button
               size="small"
               onClick={handleClear}
               color="inherit"

@@ -458,7 +458,7 @@ export default function TablaRegistrosV2() {
       console.error("Datos enviados:", formData);
       alert(
         "❌ Error al actualizar: " +
-          (error.response?.data?.mensaje || error.message),
+        (error.response?.data?.mensaje || error.message),
       );
     }
   };
@@ -487,7 +487,7 @@ export default function TablaRegistrosV2() {
       console.error("Error eliminando movimiento:", error);
       alert(
         "❌ Error al eliminar: " +
-          (error.response?.data?.mensaje || error.message),
+        (error.response?.data?.mensaje || error.message),
       );
     }
   };
@@ -761,9 +761,16 @@ export default function TablaRegistrosV2() {
                   ? COLOR_ACREENCIA
                   : "#424242";
         const signo = tipo === "Egreso" && valor !== 0 ? "-" : "";
+        const valorAbs = Math.abs(valor);
+        const isInteger = Number.isInteger(valorAbs);
+        const formatted = new Intl.NumberFormat("es-AR", {
+          minimumFractionDigits: isInteger ? 0 : 2,
+          maximumFractionDigits: 2
+        }).format(valorAbs);
+
         return (
           <Typography variant="body2" fontWeight={600} sx={{ lineHeight: "24px", color }}>
-            {`${signo}${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(Math.abs(valor))} ${moneda}`}
+            {`${signo}${formatted} ${moneda}`}
           </Typography>
         );
       },
@@ -1229,64 +1236,59 @@ export default function TablaRegistrosV2() {
           slotProps={{
             toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } },
           }}
+          localeText={{
+            columnMenuSortAsc: "Ordenar Ascendente",
+            columnMenuSortDesc: "Ordenar Descendente",
+            columnMenuFilter: "Filtrar",
+            columnMenuHideColumn: "Ocultar columna",
+            columnMenuManageColumns: "Administrar columnas",
+          }}
           disableRowSelectionOnClick
           autoHeight={false}
           sx={{
-            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            backgroundColor: "background.paper",
+            borderRadius: 2,
+            border: "none",
             "& .MuiDataGrid-cell": {
-              borderBottom: "1px solid #e0e0e0",
-              borderRight: "1px solid #e0e0e0",
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
               display: "flex",
               alignItems: "center",
             },
-            "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" },
             "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#f5f5f5",
-              fontSize: "0.95rem",
-              borderTop: "1px solid #e0e0e0",
-              borderBottom: "1px solid #e0e0e0",
+              backgroundColor: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.05)"
+                  : "#f5f5f5",
+              color: "text.primary",
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
             },
             "& .MuiDataGrid-columnHeader": {
-              borderLeft: "1px solid #e0e0e0",
-              borderRight: "1px solid #e0e0e0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              boxSizing: "border-box",
+              "&:focus": { outline: "none" },
             },
-            "& .MuiDataGrid-columnHeader:first-of-type": { borderLeft: "none" },
-            "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
-            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
-            "& .MuiDataGrid-columnSeparator": { opacity: 1, visibility: "visible", color: "#d5d5d5" },
-            "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(0, 0, 0, 0.02)" },
-            "& .MuiDataGrid-sortIcon": { display: "none" },
-            "& .MuiDataGrid-columnHeaderTitleContainer": {
-              paddingRight: "8px",
-              display: "flex",
-              alignItems: "center",
+            "& .MuiDataGrid-sortIcon": {
+              display: "none",
             },
-            "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer": {
-              width: "24px",
-              height: "24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+            "& .MuiDataGrid-iconButtonContainer": {
+              visibility: "hidden",
             },
-            "& .MuiDataGrid-columnHeader .MuiIconButton-root": {
-              padding: "4px",
-              fontSize: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            },
-            "& .MuiDataGrid-menuIcon": {
-              fontSize: "16px",
-              display: "block !important",
+            "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer": {
+              visibility: "visible",
             },
             "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
-              {
-                display: "none",
+            {
+              display: "none",
+            },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: (theme) => theme.palette.action.hover,
+            },
+            "& .MuiDataGrid-row.Mui-selected": {
+              backgroundColor: (theme) =>
+                `${theme.palette.primary.main}15 !important`,
+              "&:hover": {
+                backgroundColor: (theme) =>
+                  `${theme.palette.primary.main}25 !important`,
               },
+            },
           }}
         />
       </Box>
