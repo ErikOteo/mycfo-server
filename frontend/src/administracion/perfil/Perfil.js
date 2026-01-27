@@ -42,7 +42,7 @@ export default function Perfil() {
 
     try {
       const sub = sessionStorage.getItem("sub");
-      
+
       // 🔹 Actualizar datos del usuario en BD y Cognito mediante el backend
       await axios.put(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
         nombre: perfil.nombre,
@@ -84,7 +84,7 @@ export default function Perfil() {
         Perfil de Usuario
       </Typography>
       <Typography variant="subtitle1" sx={{ mb: 3 }}>
-        Actualiza tu información personal (los cambios se guardan en la base de datos)
+        Actualiza tu información personal
       </Typography>
 
       <CampoEditable
