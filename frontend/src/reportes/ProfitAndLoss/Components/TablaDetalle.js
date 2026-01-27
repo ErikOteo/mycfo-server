@@ -18,14 +18,14 @@ export default function TablaDetalle({ year, ingresos, egresos }) {
 
   // Columns definition
   const columns = [
-    { field: 'id', headerName: 'Nº', width: 70 },
-    { field: 'categoria', headerName: 'Categoría', flex: 1 },
+    { field: 'id', headerName: 'Nº', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'categoria', headerName: 'Categoría', flex: 1, align: 'center', headerAlign: 'center' },
     {
       field: 'total',
       headerName: 'Monto',
       width: 150,
-      align: 'right',
-      headerAlign: 'right',
+      align: 'center',
+      headerAlign: 'center',
       valueFormatter: (value) => formatCurrency(value),
     },
   ];
@@ -109,40 +109,46 @@ export default function TablaDetalle({ year, ingresos, egresos }) {
         </Grid>
       </Grid>
 
-      {/* Tabla de Ingresos */}
-      <Typography variant="h6" gutterBottom>
-        Detalle de Ingresos ({year})
-      </Typography>
-      <Box sx={{ width: '100%', mb: 4 }}>
-        <DataGrid
-          rows={rowsIngresos}
-          columns={columns}
-          density="standard"
-          autoHeight
-          hideFooter
-          disableColumnMenu
-          disableColumnResize
-          disableRowSelectionOnClick
-          sx={dataGridStyles}
-        />
-      </Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        {/* Tabla de Ingresos */}
+        <Box sx={{ flex: '1 1 450px', minWidth: 0 }}>
+          <Typography variant="h6" gutterBottom>
+            Detalle de Ingresos ({year})
+          </Typography>
+          <Box sx={{ width: '100%', mb: 4 }}>
+            <DataGrid
+              rows={rowsIngresos}
+              columns={columns}
+              density="standard"
+              autoHeight
+              hideFooter
+              disableColumnMenu
+              disableColumnResize
+              disableRowSelectionOnClick
+              sx={dataGridStyles}
+            />
+          </Box>
+        </Box>
 
-      {/* Tabla de Egresos */}
-      <Typography variant="h6" gutterBottom>
-        Detalle de Egresos ({year})
-      </Typography>
-      <Box sx={{ width: '100%' }}>
-        <DataGrid
-          rows={rowsEgresos}
-          columns={columns}
-          density="standard"
-          autoHeight
-          hideFooter
-          disableColumnMenu
-          disableColumnResize
-          disableRowSelectionOnClick
-          sx={dataGridStyles}
-        />
+        {/* Tabla de Egresos */}
+        <Box sx={{ flex: '1 1 450px', minWidth: 0 }}>
+          <Typography variant="h6" gutterBottom>
+            Detalle de Egresos ({year})
+          </Typography>
+          <Box sx={{ width: '100%' }}>
+            <DataGrid
+              rows={rowsEgresos}
+              columns={columns}
+              density="standard"
+              autoHeight
+              hideFooter
+              disableColumnMenu
+              disableColumnResize
+              disableRowSelectionOnClick
+              sx={dataGridStyles}
+            />
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

@@ -14,27 +14,27 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
   };
 
   const columnsIngresos = [
-    { field: 'id', headerName: 'N°', width: 70 },
-    { field: 'categoria', headerName: 'Categoría', flex: 1 },
+    { field: 'id', headerName: 'N°', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'categoria', headerName: 'Categoría', flex: 1, align: 'center', headerAlign: 'center' },
     {
       field: 'total',
       headerName: 'Monto',
       width: 150,
-      align: 'right',
-      headerAlign: 'right',
+      align: 'center',
+      headerAlign: 'center',
       valueFormatter: (value) => currencyFormatter(value),
     },
   ];
 
   const columnsEgresos = [
-    { field: 'id', headerName: 'N°', width: 70 },
-    { field: 'categoria', headerName: 'Categoría', flex: 1 },
+    { field: 'id', headerName: 'N°', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'categoria', headerName: 'Categoría', flex: 1, align: 'center', headerAlign: 'center' },
     {
       field: 'total',
       headerName: 'Monto',
       width: 150,
-      align: 'right',
-      headerAlign: 'right',
+      align: 'center',
+      headerAlign: 'center',
       valueFormatter: (value) => currencyFormatter(Math.abs(value)),
     },
   ];
@@ -123,48 +123,53 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
         </Grid>
       </Grid>
 
-      {/* Acciones arriba de la tabla */}
-      <Typography variant="h6" gutterBottom>
-        Detalle de Ingresos
-      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        {/* Columna Ingresos */}
+        <Box sx={{ flex: '1 1 450px', minWidth: 0 }}>
+          <Typography variant="h6" gutterBottom>
+            Detalle de Ingresos
+          </Typography>
 
-      {topRightActions && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-          {topRightActions}
+          {topRightActions && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              {topRightActions}
+            </Box>
+          )}
+
+          <Box sx={{ width: '100%', mb: 4 }}>
+            <DataGrid
+              rows={rowsIngresos}
+              columns={columnsIngresos}
+              density="standard"
+              autoHeight
+              hideFooter
+              disableColumnMenu
+              disableColumnResize
+              disableRowSelectionOnClick
+              sx={dataGridStyles}
+            />
+          </Box>
         </Box>
-      )}
 
-      {/* Tabla de ingresos */}
-      <Box sx={{ width: '100%', mb: 4 }}>
-        <DataGrid
-          rows={rowsIngresos}
-          columns={columnsIngresos}
-          density="standard" // 52px row height
-          autoHeight
-          hideFooter
-          disableColumnMenu
-          disableColumnResize
-          disableRowSelectionOnClick
-          sx={dataGridStyles}
-        />
-      </Box>
-
-      {/* Tabla de egresos */}
-      <Typography variant="h6" gutterBottom>
-        Detalle de Egresos
-      </Typography>
-      <Box sx={{ width: '100%' }}>
-        <DataGrid
-          rows={rowsEgresos}
-          columns={columnsEgresos}
-          density="standard"
-          autoHeight
-          hideFooter
-          disableColumnMenu
-          disableColumnResize
-          disableRowSelectionOnClick
-          sx={dataGridStyles}
-        />
+        {/* Columna Egresos */}
+        <Box sx={{ flex: '1 1 450px', minWidth: 0 }}>
+          <Typography variant="h6" gutterBottom>
+            Detalle de Egresos
+          </Typography>
+          <Box sx={{ width: '100%' }}>
+            <DataGrid
+              rows={rowsEgresos}
+              columns={columnsEgresos}
+              density="standard"
+              autoHeight
+              hideFooter
+              disableColumnMenu
+              disableColumnResize
+              disableRowSelectionOnClick
+              sx={dataGridStyles}
+            />
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

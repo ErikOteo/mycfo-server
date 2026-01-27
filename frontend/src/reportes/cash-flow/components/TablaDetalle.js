@@ -6,14 +6,23 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
     const theme = useTheme();
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-    const ahora = new Date();
-    const ultimoMes = (year === ahora.getFullYear()) ? ahora.getMonth() : 11;
-    const mesesVisibles = meses.slice(0, ultimoMes + 1);
+    // const ahora = new Date();
+    // const ultimoMes = (year === ahora.getFullYear()) ? ahora.getMonth() : 11;
+    // const mesesVisibles = meses.slice(0, ultimoMes + 1);
+    const mesesVisibles = meses; // Show all months always
 
     const formatCurrency = (value) => {
         const num = Number(value);
         if (Number.isNaN(num) || num === 0) return '-';
-        return num.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+
+        const isInteger = Number.isInteger(num);
+
+        return num.toLocaleString('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: isInteger ? 0 : 2,
+            maximumFractionDigits: 2
+        });
     };
 
     const normalizeCategoria = (c) => {
@@ -57,7 +66,7 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
     const monthColumns = mesesVisibles.map((monthName, index) => ({
         field: `month_${index}`,
         headerName: monthName,
-        width: 100, // Fixed width for months
+        width: 85, // Compact width
         align: 'right',
         headerAlign: 'center',
         renderCell: (params) => {
@@ -78,7 +87,8 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
         {
             field: 'concepto',
             headerName: 'Concepto',
-            width: 250,
+            width: 150, // Compact width
+            headerAlign: 'center',
             frozen: true,
             renderCell: (params) => (
                 <Box sx={{ pl: params.row.isTotal ? 0 : 2, fontWeight: (params.row.isBold || params.row.isTotal) ? 'bold' : 'normal' }}>
@@ -147,7 +157,8 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
             display: "flex",
             alignItems: "center",
-            fontSize: "0.875rem",
+            fontSize: "0.75rem", // Compact font size (12px)
+            padding: "0 8px", // Reduced padding
         },
         "& .MuiDataGrid-columnHeaders": {
             backgroundColor: (theme) =>
@@ -156,6 +167,7 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     : "#f5f5f5",
             color: "text.primary",
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            fontSize: "0.75rem", // Compact header font
         },
         "& .MuiDataGrid-columnHeader": {
             "&:focus": { outline: "none" },

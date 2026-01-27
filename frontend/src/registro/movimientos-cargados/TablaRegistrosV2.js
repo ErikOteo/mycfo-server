@@ -761,9 +761,16 @@ export default function TablaRegistrosV2() {
                   ? COLOR_ACREENCIA
                   : "#424242";
         const signo = tipo === "Egreso" && valor !== 0 ? "-" : "";
+        const valorAbs = Math.abs(valor);
+        const isInteger = Number.isInteger(valorAbs);
+        const formatted = new Intl.NumberFormat("es-AR", {
+          minimumFractionDigits: isInteger ? 0 : 2,
+          maximumFractionDigits: 2
+        }).format(valorAbs);
+
         return (
           <Typography variant="body2" fontWeight={600} sx={{ lineHeight: "24px", color }}>
-            {`${signo}${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(Math.abs(valor))} ${moneda}`}
+            {`${signo}${formatted} ${moneda}`}
           </Typography>
         );
       },
