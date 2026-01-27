@@ -295,10 +295,11 @@ const SideMenu = React.memo(function SideMenu({
           >
             <Avatar
               sizes="small"
-              alt={userData.nombre}
-              //src="/static/images/avatar/7.jpg"
+              alt={userData.nombre || 'Usuario'}
               sx={{ width: 36, height: 36 }}
-            />
+            >
+              {(userData.nombre || 'Usuario').charAt(0).toUpperCase()}
+            </Avatar>
             {expanded && (
               <Box sx={{ minWidth: 0 }}>
                 <Typography
