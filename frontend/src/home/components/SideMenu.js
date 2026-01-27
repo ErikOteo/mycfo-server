@@ -80,6 +80,7 @@ const SideMenu = React.memo(function SideMenu({
     nombre: '',
     email: '',
   });
+  const [avatarColor, setAvatarColor] = React.useState(localStorage.getItem('avatarColor') || '#008375');
   const [logoHovered, setLogoHovered] = React.useState(false);
 
   // Estado para el menú desplegable del usuario
@@ -141,8 +142,17 @@ const SideMenu = React.memo(function SideMenu({
     updateUserData();
     window.addEventListener('userDataUpdated', updateUserData);
 
+    const handleAvatarUpdate = () => {
+      const newColor = localStorage.getItem('avatarColor');
+      if (newColor) {
+        setAvatarColor(newColor);
+      }
+    };
+    window.addEventListener('avatarUpdated', handleAvatarUpdate);
+
     return () => {
       window.removeEventListener('userDataUpdated', updateUserData);
+      window.removeEventListener('avatarUpdated', handleAvatarUpdate);
     };
   }, []);
 
@@ -296,7 +306,7 @@ const SideMenu = React.memo(function SideMenu({
             <Avatar
               sizes="small"
               alt={userData.nombre || 'Usuario'}
-              sx={{ width: 36, height: 36 }}
+              sx={{ width: 36, height: 36, bgcolor: avatarColor }}
             >
               {(userData.nombre || 'Usuario').charAt(0).toUpperCase()}
             </Avatar>
