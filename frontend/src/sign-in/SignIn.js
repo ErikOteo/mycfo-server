@@ -292,13 +292,13 @@ export default function SignIn(props) {
                   mt: 1,
                   p: 1.5,
                   borderRadius: 1.5,
-                  bgcolor: "#FFF8E1",
-                  border: "1px solid #FFE082",
+                  bgcolor: "#FFDE70",
+                  border: "1px solid #F5C16C",
                 }}
               >
                 <Typography
                   variant="body2"
-                  sx={{ textAlign: "center", color: "text.primary" }}
+                  sx={{ textAlign: "center", color: "#000" }}
                 >
                   {globalMsg}
                 </Typography>
