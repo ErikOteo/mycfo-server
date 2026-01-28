@@ -13,8 +13,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
@@ -23,9 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.IOException;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
@@ -52,23 +48,18 @@ public class ChatbotVertexService {
                     "proyecci[oó]n|proyecta|pronostica|pronostico|escenario|simulaci[oó]n|simula|" +
                     "estima|estimaci[oó]n|presupuestar|sugerir|recomienda|recomendaci[oó]n|" +
                     "monto sugerido|valor sugerido" +
-            ")\\b"
-    );
+                    ")\\b");
     private static final Pattern SCOPE_QUESTION_PATTERN = Pattern.compile(
             "(?i)\\b(que podes hacer|que puedes hacer|cual es tu alcance|cu[aá]l es tu alcance|" +
-                    "para que servis|para que serv[íi]s|para qu[eé] serv[íi]s|ayuda|que haces)\\b"
-    );
+                    "para que servis|para que serv[íi]s|para qu[eé] serv[íi]s|ayuda|que haces)\\b");
     private static final Pattern LOCAL_ACTION_PATTERN = Pattern.compile(
             "(?i)\\b(que puedo hacer|que pod[eé]s hacer|que puedes hacer|que se puede hacer)\\b" +
-                    ".*\\b(aca|aqui|aquí|esta pantalla|este modulo|este módulo|esta seccion|esta sección|este lugar)\\b"
-    );
+                    ".*\\b(aca|aqui|aquí|esta pantalla|este modulo|este módulo|esta seccion|esta sección|este lugar)\\b");
     private static final Pattern LOCATION_QUESTION_PATTERN = Pattern.compile(
             "(?i)\\b(donde estoy|en que modulo estoy|en qué modulo estoy|que modulo es este|" +
-                    "que m[oó]dulo es este|que pantalla es|que estoy viendo|que es esto que veo|donde estoy parado)\\b"
-    );
+                    "que m[oó]dulo es este|que pantalla es|que estoy viendo|que es esto que veo|donde estoy parado)\\b");
     private static final Pattern EMOJI_PATTERN = Pattern.compile(
-            "[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]"
-    );
+            "[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]");
     private static final Pattern LIST_PREFIX_PATTERN = Pattern.compile("^\\s*([\\-*+•·]|\\d+\\.)\\s+");
     private static final Pattern HEADING_PREFIX_PATTERN = Pattern.compile("^\\s*#{1,6}\\s+");
     private static final Pattern QUOTE_PREFIX_PATTERN = Pattern.compile("^\\s*>\\s+");
@@ -110,8 +101,7 @@ public class ChatbotVertexService {
                 properties.getLocation(),
                 properties.getProjectId(),
                 properties.getLocation(),
-                properties.getModel()
-        );
+                properties.getModel());
 
         String token = resolveAccessToken();
         Map<String, Object> requestBody = buildRequestBody(ChatbotPolicy.SYSTEM_PROMPT, prompt);
@@ -127,8 +117,7 @@ public class ChatbotVertexService {
                     endpoint,
                     HttpMethod.POST,
                     new HttpEntity<>(payload, headers),
-                    String.class
-            );
+                    String.class);
 
             String raw = extractTextFromResponse(response.getBody());
             String cleaned = normalizePlainText(stripCodeFences(raw)).trim();
@@ -155,7 +144,8 @@ public class ChatbotVertexService {
             }
             credentials = credentials.createScoped(Collections.singleton(CLOUD_SCOPE));
             AccessToken token = credentials.getAccessToken();
-            if (token == null || token.getExpirationTime() == null || token.getExpirationTime().before(Date.from(Instant.now()))) {
+            if (token == null || token.getExpirationTime() == null
+                    || token.getExpirationTime().before(Date.from(Instant.now()))) {
                 token = credentials.refreshAccessToken();
             }
             if (token == null) {
@@ -171,22 +161,6 @@ public class ChatbotVertexService {
     private Map<String, Object> buildRequestBody(String systemPrompt, String prompt) {
         Map<String, Object> textPart = new LinkedHashMap<>();
         textPart.put("text", prompt);
-
-        List<Map<String, Object>> parts = new java.util.ArrayList<>();
-        parts.add(textPart);
-
-        byte[] pdfBytes = loadKnowledgePdfBytes();
-        if (pdfBytes != null && pdfBytes.length > 0) {
-            String base64Pdf = Base64.getEncoder().encodeToString(pdfBytes);
-
-            Map<String, Object> inlineData = new LinkedHashMap<>();
-            inlineData.put("mime_type", "application/pdf");
-            inlineData.put("data", base64Pdf);
-
-            Map<String, Object> pdfPart = new LinkedHashMap<>();
-            pdfPart.put("inline_data", inlineData);
-            parts.add(pdfPart);
-        }
 
         List<Map<String, Object>> parts = new java.util.ArrayList<>();
         parts.add(textPart);
@@ -239,51 +213,6 @@ public class ChatbotVertexService {
         }
     }
 
-    private byte[] loadKnowledgePdfBytes() {
-        try {
-            ClassPathResource resource = new ClassPathResource(KNOWLEDGE_PDF_CLASSPATH);
-            if (!resource.exists()) {
-                log.warn("No se encontro base de conocimiento en classpath: {}", KNOWLEDGE_PDF_CLASSPATH);
-                return null;
-            }
-            return resource.getInputStream().readAllBytes();
-        } catch (IOException ex) {
-            log.error("Error leyendo PDF de base de conocimiento desde classpath: {}", KNOWLEDGE_PDF_CLASSPATH, ex);
-            return null;
-        }
-    }
-
-    private byte[] loadKnowledgePdfBytes() {
-        try {
-            ClassPathResource resource = new ClassPathResource(KNOWLEDGE_PDF_CLASSPATH);
-            if (!resource.exists()) {
-                log.warn("No se encontro base de conocimiento en classpath: {}", KNOWLEDGE_PDF_CLASSPATH);
-                return null;
-            }
-            return resource.getInputStream().readAllBytes();
-        } catch (IOException ex) {
-            log.error("Error leyendo PDF de base de conocimiento desde classpath: {}", KNOWLEDGE_PDF_CLASSPATH, ex);
-            return null;
-        }
-    }
-
-<<<<<<< Updated upstream
-    private byte[] loadKnowledgePdfBytes() {
-        try {
-            ClassPathResource resource = new ClassPathResource(KNOWLEDGE_PDF_CLASSPATH);
-            if (!resource.exists()) {
-                log.warn("No se encontro base de conocimiento en classpath: {}", KNOWLEDGE_PDF_CLASSPATH);
-                return null;
-            }
-            return resource.getInputStream().readAllBytes();
-        } catch (IOException ex) {
-            log.error("Error leyendo PDF de base de conocimiento desde classpath: {}", KNOWLEDGE_PDF_CLASSPATH, ex);
-            return null;
-        }
-    }
-
-=======
->>>>>>> Stashed changes
     private String extractTextFromResponse(String json) throws Exception {
         if (json == null || json.isBlank()) {
             return "";
@@ -298,12 +227,13 @@ public class ChatbotVertexService {
 
     private String buildPrompt(String module, String message, Map<String, Object> context) {
         String moduleHint = switch (module.toLowerCase()) {
-            case "registro" -> "Estas asistiendo en el modulo Registro: cargas, movimientos, ingresos, egresos, deudas y acreencias.";
+            case "registro" ->
+                "Estas asistiendo en el modulo Registro: cargas, movimientos, ingresos, egresos, deudas y acreencias.";
             case "reporte" -> "Estas asistiendo en el modulo Reporte: cashflow, P&L, resumenes y analisis.";
             case "pronostico" -> "Estas asistiendo en el modulo Pronostico: presupuestos, proyecciones y escenarios.";
             case "administracion" -> "Estas asistiendo en el modulo Administracion: configuraciones y gestion general.";
-            case "notificacion" -> "Estas asistiendo en el modulo Notificaciones: alertas, recordatorios y configuracion de notificaciones.";
-            case "notificacion" -> "Estas asistiendo en el modulo Notificaciones: alertas, recordatorios y configuracion de notificaciones.";
+            case "notificacion" ->
+                "Estas asistiendo en el modulo Notificaciones: alertas, recordatorios y configuracion de notificaciones.";
             default -> "Estas asistiendo en MyCFO. Responde con foco en el modulo indicado por el usuario.";
         };
 
@@ -316,8 +246,7 @@ public class ChatbotVertexService {
                 contextBlock,
                 "",
                 "Consulta del usuario:",
-                message
-        );
+                message);
     }
 
     private String stripCodeFences(String text) {
@@ -402,15 +331,13 @@ public class ChatbotVertexService {
             return String.join(
                     "\n",
                     "Estas en el modulo " + moduleLabel + " y la pantalla actual es " + screenLabel + ".",
-                    "Si queres, decime que parte de la pantalla queres entender y te la explico."
-            );
+                    "Si queres, decime que parte de la pantalla queres entender y te la explico.");
         }
 
         return String.join(
                 "\n",
                 "Estas en el modulo " + moduleLabel + ".",
-                "Si me decis que pantalla o seccion estas viendo, te explico lo que aparece."
-        );
+                "Si me decis que pantalla o seccion estas viendo, te explico lo que aparece.");
     }
 
     private String friendlyModuleLabel(String module) {
@@ -459,13 +386,15 @@ public class ChatbotVertexService {
         if (matchesAny(lower, "registro", "carga", "movimientos", "facturas", "conciliacion")) {
             return "registro";
         }
-        if (matchesAny(lower, "reporte", "reportes", "cashflow", "flujo de caja", "estado de resultado", "estado de resultados", "p&l", "pyl", "dashboard")) {
+        if (matchesAny(lower, "reporte", "reportes", "cashflow", "flujo de caja", "estado de resultado",
+                "estado de resultados", "p&l", "pyl", "dashboard")) {
             return "reporte";
         }
         if (matchesAny(lower, "pronostico", "pronóstico", "presupuesto", "presupuestos")) {
             return "pronostico";
         }
-        if (matchesAny(lower, "administracion", "administración", "perfil", "organizacion", "organización", "roles", "invitaciones", "historial")) {
+        if (matchesAny(lower, "administracion", "administración", "perfil", "organizacion", "organización", "roles",
+                "invitaciones", "historial")) {
             return "administracion";
         }
         if (matchesAny(lower, "notificacion", "notificaciones", "recordatorios", "alertas")) {
@@ -481,166 +410,6 @@ public class ChatbotVertexService {
             }
         }
         return false;
-    }
-
-<<<<<<< Updated upstream
-    private String normalizePlainText(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
-        }
-        String cleaned = text;
-        cleaned = cleaned.replace("*", "");
-        cleaned = cleaned.replace("_", "");
-        cleaned = cleaned.replace("`", "");
-        cleaned = EMOJI_PATTERN.matcher(cleaned).replaceAll("");
-
-        List<String> lines = cleaned.lines()
-                .map(String::trim)
-                .filter(line -> !line.isBlank())
-                .map(line -> LIST_PREFIX_PATTERN.matcher(line).replaceAll(""))
-                .map(line -> HEADING_PREFIX_PATTERN.matcher(line).replaceAll(""))
-                .map(line -> QUOTE_PREFIX_PATTERN.matcher(line).replaceAll(""))
-                .collect(Collectors.toList());
-
-        return String.join("\n", lines);
-    }
-
-    private boolean isOutOfScope(String message) {
-        if (message == null) {
-            return false;
-        }
-        return OUT_OF_SCOPE_PATTERN.matcher(message).find();
-    }
-
-    private boolean isScopeQuestion(String message) {
-        if (message == null) {
-            return false;
-        }
-        return SCOPE_QUESTION_PATTERN.matcher(message).find();
-    }
-
-    private boolean isLocalActionQuestion(String message) {
-        if (message == null) {
-            return false;
-        }
-        return LOCAL_ACTION_PATTERN.matcher(message).find();
-    }
-
-    private boolean isLocationQuestion(String message) {
-        if (message == null) {
-            return false;
-        }
-        return LOCATION_QUESTION_PATTERN.matcher(message).find();
-    }
-
-    private String buildContextBlock(Map<String, Object> context) {
-        if (context == null || context.isEmpty()) {
-            return "Contexto de pantalla: no disponible.";
-        }
-        try {
-            String json = objectMapper.writeValueAsString(context);
-            return "Contexto de pantalla (datos ya calculados): " + json;
-        } catch (Exception ex) {
-            log.warn("No se pudo serializar el contexto de pantalla", ex);
-            return "Contexto de pantalla: disponible pero no legible.";
-        }
-    }
-
-    private String buildLocationResponse(String module, Map<String, Object> context) {
-        String moduleLabel = friendlyModuleLabel(module);
-        String screenLabel = resolveScreenLabel(context);
-
-        if (screenLabel != null) {
-            return String.join(
-                    "\n",
-                    "Estas en el modulo " + moduleLabel + " y la pantalla actual es " + screenLabel + ".",
-                    "Si queres, decime que parte de la pantalla queres entender y te la explico."
-            );
-        }
-
-        return String.join(
-                "\n",
-                "Estas en el modulo " + moduleLabel + ".",
-                "Si me decis que pantalla o seccion estas viendo, te explico lo que aparece."
-        );
-    }
-
-    private String friendlyModuleLabel(String module) {
-        if (module == null) {
-            return "general";
-        }
-        return switch (module.toLowerCase()) {
-            case "registro" -> "Registro";
-            case "reporte" -> "Reporte";
-            case "pronostico" -> "Pronostico";
-            case "administracion" -> "Administracion";
-            case "notificacion" -> "Notificaciones";
-            default -> "general";
-        };
-    }
-
-    private String resolveScreenLabel(Map<String, Object> context) {
-        if (context == null || context.isEmpty()) {
-            return null;
-        }
-        Object screen = context.get("screen");
-        if (screen == null) {
-            return null;
-        }
-        String key = screen.toString().trim();
-        if (key.isEmpty()) {
-            return null;
-        }
-        return switch (key) {
-            case "dashboard" -> "Dashboard";
-            case "reporte-mensual" -> "Reporte mensual";
-            case "flujo-de-caja" -> "Flujo de caja";
-            case "estado-de-resultados" -> "Estado de resultados";
-            case "movimientos-cargados" -> "Movimientos cargados";
-            case "presupuestos" -> "Presupuestos";
-            default -> key;
-        };
-    }
-
-    private String resolveModuleOverride(String message, String currentModule) {
-        if (!StringUtils.hasText(message)) {
-            return currentModule;
-        }
-        String lower = message.toLowerCase();
-
-        if (matchesAny(lower, "registro", "carga", "movimientos", "facturas", "conciliacion")) {
-            return "registro";
-        }
-        if (matchesAny(lower, "reporte", "reportes", "cashflow", "flujo de caja", "estado de resultado", "estado de resultados", "p&l", "pyl", "dashboard")) {
-            return "reporte";
-        }
-        if (matchesAny(lower, "pronostico", "pronóstico", "presupuesto", "presupuestos")) {
-            return "pronostico";
-        }
-        if (matchesAny(lower, "administracion", "administración", "perfil", "organizacion", "organización", "roles", "invitaciones", "historial")) {
-            return "administracion";
-        }
-        if (matchesAny(lower, "notificacion", "notificaciones", "recordatorios", "alertas")) {
-            return "notificacion";
-        }
-        return currentModule;
-    }
-
-    private boolean matchesAny(String haystack, String... needles) {
-        for (String needle : needles) {
-            if (needle != null && !needle.isBlank() && haystack.contains(needle)) {
-                return true;
-            }
-        }
-        return false;
-=======
-    private String normalizeMarkdown(String text) {
-        if (text == null || text.isBlank()) {
-            return "";
-        }
-        // Eliminar asteriscos de markdown para evitar formato en el frontend
-        return text.replace("*", "");
->>>>>>> Stashed changes
     }
 
     private String truncate(String value, int maxLen) {
