@@ -41,6 +41,7 @@ import API_CONFIG from "../../../config/api-config";
 import LoadingSpinner from "../../../shared-components/LoadingSpinner";
 import CurrencyTabs, { usePreferredCurrency } from "../../../shared-components/CurrencyTabs";
 import { matchesCurrencyFilter } from "../utils/currencyTag";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 const tableRowStyle = {
   backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -189,6 +190,57 @@ export default function MainGrid() {
       ? `${monthLabels[idx]} ${anio}`
       : ym;
   }, []);
+
+  const activePage = React.useMemo(() => {
+    if (hasActiveSearch && searchPage) {
+      return searchPage;
+    }
+    return presupuestosPage;
+  }, [hasActiveSearch, searchPage, presupuestosPage]);
+
+  const activeRows = React.useMemo(() => {
+    const rows = Array.isArray(activePage?.content) ? activePage.content : [];
+    return rows;
+  }, [activePage]);
+
+  const samplePresupuestos = React.useMemo(
+    () =>
+      activeRows.slice(0, 5).map((p) => ({
+        id: p?.id ?? null,
+        nombre: p?.nombre ?? null,
+        desde: p?.desde ?? null,
+        hasta: p?.hasta ?? null,
+        estado: p?.estado ?? p?.status ?? null,
+        eliminado: Boolean(p?.eliminado ?? p?.deleted),
+        moneda: p?.moneda ?? null,
+      })),
+    [activeRows]
+  );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuestos",
+      statusFilter,
+      pageIndex,
+      query,
+      filters,
+      currency,
+      totalPresupuestos: Number(activePage?.totalElements ?? 0),
+      totalPaginas: Number(activePage?.totalPages ?? 0),
+      muestra: samplePresupuestos,
+    }),
+    [
+      statusFilter,
+      pageIndex,
+      query,
+      filters,
+      currency,
+      activePage,
+      samplePresupuestos,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const cargarRolUsuario = React.useCallback(() => {
     const sub = sessionStorage.getItem("sub");
