@@ -94,11 +94,11 @@ export default function PronosticoFijoDetalle() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="ingresos" 
-                stroke="#2e7d32" 
-                strokeWidth={2} 
-                name="Ingresos" 
+              <Line
+                dataKey="ingresos"
+                stroke="#2e7d32"
+                strokeWidth={2}
+                name="Ingresos"
                 dot={false}
               />
             </>
@@ -109,11 +109,11 @@ export default function PronosticoFijoDetalle() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="egresos" 
-                stroke="#c62828" 
-                strokeWidth={2} 
-                name="Egresos" 
+              <Line
+                dataKey="egresos"
+                stroke="#c62828"
+                strokeWidth={2}
+                name="Egresos"
                 dot={false}
               />
             </>
@@ -124,11 +124,11 @@ export default function PronosticoFijoDetalle() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="balance" 
-                stroke="#1565c0" 
-                strokeWidth={2} 
-                name="Balance" 
+              <Line
+                dataKey="balance"
+                stroke="#1565c0"
+                strokeWidth={2}
+                name="Balance"
                 dot={false}
               />
             </>
@@ -297,7 +297,7 @@ export default function PronosticoFijoDetalle() {
           </Box>
 
           {/* Gráfico */}
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={400} minWidth={0}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mes" />
@@ -306,16 +306,16 @@ export default function PronosticoFijoDetalle() {
               <Legend />
               {getSplitPointMes() && (
                 <>
-                  <ReferenceLine 
-                    x={getSplitPointMes()} 
-                    stroke="#9e9e9e" 
-                    strokeWidth={2} 
+                  <ReferenceLine
+                    x={getSplitPointMes()}
+                    stroke="#9e9e9e"
+                    strokeWidth={2}
                     strokeDasharray="3 3"
                     label={{ value: "Estimado", position: "top", fill: "#9e9e9e" }}
                   />
-                  <ReferenceArea 
-                    x1={getSplitPointMes()} 
-                    fill="#e3f2fd" 
+                  <ReferenceArea
+                    x1={getSplitPointMes()}
+                    fill="#e3f2fd"
                     fillOpacity={0.3}
                   />
                 </>
