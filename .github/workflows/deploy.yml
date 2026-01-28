@@ -1,9 +1,6 @@
 name: Deploy MyCFO to Azure
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches: [ "main" ]
 
@@ -12,7 +9,6 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-
       - name: Build & deploy
         run: |
           cd ~/mycfo
