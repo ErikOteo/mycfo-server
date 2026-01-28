@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 
-import { Box, Typography, CircularProgress, Stack, Avatar } from "@mui/material";
+import { Box, Typography, CircularProgress, Stack, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Divider } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import CampoEditable from "../../shared-components/CampoEditable";
 import BotonConsolidar from "../../shared-components/CustomButton";
 import { sessionService } from "../../shared-services/sessionService";
@@ -82,6 +83,59 @@ export default function Perfil() {
 
   const hayCambios = Object.keys(editados).length > 0;
 
+  /* Nuevo estado para cambio de contraseña */
+  const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
+  const [passwords, setPasswords] = useState({ old: '', new: '', confirm: '' });
+  const [passError, setPassError] = useState('');
+
+  const navigate = useNavigate();
+
+  // Helper para determinar si es un color claro
+  // (Movelos el helper isLightColor aquí arriba o dejarlo donde estaba, pero mejor agrupar lógica)
+  const isLightColor = (c) => ['#ffffff'].includes(c);
+
+  const handleDownloadData = () => {
+    const data = {
+      ...perfil,
+      avatarColor,
+      fechaDescarga: new Date().toISOString()
+    };
+    const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+    const link = document.createElement("a");
+    link.href = jsonString;
+    link.download = "mis_datos_mycfo.json";
+    link.click();
+  };
+
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      setPassError("Las contraseñas nuevas no coinciden");
+      return;
+    }
+    if (passwords.new.length < 6) { // Validación básica
+      setPassError("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    try {
+      const token = sessionStorage.getItem("accessToken");
+      await axios.post(`${API_CONFIG.ADMINISTRACION}/api/usuarios/cambiar-password`, {
+        oldPassword: passwords.old,
+        newPassword: passwords.new
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      alert("Contraseña actualizada con éxito");
+      setOpenPasswordDialog(false);
+      setPasswords({ old: '', new: '', confirm: '' });
+      setPassError('');
+    } catch (error) {
+      console.error("Error cambiando password:", error);
+      setPassError("Error al cambiar contraseña. Verifica tu contraseña actual.");
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
@@ -90,8 +144,7 @@ export default function Perfil() {
     );
   }
 
-  // Helper para determinar si es un color claro
-  const isLightColor = (c) => ['#ffffff'].includes(c);
+
 
   return (
     <Box sx={{ width: "100%", maxWidth: 1000, mx: "auto", mt: 4, p: 3 }}>
@@ -175,6 +228,99 @@ export default function Perfil() {
           </Box>
         </Stack>
       </Box>
+
+      <Divider sx={{ my: 4 }} />
+
+      {/* Seguridad */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" gutterBottom>Seguridad</Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography variant="subtitle2">Contraseña</Typography>
+            <Typography variant="body2" color="text.primary">
+              Se recomienda cambiarla periódicamente
+            </Typography>
+          </Box>
+          <Button variant="contained" sx={{ lineHeight: 1.2 }} onClick={() => setOpenPasswordDialog(true)}>
+            Cambiar Contraseña
+          </Button>
+        </Stack>
+      </Box>
+
+      <Divider sx={{ my: 4 }} />
+
+      {/* Preferencias */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" gutterBottom>Preferencias</Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography variant="subtitle2">Notificaciones</Typography>
+            <Typography variant="body2" color="text.primary">
+              Gestiona qué alertas y correos quieres recibir
+            </Typography>
+          </Box>
+          <Button variant="contained" sx={{ lineHeight: 1.2 }} onClick={() => navigate('/configuracion-notificaciones')}>
+            Configurar
+          </Button>
+        </Stack>
+      </Box>
+
+      <Divider sx={{ my: 4 }} />
+
+      {/* Gestión de Datos */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" gutterBottom>Gestión de Datos</Typography>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography variant="subtitle2">Mis Datos</Typography>
+            <Typography variant="body2" color="text.primary">
+              Descarga una copia de tu información personal
+            </Typography>
+          </Box>
+          <Button variant="contained" color="primary" sx={{ lineHeight: 1.2 }} onClick={handleDownloadData}>
+            Descargar mis datos
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* Dialogo Cambio Password */}
+      <Dialog open={openPasswordDialog} onClose={() => setOpenPasswordDialog(false)}>
+        <DialogTitle>Cambiar Contraseña</DialogTitle>
+        <DialogContent sx={{ pt: 2, minWidth: 300 }}>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Contraseña Actual"
+              type="password"
+              fullWidth
+              value={passwords.old}
+              onChange={(e) => setPasswords({ ...passwords, old: e.target.value })}
+            />
+            <TextField
+              label="Nueva Contraseña"
+              type="password"
+              fullWidth
+              value={passwords.new}
+              onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+            />
+            <TextField
+              label="Confirmar Nueva Contraseña"
+              type="password"
+              fullWidth
+              value={passwords.confirm}
+              onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+            />
+            {passError && (
+              <Typography color="error" variant="caption">
+                {passError}
+              </Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenPasswordDialog(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleChangePassword}>Actualizar</Button>
+        </DialogActions>
+      </Dialog>
 
       {hayCambios && (
         <BotonConsolidar
