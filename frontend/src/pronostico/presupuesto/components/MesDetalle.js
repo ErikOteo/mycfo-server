@@ -45,18 +45,18 @@ const baseURL = API_CONFIG.PRONOSTICO;
 const GUARD_MESSAGES = {
   categoria: {
     title: 'Habilitar edicion manual',
-    body: 'La categoria, tipo y monto estimado ayudan a ordenar tus analisis. Cambiarlos manualmente puede afectar reportes y automatizaciones. Queres habilitar la edicion manual?',
-    confirmLabel: 'Habilitar edicion'
+    body: 'La categoría, tipo y monto estimado ayudan a ordenar tus análisis. Cambiarlos manualmente puede afectar reportes y automatizaciones. ¿Querés habilitar la edición manual?',
+    confirmLabel: 'Habilitar edición'
   },
   real: {
     title: 'Editar monto real',
     body: 'El monto real refleja los registros consolidados. Para ajustarlo, edita los movimientos registrados del periodo. Te llevamos a Ver movimientos.',
-    confirmLabel: 'Habilitar edicion en movimientos'
+    confirmLabel: 'Habilitar edición en movimientos'
   }
 };
 
 const GUARD_FIELD_LABELS = {
-  categoria: 'la categoria, tipo y estimado',
+  categoria: 'la categoría, tipo y estimado',
   tipo: 'el tipo',
   montoEstimado: 'el estimado',
   real: 'el monto real'
@@ -93,9 +93,9 @@ const mesANumero = {
 const formatearMes = (ym) => {
   if (!ym) return 'Mes desconocido';
   const [anio, mes] = ym.split('-');
-  const nombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const i = parseInt(mes, 10);
-  return isNaN(i) ? ym : `${nombres[i-1]} ${anio}`;
+  return isNaN(i) ? ym : `${nombres[i - 1]} ${anio}`;
 };
 
 // YYYY-MM ? YYYY-MM-01
@@ -329,8 +329,8 @@ export default function MesDetalle() {
         const d = res?.data;
         let arr =
           Array.isArray(d) ? d :
-          Array.isArray(d?.lineas) ? d.lineas :
-          Array.isArray(d?.categorias) ? d.categorias : [];
+            Array.isArray(d?.lineas) ? d.lineas :
+              Array.isArray(d?.categorias) ? d.categorias : [];
         const norm = arr.map(normalizeLine);
         return norm;
       } catch {
@@ -382,7 +382,7 @@ export default function MesDetalle() {
 
       const agruparPorCategoria = (lista) => lista.reduce((acc, movimiento) => {
         const nombreOriginal =
-          movimiento?.categoriaNombre || movimiento?.categoria || movimiento?.categoria_id_nombre || 'Sin categorÃ­a';
+          movimiento?.categoriaNombre || movimiento?.categoria || movimiento?.categoria_id_nombre || 'Sin Categoría';
         const key = normCat(nombreOriginal);
         if (!key) return acc;
         const monto = Math.abs(
@@ -390,7 +390,7 @@ export default function MesDetalle() {
         ) || 0;
         if (!Number.isFinite(monto)) return acc;
         if (!acc[key]) {
-          acc[key] = { total: 0, label: nombreOriginal || 'Sin categorÃ­a', movementIds: [] };
+          acc[key] = { total: 0, label: nombreOriginal || 'Sin Categoría', movementIds: [] };
         }
         acc[key].total += monto;
         const rawMovimientoId =
@@ -452,7 +452,7 @@ export default function MesDetalle() {
           if (!set.has(key)) {
             adicionales.push({
               id: `real-only-${tipoKey}-${key}`,
-              categoria: data.label || 'Sin categorÃ­a',
+              categoria: data.label || 'Sin Categoría',
               tipo: normalizeTipo(tipoKey),
               montoEstimado: 0,
               real: data.total,
@@ -507,29 +507,29 @@ export default function MesDetalle() {
         setPresupuestoCurrency(currency);
         setPresupuestoId(p.id);
 
-      // 2) resolver YYYY-MM desde mesNombreUrl usando /totales
-      const mesNumStr = mesANumero[(mesNombreUrl || '').toLowerCase().trim()];
-      if (!mesNumStr) throw new Error('Mes no vÃ¡lido');
+        // 2) resolver YYYY-MM desde mesNombreUrl usando /totales
+        const mesNumStr = mesANumero[(mesNombreUrl || '').toLowerCase().trim()];
+        if (!mesNumStr) throw new Error('Mes no válido');
 
-      const resTot = await http.get(`${baseURL}/api/presupuestos/${p.id}/totales`);
-      const totales = Array.isArray(resTot.data) ? resTot.data : [];
-      const mesesLista = Array.from(
-        new Set(
-          totales
-            .map((t) => (t?.mes ? String(t.mes) : ''))
-            .filter(Boolean)
-        )
-      ).sort((a, b) => a.localeCompare(b));
-      setMesesDisponibles(mesesLista);
-      const item = totales.find(t => String(t?.mes || '').endsWith(`-${mesNumStr}`));
-      if (!item?.mes) throw new Error('Mes no encontrado en totales');
+        const resTot = await http.get(`${baseURL}/api/presupuestos/${p.id}/totales`);
+        const totales = Array.isArray(resTot.data) ? resTot.data : [];
+        const mesesLista = Array.from(
+          new Set(
+            totales
+              .map((t) => (t?.mes ? String(t.mes) : ''))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        setMesesDisponibles(mesesLista);
+        const item = totales.find(t => String(t?.mes || '').endsWith(`-${mesNumStr}`));
+        if (!item?.mes) throw new Error('Mes no encontrado en totales');
 
-      setYm(item.mes);
-      setNombreMes(formatearMes(item.mes));
+        setYm(item.mes);
+        setNombreMes(formatearMes(item.mes));
 
-      // 3) cargar lineas reales
-      await cargarLineasConReales(p.id, item.mes, currency);
-  
+        // 3) cargar lineas reales
+        await cargarLineasConReales(p.id, item.mes, currency);
+
       } catch (err) {
         console.error(err);
         setLineas([]);
@@ -659,7 +659,7 @@ export default function MesDetalle() {
         });
       }
       const label = GUARD_FIELD_LABELS[field] || field;
-      setSnack({ open: true, message: `EdiciÃ³n manual desactivada para ${label}.`, severity: 'info' });
+      setSnack({ open: true, message: `Edición manual desactivada para ${label}.`, severity: 'info' });
     }
   }, [lineasCompleto, setSnack]);
 
@@ -769,7 +769,7 @@ export default function MesDetalle() {
   // ===== Export =====
   const handleExportExcel = () => {
     const excelData = [
-      ["Categoria", "Tipo", "Monto Estimado", "Monto Registrado", "Desvio"],
+      ["Categoria", "Tipo", "Monto Estimado", "Monto Registrado", "Desvío"],
       ...lineasCompleto.map((item) => {
         const estimado = Number(item.montoEstimado) || 0;
         const real = Number(item.real) || 0;
@@ -809,7 +809,7 @@ export default function MesDetalle() {
 
   const handleExportPdf = async () => {
     try {
-      const tableHead = [["Categoria", "Tipo", "Estimado", "Real", "Desvio"]];
+      const tableHead = [["Categoría", "Tipo", "Estimado", "Real", "Desvío"]];
       const tableBody = lineasCompleto.map((item) => {
         const estimado = Number(item.montoEstimado) || 0;
         const real = Number(item.real) || 0;
@@ -863,7 +863,7 @@ export default function MesDetalle() {
     }
   };
 
-// ===== CRUD =====
+  // ===== CRUD =====
   const toCamelPayload = (l) => ({
     categoria: l.categoria,
     tipo: l.tipo,
@@ -888,7 +888,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tienes permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -914,7 +914,7 @@ export default function MesDetalle() {
               return { ...prev, [l.id]: { categoria: false, real: false } };
             });
             await reloadMes();
-            setSnack({ open: true, message: 'LÃ­nea actualizada', severity: 'success' });
+            setSnack({ open: true, message: 'Línea actualizada', severity: 'success' });
             return;
           } catch (e1) {
             lastErr = e1;
@@ -928,13 +928,13 @@ export default function MesDetalle() {
                   return { ...prev, [l.id]: { categoria: false, real: false } };
                 });
                 await reloadMes();
-                setSnack({ open: true, message: 'LÃ­nea actualizada', severity: 'success' });
+                setSnack({ open: true, message: 'Línea actualizada', severity: 'success' });
                 return;
               } catch (e2) {
                 lastErr = e2;
               }
             }
-            // si 404/405 seguimos probando con otra URL o mÃ©todo
+            // si 404/405 seguimos probando con otra URL o método
           }
         }
       }
@@ -966,7 +966,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -974,7 +974,7 @@ export default function MesDetalle() {
       if (!presupuestoId || !ym || !lineaId) return;
       await http.delete(`${baseURL}/api/presupuestos/${presupuestoId}/mes/${ym}/lineas/${lineaId}`);
       await reloadMes();
-      setSnack({ open: true, message: 'LÃ­nea eliminada', severity: 'success' });
+      setSnack({ open: true, message: 'Línea eliminada', severity: 'success' });
     } catch (e) {
       console.error(e);
       setSnack({ open: true, message: 'Error al eliminar', severity: 'error' });
@@ -994,14 +994,14 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
       }
       if (!presupuestoId || !ym) return;
       if (!nueva.categoria || !nueva.tipo) {
-        setSnack({ open: true, message: 'CompletÃ¡ CategorÃ­a y tipo', severity: 'warning' });
+        setSnack({ open: true, message: 'Completá Categoría y tipo', severity: 'warning' });
         return;
       }
       const payload = {
@@ -1013,7 +1013,7 @@ export default function MesDetalle() {
       setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' });
       setAgregando(false);
       await reloadMes();
-      setSnack({ open: true, message: 'LÃ­nea agregada', severity: 'success' });
+      setSnack({ open: true, message: 'Línea agregada', severity: 'success' });
     } catch (e) {
       console.error(e);
       setSnack({ open: true, message: 'Error al agregar', severity: 'error' });
@@ -1025,7 +1025,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -1038,11 +1038,11 @@ export default function MesDetalle() {
         real: l.real === '' || l.real == null ? null : safeNumber(l.real),
       };
       await http.post(`${baseURL}/api/presupuestos/${presupuestoId}/mes/${ym}/lineas`, payload);
-      setSnack({ open: true, message: 'LÃ­nea agregada desde movimiento real.', severity: 'success' });
+      setSnack({ open: true, message: 'Línea agregada desde movimiento real.', severity: 'success' });
       await reloadMes();
     } catch (e) {
       console.error(e);
-      const msg = e?.response?.data?.message || 'Error al crear lÃ­nea';
+      const msg = e?.response?.data?.message || 'Error al crear línea';
       setSnack({ open: true, message: msg, severity: 'error' });
     }
   };
@@ -1061,7 +1061,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenÃ©s permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -1072,12 +1072,12 @@ export default function MesDetalle() {
 
       const { accion, desde, hasta } = bulkCfg;
       if (!desde || !hasta) {
-        setSnack({ open: true, message: 'CompletÃ¡ rango de meses', severity: 'warning' });
+        setSnack({ open: true, message: 'Completá rango de meses', severity: 'warning' });
         return;
       }
       const meses = mesesEntre(desde, hasta);
       if (meses.length === 0) {
-        setSnack({ open: true, message: 'Rango invÃ¡lido', severity: 'warning' });
+        setSnack({ open: true, message: 'Rango inválido', severity: 'warning' });
         return;
       }
 
@@ -1123,7 +1123,7 @@ export default function MesDetalle() {
       await reloadMes();
     } catch (e) {
       console.error(e);
-      setSnack({ open: true, message: 'Error en operaciÃ³n por mÃºltiples meses', severity: 'error' });
+      setSnack({ open: true, message: 'Error en operación por múltiples meses', severity: 'error' });
     }
   };
   // ===== Render =====
@@ -1226,11 +1226,11 @@ export default function MesDetalle() {
         </Tabs>
       </Box>
 
-      {/* === PestaÃ±a 0 === */}
+      {/* === Pestaña 0 === */}
       {tab === 0 && (
         <>
           <Grid container spacing={3} mb={2}>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.ingresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'success.main', mx: 'auto', mb: 1 }}>+</Avatar>
                 <Typography variant="h6">Ingresos</Typography>
@@ -1241,7 +1241,7 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.egresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'error.main', mx: 'auto', mb: 1 }}>-</Avatar>
                 <Typography variant="h6">Egresos</Typography>
@@ -1252,7 +1252,7 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: resultado >= 0 ? kpiColors.resultadoPos : kpiColors.resultadoNeg, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: resultado >= 0 ? 'info.main' : 'warning.main', mx: 'auto', mb: 1 }}>
                   {resultado >= 0 ? '?' : '?'}
@@ -1260,20 +1260,20 @@ export default function MesDetalle() {
                 <Typography variant="h6">Resultado</Typography>
                 <Typography variant="h4" fontWeight="bold">{formatCurrency(resultado)}</Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                  {resultado >= 0 ? 'SuperÃ¡vit' : 'DÃ©ficit'}
+                  {resultado >= 0 ? 'Superávit' : 'Déficit'}
                 </Typography>
               </Paper>
             </Grid>
           </Grid>
 
-          {/* GrÃƒÂ¡ficos */}
+          {/* Gráficos */}
           {pieDataIngresos.length > 0 ? (
             <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
-              <Typography variant="h6" gutterBottom fontWeight="600">DistribuciÃ³n de Ingresos por CategorÃ­a</Typography>
+              <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={pieDataIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                     {pieDataIngresos.map((_, i) => <Cell key={`ing-${i}`} fill={INGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
                   </Pie>
                   <RTooltip formatter={(value) => formatCurrency(value)} />
@@ -1289,7 +1289,7 @@ export default function MesDetalle() {
 
           {barDataIngresos.length > 0 && (
             <Paper sx={{ p: 3, mb: 2 }} ref={ingresosBarsRef}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Ingresos: Estimado vs Real por CategorÃ­a</Typography>
+              <Typography variant="h6" gutterBottom fontWeight="600">Ingresos: Estimado vs Real por Categoría</Typography>
               <Box sx={{ mt: 2 }}>
                 {barDataIngresos.map((item, index) => {
                   const estimadoN = safeNumber(item.estimado);
@@ -1302,7 +1302,7 @@ export default function MesDetalle() {
                         <Typography variant="subtitle1" fontWeight="600">{item.name}</Typography>
                         {sinPronostico && (
                           <Tooltip
-                            title="Este movimiento no tiene un monto estimado. HacÃ© clic para pronosticar."
+                            title="Este movimiento no tiene un monto estimado. Hacé clic para pronosticar."
                             disableHoverListener={!sinPronostico}
                           >
                             <Chip
@@ -1324,8 +1324,8 @@ export default function MesDetalle() {
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={INGRESO_EST_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={INGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1338,8 +1338,8 @@ export default function MesDetalle() {
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={INGRESO_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={INGRESO_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1354,11 +1354,11 @@ export default function MesDetalle() {
 
           {pieDataEgresos.length > 0 ? (
             <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
-              <Typography variant="h6" gutterBottom fontWeight="600">DistribuciÃ³n de Egresos por CategorÃ­a</Typography>
+              <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={pieDataEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                     {pieDataEgresos.map((_, i) => <Cell key={`egr-${i}`} fill={EGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
                   </Pie>
                   <RTooltip formatter={(value) => formatCurrency(value)} />
@@ -1374,7 +1374,7 @@ export default function MesDetalle() {
 
           {barDataEgresos.length > 0 && (
             <Paper sx={{ p: 3 }} ref={egresosBarsRef}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Egresos: Estimado vs Real por CategorÃ­a</Typography>
+              <Typography variant="h6" gutterBottom fontWeight="600">Egresos: Estimado vs Real por Categoría</Typography>
               <Box sx={{ mt: 2 }}>
                 {barDataEgresos.map((item, index) => {
                   const estimadoN = safeNumber(item.estimado);
@@ -1387,7 +1387,7 @@ export default function MesDetalle() {
                         <Typography variant="subtitle1" fontWeight="600">{item.name}</Typography>
                         {sinPronostico && (
                           <Tooltip
-                            title="Este movimiento no tiene un monto estimado. HacÃ© clic para pronosticar."
+                            title="Este movimiento no tiene un monto estimado. Hacé clic para pronosticar."
                             disableHoverListener={!sinPronostico}
                           >
                             <Chip
@@ -1409,8 +1409,8 @@ export default function MesDetalle() {
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={EGRESO_EST_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={EGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1423,8 +1423,8 @@ export default function MesDetalle() {
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={EGRESO_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={EGRESO_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1439,108 +1439,108 @@ export default function MesDetalle() {
         </>
       )}
 
-      {/* === PestaÃƒÂ±a 1: Tabla editable === */}
+      {/* === Pestaña 1: Tabla editable === */}
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
-          {/* Agregar nueva lÃƒÂ­nea */}
+          {/* Agregar nueva línea */}
           {esAdmin && (
-          <Box sx={{ mb: 2 }}>
-            {!agregando ? (
-              <Button startIcon={<AddCircleOutlineIcon />} variant="contained" onClick={() => setAgregando(true)}>
-                Agregar categorÃ­a
-              </Button>
-            ) : (
-              <Grid container spacing={1} alignItems="center">
-                <Grid item xs={12} md={4} sx={{ minWidth: 240 }}>
-                  <Autocomplete
-                    size="small"
-                    fullWidth
-                    value={nueva.categoria || null}
-                    onChange={(_, newValue) => {
-                      setNueva((s) => ({ ...s, categoria: newValue || '' }));
-                    }}
-                    options={opcionesNuevaLinea}
-                    freeSolo={false}
-                    disableClearable
-                    forcePopupIcon
-                    popupIcon={<KeyboardArrowDownIcon />}
-                    componentsProps={{
-                      popupIndicator: {
-                        disableRipple: true,
-                        disableFocusRipple: true,
-                        sx: {
-                          p: 0,
-                          m: 0,
-                          bgcolor: 'transparent',
-                          border: 'none',
-                          boxShadow: 'none',
-                          '&:hover': { bgcolor: 'transparent' },
-                          '& .MuiTouchRipple-root': { display: 'none' },
-                          '& .MuiSvgIcon-root': { fontSize: 24 },
-                        },
-                      },
-                      clearIndicator: { sx: { display: 'none' } },
-                    }}
-                    sx={{
-                      '& .MuiAutocomplete-endAdornment': {
-                        right: 0,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                      },
-                      '& .MuiAutocomplete-popupIndicator': { p: 0 },
-                      '& .MuiAutocomplete-popupIndicatorOpen .MuiSvgIcon-root': {
-                        transform: 'none',
-                      },
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="CategorÃ­a"
-                        size="small"
-                        fullWidth
-                        InputLabelProps={params.InputLabelProps}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={2}>
-                  <FormControl fullWidth size="small" sx={buildTipoSelectSx(nueva.tipo)}>
-                    <InputLabel>Tipo</InputLabel>
-                    <Select
-                      label="Tipo"
-                      value={nueva.tipo}
-                      onChange={(e) => setNueva((s) => ({ ...s, tipo: e.target.value }))}
+            <Box sx={{ mb: 2 }}>
+              {!agregando ? (
+                <Button startIcon={<AddCircleOutlineIcon />} variant="contained" onClick={() => setAgregando(true)}>
+                  Agregar Categoría
+                </Button>
+              ) : (
+                <Grid container spacing={1} alignItems="center">
+                  <Grid size={{ xs: 12, md: 4 }} sx={{ minWidth: 240 }}>
+                    <Autocomplete
                       size="small"
-                    >
-                      <MenuItem value="Ingreso">INGRESO</MenuItem>
-                      <MenuItem value="Egreso">EGRESO</MenuItem>
-                    </Select>
-                  </FormControl>
+                      fullWidth
+                      value={nueva.categoria || null}
+                      onChange={(_, newValue) => {
+                        setNueva((s) => ({ ...s, categoria: newValue || '' }));
+                      }}
+                      options={opcionesNuevaLinea}
+                      freeSolo={false}
+                      disableClearable
+                      forcePopupIcon
+                      popupIcon={<KeyboardArrowDownIcon />}
+                      componentsProps={{
+                        popupIndicator: {
+                          disableRipple: true,
+                          disableFocusRipple: true,
+                          sx: {
+                            p: 0,
+                            m: 0,
+                            bgcolor: 'transparent',
+                            border: 'none',
+                            boxShadow: 'none',
+                            '&:hover': { bgcolor: 'transparent' },
+                            '& .MuiTouchRipple-root': { display: 'none' },
+                            '& .MuiSvgIcon-root': { fontSize: 24 },
+                          },
+                        },
+                        clearIndicator: { sx: { display: 'none' } },
+                      }}
+                      sx={{
+                        '& .MuiAutocomplete-endAdornment': {
+                          right: 0,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                        },
+                        '& .MuiAutocomplete-popupIndicator': { p: 0 },
+                        '& .MuiAutocomplete-popupIndicatorOpen .MuiSvgIcon-root': {
+                          transform: 'none',
+                        },
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Categoría"
+                          size="small"
+                          fullWidth
+                          InputLabelProps={params.InputLabelProps}
+                        />
+                      )}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 2 }}>
+                    <FormControl fullWidth size="small" sx={buildTipoSelectSx(nueva.tipo)}>
+                      <InputLabel>Tipo</InputLabel>
+                      <Select
+                        label="Tipo"
+                        value={nueva.tipo}
+                        onChange={(e) => setNueva((s) => ({ ...s, tipo: e.target.value }))}
+                        size="small"
+                      >
+                        <MenuItem value="Ingreso">INGRESO</MenuItem>
+                        <MenuItem value="Egreso">EGRESO</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      label="Estimado"
+                      type="text"
+                      fullWidth
+                      size="small"
+                      InputLabelProps={{ sx: CENTERED_INPUT_LABEL_SX }}
+                      value={formatCurrencyInput(nueva.montoEstimado)}
+                      onChange={(e) => {
+                        const parsed = parseCurrency(e.target.value, { returnEmpty: true });
+                        setNueva((s) => ({ ...s, montoEstimado: parsed === '' ? '' : parsed }));
+                      }}
+                      inputProps={{ inputMode: 'numeric' }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 3 }} display="flex" gap={1} justifyContent="flex-end">
+                    <Button variant="outlined" onClick={() => { setAgregando(false); setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' }); }}>
+                      Cancelar
+                    </Button>
+                    <Button variant="contained" onClick={addLinea}>Guardar</Button>
+                  </Grid>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Estimado"
-                    type="text"
-                    fullWidth
-                    size="small"
-                    InputLabelProps={{ sx: CENTERED_INPUT_LABEL_SX }}
-                    value={formatCurrencyInput(nueva.montoEstimado)}
-                    onChange={(e) => {
-                      const parsed = parseCurrency(e.target.value, { returnEmpty: true });
-                      setNueva((s) => ({ ...s, montoEstimado: parsed === '' ? '' : parsed }));
-                    }}
-                    inputProps={{ inputMode: 'numeric' }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={3} display="flex" gap={1} justifyContent="flex-end">
-                  <Button variant="outlined" onClick={() => { setAgregando(false); setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' }); }}>
-                    Cancelar
-                  </Button>
-                  <Button variant="contained" onClick={addLinea}>Guardar</Button>
-                </Grid>
-              </Grid>
-            )}
-          </Box>
+              )}
+            </Box>
           )}
 
           <Divider sx={{ my: 2 }} />
@@ -1549,11 +1549,11 @@ export default function MesDetalle() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ fontWeight: 'bold', borderBottom: '1px solid var(--mui-palette-divider)' }}>
-                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>CategorÃ­a</th>
+                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Categoría</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Tipo</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Estimado</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Real</th>
-                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>DesvÃ­o</th>
+                  <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Desvío</th>
                   {esAdmin && <th style={{ padding: 12 }}>Acciones</th>}
                 </tr>
               </thead>
@@ -1597,7 +1597,7 @@ export default function MesDetalle() {
                           <Box display="flex" alignItems="center" gap={1}>
                             {esAdmin && manualEnabled ? (
                               (() => {
-                                // Oculta las categorÃ­as ya asignadas a otras lÃ­neas del mismo mes.
+                                // Oculta las categorías ya asignadas a otras líneas del mismo mes.
                                 const categoriaActual = e.categoria || '';
                                 const categoriaActualNorm = normCat(categoriaActual);
                                 const categoriasOcupadas = new Set(
@@ -1713,13 +1713,13 @@ export default function MesDetalle() {
                             />
                             {esAdmin && (
                               manualEnabled ? (
-                                <Tooltip title="Deshabilitar ediciÃ³n manual">
+                                <Tooltip title="Deshabilitar edición manual">
                                   <IconButton size="small" onClick={() => toggleManualGuard(item.id, 'categoria', false)}>
                                     <EditOffOutlinedIcon fontSize="small" color="warning" />
                                   </IconButton>
                                 </Tooltip>
                               ) : (
-                                <Tooltip title="Editar (categorÃ­a, tipo y estimado)">
+                                <Tooltip title="Editar (Categoría, tipo y estimado)">
                                   <IconButton size="small" onClick={() => requestManualUnlock(item.id, 'categoria')}>
                                     <EditOutlinedIcon fontSize="small" />
                                   </IconButton>
@@ -1745,55 +1745,55 @@ export default function MesDetalle() {
                             </Tooltip>
                           </Box>
                         </td>
-                        <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', color: desvio >= 0 ? '#66bb6a' : '#ef5350' , minWidth: 100 }}>
+                        <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', color: desvio >= 0 ? '#66bb6a' : '#ef5350', minWidth: 100 }}>
                           {desvio >= 0 ? '+' : '-'}{formatCurrency(Math.abs(desvio))}
                         </td>
                         {esAdmin && (
-                        <td style={{ padding: 12, whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
-                            <Tooltip title={esSoloReal ? 'Crear linea de presupuesto con este movimiento' : 'Guardar cambios'}>
-                              <span>
-                                <IconButton size="small" onClick={handleGuardar}>
-                                  <SaveOutlinedIcon />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                            {sinPronostico && (
-                              <Tooltip title="Movimiento sin pronosticar: no tiene monto estimado.">
-                                <Chip
-                                  size="small"
-                                  icon={<WarningAmberOutlinedIcon fontSize="small" />}
-                                  label="Sin pronosticar"
-                                  variant="filled"
-                                  sx={SIN_PRONOSTICO_CHIP_SX}
-                                />
+                          <td style={{ padding: 12, whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
+                              <Tooltip title={esSoloReal ? 'Crear linea de presupuesto con este movimiento' : 'Guardar cambios'}>
+                                <span>
+                                  <IconButton size="small" onClick={handleGuardar}>
+                                    <SaveOutlinedIcon />
+                                  </IconButton>
+                                </span>
                               </Tooltip>
-                            )}
-                            {!esSoloReal && (
-                              <>
-                                <Tooltip title="Eliminar esta linea">
-                                  <span>
-                                    <IconButton size="small" onClick={() => openDeletePrompt(item)}>
-                                      <DeleteOutlineIcon />
-                                    </IconButton>
-                                  </span>
+                              {sinPronostico && (
+                                <Tooltip title="Movimiento sin pronosticar: no tiene monto estimado.">
+                                  <Chip
+                                    size="small"
+                                    icon={<WarningAmberOutlinedIcon fontSize="small" />}
+                                    label="Sin pronosticar"
+                                    variant="filled"
+                                    sx={SIN_PRONOSTICO_CHIP_SX}
+                                  />
                                 </Tooltip>
-                                <Tooltip title="Aplicar esta linea a varios meses">
-                                  <span>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        if (baseIdx >= 0) abrirDlgVariosConFila(baseIdx);
-                                      }}
-                                    >
-                                      <ContentCopyIcon />
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                              </>
-                            )}
-                          </Box>
-                        </td>
+                              )}
+                              {!esSoloReal && (
+                                <>
+                                  <Tooltip title="Eliminar esta linea">
+                                    <span>
+                                      <IconButton size="small" onClick={() => openDeletePrompt(item)}>
+                                        <DeleteOutlineIcon />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                  <Tooltip title="Aplicar esta linea a varios meses">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          if (baseIdx >= 0) abrirDlgVariosConFila(baseIdx);
+                                        }}
+                                      >
+                                        <ContentCopyIcon />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </Box>
+                          </td>
                         )}
                       </tr>
                     );
@@ -1816,12 +1816,12 @@ export default function MesDetalle() {
         <Button variant="outlined" onClick={() => navigate(-1)}>Volver</Button>
       </Box>
 
-      {/* Confirmar ediciÃ³n manual */}
+      {/* Confirmar edición manual */}
       <Dialog open={guardPrompt.open} onClose={handleGuardCancel} maxWidth="sm" fullWidth>
-        <DialogTitle>{guardPrompt.title || 'Confirmar ediciÃ³n manual'}</DialogTitle>
+        <DialogTitle>{guardPrompt.title || 'Confirmar edición manual'}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            {guardPrompt.message || 'Esta acciÃ³n habilita la ediciÃ³n manual.'}
+            {guardPrompt.message || 'Esta acción habilita la edición manual.'}
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1836,10 +1836,10 @@ export default function MesDetalle() {
         <DialogTitle>Eliminar movimiento</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            Se eliminarÃ¡ la categorÃ­a <strong>{deletePrompt.categoria || 'sin nombre'}</strong> ({deletePrompt.tipo ? deletePrompt.tipo.toLowerCase() : 'movimiento'}) de este mes.
+            Se eliminará la Categoría <strong>{deletePrompt.categoria || 'sin nombre'}</strong> ({deletePrompt.tipo ? deletePrompt.tipo.toLowerCase() : 'movimiento'}) de este mes.
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Esta acciÃ³n no se puede deshacer.
+            Esta acción no se puede deshacer.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1848,14 +1848,14 @@ export default function MesDetalle() {
         </DialogActions>
       </Dialog>
 
-      {/* DiÃ¡logo Reglas rÃ¡pidas (visual) */}
+      {/* Diálogo Reglas rápidas (visual) */}
       <Dialog open={dlgReglas} onClose={() => setDlgReglas(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Reglas rÃ¡pidas (simulaciÃ³n)</DialogTitle>
+        <DialogTitle>Reglas rápidas (simulación)</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField select label="Ã�mbito" value={regla.ambito} onChange={(e) => setRegla((r) => ({ ...r, ambito: e.target.value }))}>
+            <TextField select label="Ámbito" value={regla.ambito} onChange={(e) => setRegla((r) => ({ ...r, ambito: e.target.value }))}>
               <MenuItem value="este_mes">Este mes</MenuItem>
-              <MenuItem value="hasta_fin">Desde este mes hasta fin de aÃ±o</MenuItem>
+              <MenuItem value="hasta_fin">Desde este mes hasta fin de año</MenuItem>
               <MenuItem value="rango">Rango personalizado</MenuItem>
             </TextField>
             {regla.ambito === 'rango' && (
@@ -1867,7 +1867,7 @@ export default function MesDetalle() {
             <TextField select label="Modo" value={regla.modo} onChange={(e) => setRegla((r) => ({ ...r, modo: e.target.value }))}>
               <MenuItem value="FIJO">Monto fijo</MenuItem>
               <MenuItem value="AJUSTE_PCT">% Ajuste mensual</MenuItem>
-              <MenuItem value="UNICO">Ãšnico (1 mes)</MenuItem>
+              <MenuItem value="UNICO">Único (1 mes)</MenuItem>
               <MenuItem value="CUOTAS">En cuotas</MenuItem>
             </TextField>
             <TextField
@@ -1890,9 +1890,9 @@ export default function MesDetalle() {
               <MenuItem value="Egresos">Solo egresos</MenuItem>
             </TextField>
             <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>PrevisualizaciÃ³n (conceptual)</Typography>
+              <Typography variant="subtitle2" gutterBottom>Previsualización (conceptual)</Typography>
               <Typography variant="body2" color="text.secondary">
-                AquÃ­ mostrarÃ­as una mini-grilla con las celdas impactadas antes de confirmar.
+                Aquí mostrarías una mini-grilla con las celdas impactadas antes de confirmar.
               </Typography>
             </Paper>
             <FormControlLabel control={<Switch checked={simulacion} onChange={(_, v) => setSimulacion(v)} />} label="Simular cambios (no impacta datos reales)" />
@@ -1900,28 +1900,28 @@ export default function MesDetalle() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDlgReglas(false)}>Cerrar</Button>
-          <Button variant="contained" disabled={!simulacion} onClick={() => { setDlgReglas(false); window.alert('SimulaciÃ³n: regla aplicada (visual).'); }}>
+          <Button variant="contained" disabled={!simulacion} onClick={() => { setDlgReglas(false); window.alert('Simulación: regla aplicada (visual).'); }}>
             Aplicar (visual)
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* DiÃ¡logo varios meses */}
+      {/* Diálogo varios meses */}
       <Dialog open={dlgVarios} onClose={() => setDlgVarios(false)} fullWidth maxWidth="sm">
         <DialogTitle>Aplicar a varios meses</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
-            <TextField select label="AcciÃ³n" value={bulkCfg.accion} onChange={(e) => setBulkCfg((s) => ({ ...s, accion: e.target.value }))}>
-              <MenuItem value="replicar">Replicar esta lÃ­nea en un rango</MenuItem>
-              <MenuItem value="eliminar">Eliminar esta categorÃ­a (mismo tipo) en un rango</MenuItem>
+            <TextField select label="Acción" value={bulkCfg.accion} onChange={(e) => setBulkCfg((s) => ({ ...s, accion: e.target.value }))}>
+              <MenuItem value="replicar">Replicar esta línea en un rango</MenuItem>
+              <MenuItem value="eliminar">Eliminar esta Categoría (mismo tipo) en un rango</MenuItem>
             </TextField>
             <Stack direction="row" spacing={2}>
               <TextField label="Desde (YYYY-MM)" value={bulkCfg.desde} onChange={(e) => setBulkCfg((s) => ({ ...s, desde: e.target.value }))} placeholder="2025-07" />
               <TextField label="Hasta (YYYY-MM)" value={bulkCfg.hasta} onChange={(e) => setBulkCfg((s) => ({ ...s, hasta: e.target.value }))} placeholder="2025-12" />
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              â€¢ Replicar: crea una lÃ­nea por cada mes con los mismos valores (no deduplica).<br />
-              â€¢ Eliminar: busca por <b>categorÃ­a + tipo</b> en cada mes y borra coincidencias.
+              • Replicar: crea una línea por cada mes con los mismos valores (no deduplica).<br />
+              • Eliminar: busca por <b>Categoría + tipo</b> en cada mes y borra coincidencias.
             </Typography>
           </Stack>
         </DialogContent>

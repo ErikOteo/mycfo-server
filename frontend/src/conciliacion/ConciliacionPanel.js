@@ -76,22 +76,22 @@ export default function ConciliacionPanel() {
       let response;
       if (filtroEstado === "sin-conciliar") {
         response = await conciliacionApi.obtenerMovimientosSinConciliar(
-          paginaActual, 
-          tamanioPagina, 
-          'fechaEmision', 
+          paginaActual,
+          tamanioPagina,
+          'fechaEmision',
           'desc',
           currency
         );
       } else {
         response = await conciliacionApi.obtenerTodosLosMovimientos(
-          paginaActual, 
-          tamanioPagina, 
-          'fechaEmision', 
+          paginaActual,
+          tamanioPagina,
+          'fechaEmision',
           'desc',
           currency
         );
       }
-      
+
       // El backend devuelve un objeto Page con content, totalPages, totalElements, etc.
       setMovimientos(response.content || []);
       setTotalPaginas(response.totalPages || 0);
@@ -268,12 +268,12 @@ export default function ConciliacionPanel() {
           gutterBottom
           sx={{ fontWeight: 600, color: 'text.primary' }}
         >
-        Conciliación de Movimientos
-      </Typography>
-      <Typography variant="body2" sx={{ color: 'text.primary' }}>
-        Vincula tus movimientos bancarios con documentos comerciales
-      </Typography>
-    </Box>
+          Conciliación de Movimientos
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.primary' }}>
+          Vincula tus movimientos bancarios con documentos comerciales
+        </Typography>
+      </Box>
 
       {/* Estadísticas */}
       {estadisticas && (
@@ -454,9 +454,7 @@ export default function ConciliacionPanel() {
         >
           {/* Columna izquierda: Movimientos */}
           <Grid
-            item
-            xs={12}
-            md={6}
+            size={{ xs: 12, md: 6 }}
             sx={{
               height: "100%",
               minWidth: 0,
@@ -533,9 +531,7 @@ export default function ConciliacionPanel() {
 
           {/* Columna derecha: Sugerencias */}
           <Grid
-            item
-            xs={12}
-            md={6}
+            size={{ xs: 12, md: 6 }}
             sx={{
               height: "100%",
               minWidth: 0,

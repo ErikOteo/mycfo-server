@@ -1,6 +1,9 @@
 name: Deploy MyCFO to Azure
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches: [ "main" ]
 
