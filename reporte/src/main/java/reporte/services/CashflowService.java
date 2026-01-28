@@ -29,7 +29,8 @@ public class CashflowService {
         String url = registroUrl + "/registros";
         RegistroDTO[] registros = restTemplate.getForObject(url, RegistroDTO[].class);
 
-        if (registros == null) return List.of();
+        if (registros == null)
+            return List.of();
 
         // Filtrar solo ingresos y egresos válidos para el año
         List<String> mediosValidos = List.of("Efectivo", "Transferencia", "MercadoPago");
@@ -38,9 +39,9 @@ public class CashflowService {
                 .filter(r -> r.getFechaEmision() != null
                         && r.getFechaEmision().toLocalDate().getYear() == anio
                         && r.getTipo() != null
-                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo()))
-                        && r.getMedioPago() != null
-                        && mediosValidos.contains(r.getMedioPago()))
+                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo())))
+                // && r.getMedioPago() != null
+                // && mediosValidos.contains(r.getMedioPago()))
                 .collect(Collectors.toList());
     }
 
@@ -77,8 +78,8 @@ public class CashflowService {
                     url,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {}
-            );
+                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {
+                    });
         } catch (HttpClientErrorException e) {
             var status = e.getStatusCode();
             if (status.value() == HttpStatus.UNAUTHORIZED.value() || status.value() == HttpStatus.FORBIDDEN.value()) {
@@ -97,9 +98,9 @@ public class CashflowService {
                 .filter(r -> r.getFechaEmision() != null
                         && r.getFechaEmision().toLocalDate().getYear() == anio
                         && r.getTipo() != null
-                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo()))
-                        && r.getMedioPago() != null
-                        && mediosValidos.contains(r.getMedioPago()))
+                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo())))
+                // && r.getMedioPago() != null
+                // && mediosValidos.contains(r.getMedioPago()))
                 .collect(Collectors.toList());
     }
 

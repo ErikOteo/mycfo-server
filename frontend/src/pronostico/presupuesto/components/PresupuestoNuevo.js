@@ -2,8 +2,10 @@ import * as React from 'react';
 import {
   Box, Typography, Button, Paper, Table, TableHead, TableRow,
   TableCell, TableBody, Grid, TextField, MenuItem, IconButton,
-  Stepper, Step, StepLabel, Alert, AlertTitle, Divider, Tooltip, Chip, Stack, FormControlLabel, Switch, CircularProgress, Autocomplete
+  Stepper, Step, StepLabel, Alert, AlertTitle, Divider, Tooltip, Chip, Stack, FormControlLabel, Switch, CircularProgress, Autocomplete,
+  styled
 } from '@mui/material';
+import CheckIcon from '@mui/icons-material/Check';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import MonthRangeSelect from './MonthRangeSelect';
 import CustomSelect from '../../../shared-components/CustomSelect';
@@ -19,6 +21,60 @@ import API_CONFIG from '../../../config/api-config';
 import { getStoredCurrencyPreference, persistCurrencyPreference } from '../../../shared-components/CurrencyTabs';
 import { CURRENCY_OPTIONS, stripCurrencyTag, withCurrencyTag } from '../utils/currencyTag';
 import { fetchCategorias } from '../../../shared-services/categoriasService';
+
+const CustomStepIconRoot = styled('div')(({ theme, ownerState }) => {
+  const { active, completed } = ownerState;
+
+  const styles = {
+    backgroundColor: 'transparent',
+    zIndex: 1,
+    color: '#000',
+    width: 24,
+    height: 24,
+    display: 'flex',
+    borderRadius: '50%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    border: '3px solid black', // Círculo grueso negro
+    fontWeight: '900', // Negrita fuerte
+    fontSize: '0.9rem',
+  };
+
+  if (active) {
+    return {
+      ...styles,
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.primary.contrastText,
+      border: 'none',
+      width: 32, // un poco más destacado
+      height: 32,
+      fontWeight: 'bold',
+      boxShadow: '0 4px 10px 0 rgba(0,0,0,.25)',
+    };
+  }
+
+  if (completed) {
+    return {
+      ...styles,
+      backgroundColor: theme.palette.primary.main, // Igual que el activo
+      color: theme.palette.primary.contrastText,
+      border: 'none',
+      width: 34, // "un poquitito mas grande"
+      height: 34,
+    };
+  }
+
+  return styles;
+});
+
+function CustomStepIcon(props) {
+  const { active, completed, className, icon } = props;
+  return (
+    <CustomStepIconRoot ownerState={{ active, completed }} className={className}>
+      {completed ? <CheckIcon sx={{ fontSize: 20 }} /> : icon}
+    </CustomStepIconRoot>
+  );
+}
 
 const tableRowStyle = {
   backgroundColor: 'rgba(255, 255, 255, 0.02)',
@@ -209,7 +265,7 @@ export default function PresupuestoNuevo() {
     if (categorias.length === 0) return 'Agregá al menos una categoría.';
     if (categorias.some(c => !c.categoria?.trim())) return 'Todas las categorías deben tener nombre.';
     if (categorias.some(c => !c.tipo?.trim())) return 'Todas las categorías deben tener tipo.';
-    
+
     // Helper numérico
     const isBlankNum = (v) => v === '' || v == null || Number.isNaN(Number(v));
     const isPositiveInt = (v) => Number.isInteger(Number(v)) && Number(v) >= 1;
@@ -594,9 +650,9 @@ export default function PresupuestoNuevo() {
       <Typography variant="subtitle1" gutterBottom>Planificá tus ingresos y egresos esperados</Typography>
 
       <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>
-        <Step><StepLabel>Datos básicos</StepLabel></Step>
-        <Step><StepLabel>Categorías & Reglas</StepLabel></Step>
-        <Step><StepLabel>Vista previa & Guardar</StepLabel></Step>
+        <Step><StepLabel StepIconComponent={CustomStepIcon}>Datos básicos</StepLabel></Step>
+        <Step><StepLabel StepIconComponent={CustomStepIcon}>Categorías & Reglas</StepLabel></Step>
+        <Step><StepLabel StepIconComponent={CustomStepIcon}>Vista previa & Guardar</StepLabel></Step>
       </Stepper>
 
       {errors && <Alert severity="warning" sx={{ mb: 2 }}>{errors}</Alert>}
@@ -605,32 +661,33 @@ export default function PresupuestoNuevo() {
       {step === 0 && (
         <>
           <Box sx={{ display: 'flex', gap: 2, mb: 3, flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <TextField 
-                label="Nombre del presupuesto" 
-                value={nombreBase} 
-                onChange={e => setNombreBase(stripCurrencyTag(e.target.value))} 
-                fullWidth 
-                variant="outlined"
-                sx={{ flex: 1, minWidth: 260 }}
+            <TextField
+              label="Nombre del presupuesto"
+              value={nombreBase}
+              onChange={e => setNombreBase(stripCurrencyTag(e.target.value))}
+              fullWidth
+              variant="outlined"
+              sx={{ minWidth: 260 }}
+            />
+
+            <Box sx={{ minWidth: 220, maxWidth: 300 }}>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Moneda</Typography>
+              <CustomSelect
+                value={currency}
+                size="small"
+                fullWidth
+                options={CURRENCY_OPTIONS}
+                width="100%"
+                onChange={(val) => {
+                  const next = val || 'ARS';
+                  setCurrency(next);
+                  persistCurrencyPreference(next);
+                }}
               />
-              <Box sx={{ minWidth: 220 }}>
-                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Moneda</Typography>
-                <CustomSelect
-                  value={currency}
-                  size="small"
-                  fullWidth
-                  options={CURRENCY_OPTIONS}
-                  width="100%"
-                  onChange={(val) => {
-                    const next = val || 'ARS';
-                    setCurrency(next);
-                    persistCurrencyPreference(next);
-                  }}
-                />
-              </Box>
             </Box>
+
             <Box sx={{ maxWidth: 300 }}>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Período</Typography>
               <MonthRangeSelect
                 value={{
                   from: fechaDesde,
