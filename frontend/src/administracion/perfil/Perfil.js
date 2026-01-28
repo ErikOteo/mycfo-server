@@ -18,7 +18,7 @@ export default function Perfil() {
 
   // Estado para el color del avatar
   const [avatarColor, setAvatarColor] = useState(localStorage.getItem('avatarColor') || '#008375');
-  const colors = ['#008375', '#1976d2', '#7b1fa2', '#ed6c02', '#c2185b', '#2e7d32', '#757575', '#d32f2f', '#fbc02d'];
+  const colors = ['#008375', '#2e7d32', '#29B6F6', '#1976d2', '#7b1fa2', '#c2185b', '#d32f2f', '#ed6c02', '#fbc02d', '#757575'];
 
   // Manejo del cambio de color
   const handleColorChange = (color) => {
@@ -90,6 +90,9 @@ export default function Perfil() {
     );
   }
 
+  // Helper para determinar si es un color claro
+  const isLightColor = (c) => ['#ffffff'].includes(c);
+
   return (
     <Box sx={{ width: "100%", maxWidth: 1000, mx: "auto", mt: 4, p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -124,21 +127,28 @@ export default function Perfil() {
           Elige un color de fondo para tu inicial.
         </Typography>
 
-        <Stack direction="row" alignItems="center" spacing={3}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={3}>
           {/* Previsualización */}
           <Avatar
             sx={{
               width: 56,
               height: 56,
               bgcolor: avatarColor,
-              fontSize: '1.5rem'
+              fontSize: '1.5rem',
+              color: isLightColor(avatarColor) ? '#000000' : '#ffffff', // Texto negro si el fondo es claro
+              border: isLightColor(avatarColor) ? '1px solid #e0e0e0' : 'none' // Borde suave si es claro
             }}
           >
             {(perfil.nombre || 'U').charAt(0).toUpperCase()}
           </Avatar>
 
           {/* Selector de colores */}
-          <Stack direction="row" spacing={1.5}>
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: 'repeat(5, auto)', sm: 'repeat(10, auto)' },
+            gap: 1.5,
+            justifyContent: { xs: 'center', sm: 'flex-start' }
+          }}>
             {colors.map((color) => (
               <Box
                 key={color}
@@ -149,9 +159,11 @@ export default function Perfil() {
                   borderRadius: '50%',
                   bgcolor: color,
                   cursor: 'pointer',
-                  border: avatarColor === color ? '3px solid #fff' : 'none',
+                  border: avatarColor === color
+                    ? '3px solid #fff'
+                    : (isLightColor(color) ? '1px solid #bdbdbd' : 'none'),
                   boxShadow: avatarColor === color
-                    ? `0 0 0 2px ${color}` // Anillo exterior simulando selección
+                    ? `0 0 0 2px ${isLightColor(color) ? '#9e9e9e' : color}`
                     : 'none',
                   transition: 'transform 0.2s',
                   '&:hover': {
@@ -160,7 +172,7 @@ export default function Perfil() {
                 }}
               />
             ))}
-          </Stack>
+          </Box>
         </Stack>
       </Box>
 
