@@ -278,7 +278,14 @@ export default function TablaRegistrosV2() {
     } finally {
       setLoading(false);
     }
-  }, [currency, paginationModel, debouncedSearch, searchDateISO, fechaDesde, fechaHasta]);
+  }, [
+    currency,
+    paginationModel,
+    debouncedSearch,
+    searchDateISO,
+    fechaDesde,
+    fechaHasta,
+  ]);
 
   const initializedRef = useRef(false);
 
@@ -458,7 +465,7 @@ export default function TablaRegistrosV2() {
       console.error("Datos enviados:", formData);
       alert(
         "❌ Error al actualizar: " +
-        (error.response?.data?.mensaje || error.message),
+          (error.response?.data?.mensaje || error.message),
       );
     }
   };
@@ -487,7 +494,7 @@ export default function TablaRegistrosV2() {
       console.error("Error eliminando movimiento:", error);
       alert(
         "❌ Error al eliminar: " +
-        (error.response?.data?.mensaje || error.message),
+          (error.response?.data?.mensaje || error.message),
       );
     }
   };
@@ -765,12 +772,16 @@ export default function TablaRegistrosV2() {
         const isInteger = Number.isInteger(valorAbs);
         const formatted = new Intl.NumberFormat("es-AR", {
           minimumFractionDigits: isInteger ? 0 : 2,
-          maximumFractionDigits: 2
+          maximumFractionDigits: 2,
         }).format(valorAbs);
 
         return (
-          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: "24px", color }}>
-            {`${signo}${formatted} ${moneda}`}
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            sx={{ lineHeight: "24px", color }}
+          >
+            {`${signo}${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(Math.abs(valor))} ${moneda}`}
           </Typography>
         );
       },
@@ -906,15 +917,30 @@ export default function TablaRegistrosV2() {
         const isAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
         return (
           <Box sx={{ display: "flex", gap: 0.5 }}>
-            <IconButton size="small" color="info" onClick={() => handleVerMovimiento(params.row)} title="Ver detalles">
+            <IconButton
+              size="small"
+              color="info"
+              onClick={() => handleVerMovimiento(params.row)}
+              title="Ver detalles"
+            >
               <VisibilityIcon fontSize="small" />
             </IconButton>
             {isAdmin && (
               <>
-                <IconButton size="small" color="primary" onClick={() => handleEditarMovimiento(params.row)} title="Editar">
+                <IconButton
+                  size="small"
+                  color="primary"
+                  onClick={() => handleEditarMovimiento(params.row)}
+                  title="Editar"
+                >
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" color="error" onClick={() => handleEliminarClick(params.row)} title="Eliminar">
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleEliminarClick(params.row)}
+                  title="Eliminar"
+                >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </>
@@ -974,24 +1000,18 @@ export default function TablaRegistrosV2() {
     const headers = exportColumns.map((c) => c.headerName);
     const excelData = [
       headers,
-      ...registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field))),
+      ...registros.map((row) =>
+        exportColumns.map((c) => formatValorExport(row, c.field)),
+      ),
     ];
 
     const colsConfig = exportColumns.map(() => ({ wch: 18 }));
 
-    exportToExcel(
-      excelData,
-      "Movimientos",
-      "Movimientos",
-      colsConfig,
-      [],
-      [],
-      {
-        headerRows: [0],
-        zebra: true,
-        freezePane: { rowSplit: 1, colSplit: 1 },
-      },
-    );
+    exportToExcel(excelData, "Movimientos", "Movimientos", colsConfig, [], [], {
+      headerRows: [0],
+      zebra: true,
+      freezePane: { rowSplit: 1, colSplit: 1 },
+    });
   };
 
   const handleExportPdf = async () => {
@@ -999,17 +1019,17 @@ export default function TablaRegistrosV2() {
     if (!registros.length) return;
 
     const head = [exportColumns.map((c) => c.headerName)];
-    const body = registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field)));
+    const body = registros.map((row) =>
+      exportColumns.map((c) => formatValorExport(row, c.field)),
+    );
 
     const categorias = new Set(
-      registros
-        .map((r) => r.categoria)
-        .filter(Boolean),
+      registros.map((r) => r.categoria).filter(Boolean),
     );
 
     await exportPdfReport({
       title: "Movimientos financieros",
-      subtitle: "Exportaci?n",
+      subtitle: "Exportación",
       charts: [],
       table: { head, body },
       fileName: "Movimientos",
@@ -1028,9 +1048,7 @@ export default function TablaRegistrosV2() {
           { label: "Categorias", value: categorias.size.toString() },
           { label: "Orden", value: "Fecha desc" },
         ],
-        summary: [
-          "Incluye filtros y rango de fechas aplicados.",
-        ],
+        summary: ["Incluye filtros y rango de fechas aplicados."],
       },
     });
   };
@@ -1198,7 +1216,10 @@ export default function TablaRegistrosV2() {
           <Button variant="contained" onClick={() => navigate("/carga")}>
             Cargar movimiento
           </Button>
-          <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
+          <ExportadorSimple
+            onExportPdf={handleExportPdf}
+            onExportExcel={handleExportExcel}
+          />
         </Box>
       </Box>
 
@@ -1234,7 +1255,10 @@ export default function TablaRegistrosV2() {
             ),
           }}
           slotProps={{
-            toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } },
+            toolbar: {
+              showQuickFilter: true,
+              quickFilterProps: { debounceMs: 500 },
+            },
           }}
           localeText={{
             columnMenuSortAsc: "Ordenar Ascendente",
@@ -1265,19 +1289,34 @@ export default function TablaRegistrosV2() {
             "& .MuiDataGrid-columnHeader": {
               "&:focus": { outline: "none" },
             },
-            "& .MuiDataGrid-sortIcon": {
-              display: "none",
+            "& .MuiDataGrid-columnHeader:first-of-type": { borderLeft: "none" },
+            "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
+            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
+            "& .MuiDataGrid-columnSeparator": {
+              opacity: 1,
+              visibility: "visible",
+              color: "#d5d5d5",
+            },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: "rgba(0, 0, 0, 0.02)",
+            },
+            "& .MuiDataGrid-sortIcon": { display: "none" },
+            "& .MuiDataGrid-columnHeaderTitleContainer": {
+              paddingRight: "8px",
+              display: "flex",
+              alignItems: "center",
             },
             "& .MuiDataGrid-iconButtonContainer": {
               visibility: "hidden",
             },
-            "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer": {
-              visibility: "visible",
-            },
+            "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer":
+              {
+                visibility: "visible",
+              },
             "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
-            {
-              display: "none",
-            },
+              {
+                display: "none",
+              },
             "& .MuiDataGrid-row:hover": {
               backgroundColor: (theme) => theme.palette.action.hover,
             },
@@ -1293,7 +1332,12 @@ export default function TablaRegistrosV2() {
         />
       </Box>
 
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle sx={{ fontWeight: 600 }}>
           {dialogMode === "edit"
             ? "Editar movimiento"
@@ -1325,7 +1369,10 @@ export default function TablaRegistrosV2() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
         <DialogTitle>⚠️ Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1349,7 +1396,9 @@ export default function TablaRegistrosV2() {
               </Typography>
             </Box>
           )}
-          <Alert severity="error" sx={{ mt: 2 }}>Esta acción no se puede deshacer.</Alert>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Esta acción no se puede deshacer.
+          </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
