@@ -21,7 +21,8 @@ public class ChatbotController {
     public Map<String, Object> chat(@RequestBody ChatRequest request) {
         ChatbotVertexService.ChatbotResult result = chatbotVertexService.chat(
                 request != null ? request.message() : null,
-                request != null ? request.module() : null
+                request != null ? request.module() : null,
+                request != null ? request.context() : null
         );
         return Map.of(
                 "response", result.responseText(),
@@ -29,7 +30,7 @@ public class ChatbotController {
         );
     }
 
-    public record ChatRequest(String message, String module) {
+    public record ChatRequest(String message, String module, Map<String, Object> context) {
     }
 }
 

@@ -8,6 +8,7 @@ import GraficoPorCategoria from './components/GraficoPorCategoria';
 import API_CONFIG from '../../config/api-config';
 import { exportToExcel } from '../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../utils/exportPdfUtils';
+import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
 
 const URL_REGISTRO = API_CONFIG.REGISTRO;
 
@@ -20,6 +21,34 @@ export default function MovimientosCargados() {
   const [error, setError] = useState(null);
   const [vista, setVista] = useState("tabla"); // Vista actual
   const [logoDataUrl, setLogoDataUrl] = useState(null);
+
+  const visibleRows = filteredData.length > 0 ? filteredData : data;
+  const sampleRows = React.useMemo(() => {
+    const rows = Array.isArray(visibleRows) ? visibleRows : [];
+    return rows.slice(0, 5).map((row) => ({
+      id: row.id ?? row.uuid ?? row.codigo ?? null,
+      tipo: row.tipo ?? row.tipoMovimiento ?? row.tipoOperacion ?? null,
+      montoTotal: row.montoTotal ?? row.monto ?? row.importe ?? null,
+      moneda: row.moneda ?? row.monedaCodigo ?? null,
+      fechaEmision: row.fechaEmision ?? row.fecha ?? row.fechaRegistro ?? null,
+      categoria: row.categoria ?? row.categoriaNombre ?? row.categoriaDescripcion ?? null,
+      categorias: Array.isArray(row.categorias) ? row.categorias : undefined,
+    }));
+  }, [visibleRows]);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "movimientos-cargados",
+      vista,
+      totalRegistros: data.length,
+      registrosFiltrados: filteredData.length,
+      filtrosActivos: filterModel?.items ?? [],
+      muestra: sampleRows,
+    }),
+    [vista, data.length, filteredData.length, filterModel, sampleRows]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   useEffect(() => {
     const loadLogo = async () => {

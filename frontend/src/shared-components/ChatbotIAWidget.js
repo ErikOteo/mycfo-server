@@ -4,12 +4,14 @@ import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { useChatbotContext } from './ChatbotContext';
 
 // Asegúrate de configurar la URL correcta de tu backend de IA
 const IA_API_URL = 'http://localhost:8083/api/chat';
 
 const ChatbotWidget = ({ currentModule = 'general' }) => {
     const theme = useTheme();
+    const { context } = useChatbotContext();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
         { sender: 'bot', text: 'Hola, soy tu asistente virtual. ¿En qué puedo ayudarte con este módulo?' }
@@ -42,7 +44,8 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                 },
                 body: JSON.stringify({
                     message: userMessage.text,
-                    module: currentModule
+                    module: currentModule,
+                    context: context || null
                 }),
             });
 
@@ -63,25 +66,15 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
         if (e.key === 'Enter') handleSend();
     };
 
-    // Definición de colores según el modo
-    const isDarkMode = theme.palette.mode === 'dark';
-
-    const botBubbleColor = isDarkMode ? theme.palette.grey[800] : '#ffffff';
-    const botTextColor = theme.palette.text.primary; // Blanco en dark, Negro en light
-
-    const userBubbleColor = theme.palette.primary.main;
-    const userTextColor = theme.palette.primary.contrastText;
-
-    const chatBackgroundColor = isDarkMode ? theme.palette.grey[900] : '#f5f5f5';
-    const inputAreaColor = isDarkMode ? theme.palette.grey[800] : '#ffffff';
+    const palette = theme.vars?.palette ?? theme.palette;
 
     return (
         <>
             {/* Botón flotante */}
             {!isOpen && (
-                <Fab
-                    color="primary"
-                    aria-label="chat"
+                <Fab 
+                    color="primary" 
+                    aria-label="chat" 
                     onClick={() => setIsOpen(true)}
                     sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}
                 >
@@ -91,9 +84,9 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
 
             {/* Ventana de Chat */}
             {isOpen && (
-                <Paper
-                    elevation={12}
-                    sx={{
+                <Paper 
+                    elevation={12} 
+                    sx={(theme) => ({
                         position: 'fixed',
                         bottom: 20,
                         right: 20,
@@ -104,20 +97,21 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                         zIndex: 1000,
                         borderRadius: 2,
                         overflow: 'hidden',
-                        bgcolor: 'background.paper',
-                        border: isDarkMode ? `1px solid ${theme.palette.grey[700]}` : 'none'
-                    }}
+                        bgcolor: (theme.vars || theme).palette.background.paper,
+                        border: `1px solid ${(theme.vars || theme).palette.divider}`,
+                        color: (theme.vars || theme).palette.text.primary,
+                    })}
                 >
                     {/* Header */}
-                    <Box sx={{
-                        p: 2,
-                        bgcolor: 'primary.main',
-                        color: 'primary.contrastText',
-                        display: 'flex',
-                        justifyContent: 'space-between',
+                    <Box sx={(theme) => ({ 
+                        p: 2, 
+                        bgcolor: (theme.vars || theme).palette.primary.main, 
+                        color: (theme.vars || theme).palette.primary.contrastText, 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
                         alignItems: 'center',
                         boxShadow: 1
-                    }}>
+                    })}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <SmartToyIcon />
                             <Typography variant="subtitle1" fontWeight="bold">Asistente MyCFO</Typography>
@@ -128,29 +122,34 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     </Box>
 
                     {/* Área de mensajes */}
-                    <Box sx={{
-                        flex: 1,
-                        p: 2,
-                        overflowY: 'auto',
-                        bgcolor: chatBackgroundColor,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 1.5
-                    }}>
+                    <Box sx={(theme) => ({ 
+                        flex: 1, 
+                        p: 2, 
+                        overflowY: 'auto', 
+                        bgcolor: (theme.vars || theme).palette.background.default,
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: 1.5 
+                    })}>
                         {messages.map((msg, index) => (
-                            <Box
-                                key={index}
-                                sx={{
+                            <Box 
+                                key={index} 
+                                sx={(theme) => ({ 
                                     alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                                     maxWidth: '85%',
-                                    bgcolor: msg.sender === 'user' ? userBubbleColor : botBubbleColor,
-                                    color: msg.sender === 'user' ? userTextColor : botTextColor,
+                                    bgcolor: msg.sender === 'user' 
+                                        ? (theme.vars || theme).palette.primary.main 
+                                        : (theme.vars || theme).palette.background.paper,
+                                    color: msg.sender === 'user' 
+                                        ? (theme.vars || theme).palette.primary.contrastText 
+                                        : (theme.vars || theme).palette.text.primary,
                                     p: 1.5,
                                     borderRadius: 2,
-                                    boxShadow: 1,
+                                    boxShadow: 2,
                                     borderTopLeftRadius: msg.sender === 'bot' ? 0 : 2,
                                     borderTopRightRadius: msg.sender === 'user' ? 0 : 2,
-                                }}
+                                    border: `1px solid ${(theme.vars || theme).palette.divider}`
+                                })}
                             >
                                 <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
                                     {msg.text}
@@ -166,15 +165,14 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     </Box>
 
                     {/* Input Area */}
-                    <Box sx={{
-                        p: 2,
-                        bgcolor: inputAreaColor,
-                        borderTop: 1,
-                        borderColor: 'divider',
-                        display: 'flex',
+                    <Box sx={(theme) => ({ 
+                        p: 2, 
+                        bgcolor: (theme.vars || theme).palette.background.paper, 
+                        borderTop: `1px solid ${(theme.vars || theme).palette.divider}`, 
+                        display: 'flex', 
                         gap: 1,
                         alignItems: 'center'
-                    }}>
+                    })}>
                         <TextField
                             fullWidth
                             size="small"
@@ -186,19 +184,37 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                             variant="outlined"
                             sx={{
                                 '& .MuiOutlinedInput-root': {
-                                    bgcolor: isDarkMode ? theme.palette.background.default : 'white',
-                                    color: theme.palette.text.primary
-                                }
+                                    bgcolor: palette.background.default,
+                                    color: palette.text.primary,
+                                    '& fieldset': {
+                                        borderColor: palette.divider,
+                                    },
+                                    '&:hover fieldset': {
+                                        borderColor: palette.text.secondary,
+                                    },
+                                },
+                                '& .MuiInputBase-input::placeholder': {
+                                    color: palette.text.secondary,
+                                    opacity: 1,
+                                },
                             }}
                         />
-                        <IconButton
-                            color="primary"
-                            onClick={handleSend}
+                        <IconButton 
+                            color="primary" 
+                            onClick={handleSend} 
                             disabled={isLoading || !input.trim()}
-                            sx={{
-                                bgcolor: isDarkMode ? theme.palette.action.hover : 'transparent',
-                                '&:hover': { bgcolor: isDarkMode ? theme.palette.action.selected : 'action.hover' }
-                            }}
+                            sx={(theme) => ({
+                                bgcolor: (theme.vars || theme).palette.primary.dark,
+                                color: (theme.vars || theme).palette.primary.contrastText,
+                                '&:hover': {
+                                    bgcolor: (theme.vars || theme).palette.primary.main,
+                                },
+                                '&.Mui-disabled': {
+                                    bgcolor: (theme.vars || theme).palette.primary.dark,
+                                    color: (theme.vars || theme).palette.primary.contrastText,
+                                    opacity: 0.6,
+                                },
+                            })}
                         >
                             <SendIcon />
                         </IconButton>

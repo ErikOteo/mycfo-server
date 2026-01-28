@@ -11,6 +11,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Header from "./components/Header";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import ChatbotIaWidget from "../shared-components/ChatbotIAWidget"; // Corregido: ChatbotIAWidget con IA en mayúsculas
+import { ChatbotContextProvider } from "../shared-components/ChatbotContext";
 
 const Home = React.memo(function Home(props) {
   const location = useLocation();
@@ -22,8 +23,52 @@ const Home = React.memo(function Home(props) {
 
   // Determinar el módulo actual basado en la ruta
   const currentModule = React.useMemo(() => {
-    const path = location.pathname.split('/')[1]; // Obtiene la primera parte de la ruta (ej. "dashboard")
-    return path || 'dashboard'; // Si la ruta es solo "/", usa "dashboard" como default
+    const segment = location.pathname.split("/")[1] || "dashboard";
+
+    const registroSegments = new Set([
+      "carga",
+      "ver-movimientos",
+      "ver-facturas",
+      "conciliacion",
+      "carga-movimientos",
+      "mercado-pago",
+    ]);
+
+    const reporteSegments = new Set([
+      "dashboard",
+      "reporte-mensual",
+      "flujo-de-caja",
+      "estado-de-resultado",
+    ]);
+
+    const pronosticoSegments = new Set([
+      "presupuestos",
+      "pronostico-continuo",
+      "pronostico-fijo",
+    ]);
+
+    const administracionSegments = new Set([
+      "perfil",
+      "organizacion",
+      "historial-cambios",
+      "roles",
+      "invitaciones",
+    ]);
+
+    const notificacionSegments = new Set([
+      "listado-notificaciones",
+      "recordatorios",
+      "configuracion-notificaciones",
+      "configuracion-email",
+    ]);
+
+    if (registroSegments.has(segment)) return "registro";
+    if (reporteSegments.has(segment)) return "reporte";
+    if (pronosticoSegments.has(segment)) return "pronostico";
+    if (administracionSegments.has(segment)) return "administracion";
+    if (notificacionSegments.has(segment)) return "notificacion";
+
+    return "general";
   }, [location.pathname]);
 
   React.useEffect(() => {
@@ -102,34 +147,36 @@ const Home = React.memo(function Home(props) {
             },
           })}
         >
-          <Stack
-            spacing={2}
-            sx={{
-              position: "relative",
-              zIndex: 1,
-              mx: 3,
-              pb: 5,
-              minHeight: "100vh",
-              alignItems: "center",
-            }}
-          >
-            <Header onToggleSidebar={handleToggleMobileMenu} />
-            <Box
+          <ChatbotContextProvider>
+            <Stack
+              spacing={2}
               sx={{
-                flexGrow: 1,
-                width: "100%",
-                maxWidth: { sm: "100%", md: "1700px" },
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "center",
+                position: "relative",
+                zIndex: 1,
+                mx: 3,
+                pb: 5,
+                minHeight: "100vh",
+                alignItems: "center",
               }}
             >
-              <Outlet />
-            </Box>
-          </Stack>
-          
-          {/* Chatbot Widget integrado globalmente en el layout autenticado */}
-          <ChatbotIaWidget currentModule={currentModule} />
+              <Header onToggleSidebar={handleToggleMobileMenu} />
+              <Box
+                sx={{
+                  flexGrow: 1,
+                  width: "100%",
+                  maxWidth: { sm: "100%", md: "1700px" },
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                }}
+              >
+                <Outlet />
+              </Box>
+            </Stack>
+
+            {/* Chatbot Widget integrado globalmente en el layout autenticado */}
+            <ChatbotIaWidget currentModule={currentModule} />
+          </ChatbotContextProvider>
         </Box>
       </Box>
     </AppTheme>
