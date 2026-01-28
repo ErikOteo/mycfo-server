@@ -5,9 +5,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { useChatbotContext } from './ChatbotContext';
+import API_CONFIG from '../config/api-config';
 
 // Asegúrate de configurar la URL correcta de tu backend de IA
-const IA_API_URL = 'http://localhost:8083/api/chat';
+const IA_API_URL = API_CONFIG.IA + '/chat';
 
 const ChatbotWidget = ({ currentModule = 'general' }) => {
     const theme = useTheme();
