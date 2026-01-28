@@ -8,7 +8,8 @@ import { useChatbotContext } from './ChatbotContext';
 
 // Asegúrate de configurar la URL correcta de tu backend de IA
 //const IA_API_URL = 'http://localhost:8083/api/chat';
-const IA_API_URL = `${process.env.REACT_APP_URL_IA}/chat`;
+//const IA_API_URL = `${process.env.REACT_APP_URL_IA}/chat`;
+const IA_API_URL = `${process.env.REACT_APP_API_URL}/chat`;
 
 const ChatbotWidget = ({ currentModule = 'general' }) => {
     const theme = useTheme();
