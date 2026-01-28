@@ -2,17 +2,11 @@ name: PR Check
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
-  check:
-    name: pr-check
+  pr-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Validar proyecto
-        run: |
-          echo "Checks OK"
-          # acá después podés agregar mvn test, npm test, etc
+      - run: echo "Checks OK"
