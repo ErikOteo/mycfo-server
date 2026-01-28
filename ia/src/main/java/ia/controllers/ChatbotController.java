@@ -17,7 +17,7 @@ public class ChatbotController {
 
     private final ChatbotVertexService chatbotVertexService;
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> chat(@RequestBody ChatRequest request) {
         ChatbotVertexService.ChatbotResult result = chatbotVertexService.chat(
                 request != null ? request.message() : null,
