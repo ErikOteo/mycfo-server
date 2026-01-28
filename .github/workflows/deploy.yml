@@ -1,9 +1,6 @@
 name: Deploy MyCFO to Azure
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
     branches: [ "main" ]
 
@@ -13,7 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build & deploy
+      - name: Build backend jars
+        run: mvn clean package -DskipTests
+
+      - name: Deploy
         run: |
           cd ~/mycfo
           git fetch origin

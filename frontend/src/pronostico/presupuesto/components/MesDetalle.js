@@ -1270,7 +1270,7 @@ export default function MesDetalle() {
           {pieDataIngresos.length > 0 ? (
             <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
               <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
                 <PieChart>
                   <Pie data={pieDataIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
@@ -1319,7 +1319,7 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.estimado }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
@@ -1333,7 +1333,7 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
@@ -1355,7 +1355,7 @@ export default function MesDetalle() {
           {pieDataEgresos.length > 0 ? (
             <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
               <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
                 <PieChart>
                   <Pie data={pieDataEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
@@ -1404,7 +1404,7 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.estimado }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
@@ -1418,7 +1418,7 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />

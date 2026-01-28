@@ -12,25 +12,22 @@ import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping({"/chat", "/api/chat"})
+@RequestMapping("/")
 public class ChatbotController {
 
     private final ChatbotVertexService chatbotVertexService;
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/chat", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> chat(@RequestBody ChatRequest request) {
         ChatbotVertexService.ChatbotResult result = chatbotVertexService.chat(
                 request != null ? request.message() : null,
                 request != null ? request.module() : null,
-                request != null ? request.context() : null
-        );
+                request != null ? request.context() : null);
         return Map.of(
                 "response", result.responseText(),
-                "raw", result.rawText()
-        );
+                "raw", result.rawText());
     }
 
     public record ChatRequest(String message, String module, Map<String, Object> context) {
     }
 }
-

@@ -785,7 +785,7 @@ export default function PresupuestoDetalle() {
                         onClick={() => fila && goToMes(fila)}>
                         <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                         <Box sx={{ flex: 1, height: 30 }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                          <ResponsiveContainer width="100%" height={30} minWidth={0}>
                             <BarChart data={[{ name: item.mes, valor: item.estimado }]} layout="vertical">
                               <XAxis type="number" domain={[0, max]} hide />
                               <YAxis type="category" dataKey="name" hide />
@@ -803,7 +803,7 @@ export default function PresupuestoDetalle() {
                           onClick={() => fila && goToMes(fila)}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.mes, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
@@ -842,7 +842,7 @@ export default function PresupuestoDetalle() {
                         onClick={() => fila && goToMes(fila)}>
                         <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                         <Box sx={{ flex: 1, height: 30 }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                          <ResponsiveContainer width="100%" height={30} minWidth={0}>
                             <BarChart data={[{ name: item.mes, valor: item.estimado }]} layout="vertical">
                               <XAxis type="number" domain={[0, max]} hide />
                               <YAxis type="category" dataKey="name" hide />
@@ -860,7 +860,7 @@ export default function PresupuestoDetalle() {
                           onClick={() => fila && goToMes(fila)}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.mes, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
@@ -885,7 +885,7 @@ export default function PresupuestoDetalle() {
               Tendencia del Resultado Mensual
             </Typography>
             <Box ref={desvioChartRef}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
                 <LineChart data={desvioData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">

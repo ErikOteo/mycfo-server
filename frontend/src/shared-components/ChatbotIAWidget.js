@@ -8,7 +8,9 @@ import { useChatbotContext } from './ChatbotContext';
 import API_CONFIG from '../config/api-config';
 
 // Asegúrate de configurar la URL correcta de tu backend de IA
-const IA_API_URL = API_CONFIG.IA + '/chat';
+//const IA_API_URL = 'http://localhost:8083/api/chat';
+//const IA_API_URL = `${process.env.REACT_APP_URL_IA}/chat`;
+const IA_API_URL = `${process.env.REACT_APP_API_URL}/ia/chat`;
 
 const ChatbotWidget = ({ currentModule = 'general' }) => {
     const theme = useTheme();
@@ -73,9 +75,9 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
         <>
             {/* Botón flotante */}
             {!isOpen && (
-                <Fab 
-                    color="primary" 
-                    aria-label="chat" 
+                <Fab
+                    color="primary"
+                    aria-label="chat"
                     onClick={() => setIsOpen(true)}
                     sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}
                 >
@@ -85,8 +87,8 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
 
             {/* Ventana de Chat */}
             {isOpen && (
-                <Paper 
-                    elevation={12} 
+                <Paper
+                    elevation={12}
                     sx={(theme) => ({
                         position: 'fixed',
                         bottom: 20,
@@ -104,12 +106,12 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     })}
                 >
                     {/* Header */}
-                    <Box sx={(theme) => ({ 
-                        p: 2, 
-                        bgcolor: (theme.vars || theme).palette.primary.main, 
-                        color: (theme.vars || theme).palette.primary.contrastText, 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
+                    <Box sx={(theme) => ({
+                        p: 2,
+                        bgcolor: (theme.vars || theme).palette.primary.main,
+                        color: (theme.vars || theme).palette.primary.contrastText,
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         boxShadow: 1
                     })}>
@@ -123,26 +125,26 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     </Box>
 
                     {/* Área de mensajes */}
-                    <Box sx={(theme) => ({ 
-                        flex: 1, 
-                        p: 2, 
-                        overflowY: 'auto', 
+                    <Box sx={(theme) => ({
+                        flex: 1,
+                        p: 2,
+                        overflowY: 'auto',
                         bgcolor: (theme.vars || theme).palette.background.default,
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: 1.5 
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1.5
                     })}>
                         {messages.map((msg, index) => (
-                            <Box 
-                                key={index} 
-                                sx={(theme) => ({ 
+                            <Box
+                                key={index}
+                                sx={(theme) => ({
                                     alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                                     maxWidth: '85%',
-                                    bgcolor: msg.sender === 'user' 
-                                        ? (theme.vars || theme).palette.primary.main 
+                                    bgcolor: msg.sender === 'user'
+                                        ? (theme.vars || theme).palette.primary.main
                                         : (theme.vars || theme).palette.background.paper,
-                                    color: msg.sender === 'user' 
-                                        ? (theme.vars || theme).palette.primary.contrastText 
+                                    color: msg.sender === 'user'
+                                        ? (theme.vars || theme).palette.primary.contrastText
                                         : (theme.vars || theme).palette.text.primary,
                                     p: 1.5,
                                     borderRadius: 2,
@@ -166,11 +168,11 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     </Box>
 
                     {/* Input Area */}
-                    <Box sx={(theme) => ({ 
-                        p: 2, 
-                        bgcolor: (theme.vars || theme).palette.background.paper, 
-                        borderTop: `1px solid ${(theme.vars || theme).palette.divider}`, 
-                        display: 'flex', 
+                    <Box sx={(theme) => ({
+                        p: 2,
+                        bgcolor: (theme.vars || theme).palette.background.paper,
+                        borderTop: `1px solid ${(theme.vars || theme).palette.divider}`,
+                        display: 'flex',
                         gap: 1,
                         alignItems: 'center'
                     })}>
@@ -200,9 +202,9 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                                 },
                             }}
                         />
-                        <IconButton 
-                            color="primary" 
-                            onClick={handleSend} 
+                        <IconButton
+                            color="primary"
+                            onClick={handleSend}
                             disabled={isLoading || !input.trim()}
                             sx={(theme) => ({
                                 bgcolor: (theme.vars || theme).palette.primary.dark,
