@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/ia")
+@RequestMapping("/")
 public class ChatbotController {
 
     private final ChatbotVertexService chatbotVertexService;
