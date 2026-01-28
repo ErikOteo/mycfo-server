@@ -174,7 +174,10 @@ const CurrencyTabs = ({ value, onChange, sx }) => {
         <ToggleButton
           value="ARS"
           sx={(theme) => {
-            const inactiveColor = theme.palette.grey[700];
+            const inactiveColor =
+              theme.palette.mode === "light"
+                ? theme.palette.common.black
+                : theme.palette.grey[700];
             const selectedColor = theme.palette.common.white;
             return {
               color: inactiveColor,
@@ -196,7 +199,10 @@ const CurrencyTabs = ({ value, onChange, sx }) => {
         <ToggleButton
           value="USD"
           sx={(theme) => {
-            const inactiveColor = theme.palette.grey[700];
+            const inactiveColor =
+              theme.palette.mode === "light"
+                ? theme.palette.common.black
+                : theme.palette.grey[700];
             const selectedColor = theme.palette.common.white;
             return {
               color: inactiveColor,
