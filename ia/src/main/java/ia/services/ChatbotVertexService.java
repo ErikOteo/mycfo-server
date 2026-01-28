@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
@@ -21,7 +22,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.IOException;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
@@ -219,6 +222,20 @@ public class ChatbotVertexService {
         }
     }
 
+    private byte[] loadKnowledgePdfBytes() {
+        try {
+            ClassPathResource resource = new ClassPathResource(KNOWLEDGE_PDF_CLASSPATH);
+            if (!resource.exists()) {
+                log.warn("No se encontro base de conocimiento en classpath: {}", KNOWLEDGE_PDF_CLASSPATH);
+                return null;
+            }
+            return resource.getInputStream().readAllBytes();
+        } catch (IOException ex) {
+            log.error("Error leyendo PDF de base de conocimiento desde classpath: {}", KNOWLEDGE_PDF_CLASSPATH, ex);
+            return null;
+        }
+    }
+
     private String extractTextFromResponse(String json) throws Exception {
         if (json == null || json.isBlank()) {
             return "";
@@ -237,6 +254,7 @@ public class ChatbotVertexService {
             case "reporte" -> "Estas asistiendo en el modulo Reporte: cashflow, P&L, resumenes y analisis.";
             case "pronostico" -> "Estas asistiendo en el modulo Pronostico: presupuestos, proyecciones y escenarios.";
             case "administracion" -> "Estas asistiendo en el modulo Administracion: configuraciones y gestion general.";
+            case "notificacion" -> "Estas asistiendo en el modulo Notificaciones: alertas, recordatorios y configuracion de notificaciones.";
             case "notificacion" -> "Estas asistiendo en el modulo Notificaciones: alertas, recordatorios y configuracion de notificaciones.";
             default -> "Estas asistiendo en MyCFO. Responde con foco en el modulo indicado por el usuario.";
         };
