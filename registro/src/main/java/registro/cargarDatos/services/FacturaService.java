@@ -98,6 +98,8 @@ public class FacturaService {
                         moneda,
                         null,
                         null,
+                        null,
+                        null,
                         pageable
                 );
 
@@ -174,9 +176,11 @@ public class FacturaService {
             String tipoFactura,
             EstadoPago estadoPago,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
             org.springframework.data.domain.Pageable pageable
     ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, null, null, pageable);
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, montoMin, montoMax, null, null, pageable);
     }
 
     public List<Factura> buscarFacturas(
@@ -186,9 +190,11 @@ public class FacturaService {
             java.time.LocalDate fechaHasta,
             String tipoFactura,
             EstadoPago estadoPago,
-            TipoMoneda moneda
+            TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax
     ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, null, null);
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, montoMin, montoMax, null, null);
     }
 
     public List<Factura> buscarFacturas(
@@ -201,7 +207,7 @@ public class FacturaService {
             String search,
             java.time.LocalDate searchDate
     ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, null, search, searchDate);
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, null, null, null, search, searchDate);
     }
 
     public List<Factura> buscarFacturas(
@@ -212,6 +218,8 @@ public class FacturaService {
             String tipoFactura,
             EstadoPago estadoPago,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
             String search,
             java.time.LocalDate searchDate
     ) {
@@ -226,6 +234,8 @@ public class FacturaService {
                 tipoFactura,
                 estadoPago,
                 moneda,
+                montoMin,
+                montoMax,
                 search,
                 searchDate
         );
@@ -248,6 +258,8 @@ public class FacturaService {
             String tipoFactura,
             EstadoPago estadoPago,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
             String search,
             java.time.LocalDate searchDate,
             org.springframework.data.domain.Pageable pageable
@@ -263,6 +275,8 @@ public class FacturaService {
                 tipoFactura,
                 estadoPago,
                 moneda,
+                montoMin,
+                montoMax,
                 search,
                 searchDate,
                 pageable
@@ -283,7 +297,7 @@ public class FacturaService {
             java.time.LocalDate fechaDesde,
             java.time.LocalDate fechaHasta
     ) {
-        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null, null, null).stream()
+        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null, null, null, null, null).stream()
                 .collect(Collectors.groupingBy(
                         factura -> java.time.YearMonth.from(factura.getFechaEmision() != null
                                 ? factura.getFechaEmision()

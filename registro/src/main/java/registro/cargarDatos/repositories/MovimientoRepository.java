@@ -156,6 +156,8 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
            "AND (:fechaHasta IS NULL OR m.fechaEmision <= :fechaHasta) " +
            "AND (:tipos IS NULL OR m.tipo IN :tipos) " +
            "AND (:moneda IS NULL OR m.moneda = :moneda) " +
+           "AND (:montoMin IS NULL OR COALESCE(m.montoTotal, 0) >= :montoMin) " +
+           "AND (:montoMax IS NULL OR COALESCE(m.montoTotal, 0) <= :montoMax) " +
            "AND (:conciliado IS NULL OR " +
            "     (CASE WHEN :conciliado = true THEN m.documentoComercial IS NOT NULL " +
            "           ELSE m.documentoComercial IS NULL END)) " +
@@ -178,6 +180,8 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
             @Param("fechaHasta") LocalDateTime fechaHasta,
             @Param("tipos") List<TipoMovimiento> tipos,
             @Param("moneda") TipoMoneda moneda,
+            @Param("montoMin") Double montoMin,
+            @Param("montoMax") Double montoMax,
             @Param("conciliado") Boolean conciliado,
             @Param("nombreRelacionado") String nombreRelacionado,
             @Param("search") String search,
