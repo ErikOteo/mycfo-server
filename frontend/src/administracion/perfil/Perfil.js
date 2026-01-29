@@ -7,6 +7,7 @@ import BotonConsolidar from "../../shared-components/CustomButton";
 import { sessionService } from "../../shared-services/sessionService";
 import API_CONFIG from "../../config/api-config";
 import axios from "axios";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function Perfil() {
   const [perfil, setPerfil] = useState({
@@ -135,6 +136,20 @@ export default function Perfil() {
       setPassError("Error al cambiar contraseña. Verifica tu contraseña actual.");
     }
   };
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "perfil",
+      perfil: {
+        nombre: perfil.nombre,
+        email: perfil.email,
+        telefono: perfil.telefono,
+      },
+    }),
+    [perfil]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   if (loading) {
     return (
