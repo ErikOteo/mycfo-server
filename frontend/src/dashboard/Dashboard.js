@@ -37,6 +37,7 @@ import { formatCurrencyByCode } from "../utils/formatters";
 import CurrencyTabs, {
   usePreferredCurrency,
 } from "../shared-components/CurrencyTabs";
+import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
 
 const mockKpis = {
   totalIncomes: 820000,
@@ -441,6 +442,35 @@ const Dashboard = React.memo(() => {
     () => (value) => formatCurrencyByCode(value, currency),
     [currency]
   );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "dashboard",
+      period,
+      currency,
+      kpis: state.kpis?.data ?? null,
+      cashflow: state.cashflow?.data ?? null,
+      reconciliation: state.reconciliation?.data ?? null,
+      recentMovements: Array.isArray(state.movements?.data)
+        ? state.movements.data.slice(0, 5)
+        : [],
+      recentInvoices: Array.isArray(state.invoices?.data)
+        ? state.invoices.data.slice(0, 5)
+        : [],
+      salesTrend: state.salesTrend?.data ?? null,
+      expensesTrend: state.expensesTrend?.data ?? null,
+      salesByCategory: Array.isArray(state.salesByCategory?.data)
+        ? state.salesByCategory.data.slice(0, 6)
+        : [],
+      expensesByCategory: Array.isArray(state.expensesByCategory?.data)
+        ? state.expensesByCategory.data.slice(0, 6)
+        : [],
+      budget: state.budget?.data ?? null,
+    }),
+    [currency, period, state]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const userDisplayName = React.useMemo(() => {
     if (typeof window === "undefined") {

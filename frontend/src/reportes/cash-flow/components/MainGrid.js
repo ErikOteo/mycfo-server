@@ -11,6 +11,7 @@ import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 export default function MainGrid() {
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
@@ -122,6 +123,32 @@ export default function MainGrid() {
     const saldoFinalMensual = [];
     saldoFinalMensual[0] = saldoInicial + netosMensual[0];
     for (let i = 1; i < 12; i++) saldoFinalMensual[i] = saldoFinalMensual[i - 1] + netosMensual[i];
+
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "flujo-de-caja",
+            year: selectedYear,
+            currency,
+            ingresosMensuales: totalIngresosMensual,
+            egresosMensuales: totalEgresosMensual,
+            netosMensuales: netosMensual,
+            saldoFinalMensual,
+            topIngresosPorCategoria: ingresosPorCategoria.slice(0, 5),
+            topEgresosPorCategoria: egresosPorCategoria.slice(0, 5),
+        }),
+        [
+            selectedYear,
+            currency,
+            totalIngresosMensual,
+            totalEgresosMensual,
+            netosMensual,
+            saldoFinalMensual,
+            ingresosPorCategoria,
+            egresosPorCategoria,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
 
     const handleExportExcel = () => {
         const excelData = [];

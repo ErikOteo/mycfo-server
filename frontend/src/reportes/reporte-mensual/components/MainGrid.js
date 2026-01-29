@@ -11,6 +11,7 @@ import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#19C9FF'];
 
@@ -26,6 +27,64 @@ export default function MainGrid() {
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
     const [currency, setCurrency] = usePreferredCurrency("ARS");
+
+    const topIngresos = React.useMemo(() => {
+        const items = Array.isArray(data.detalleIngresos) ? data.detalleIngresos : [];
+        return [...items]
+            .sort((a, b) => Number(b?.total ?? 0) - Number(a?.total ?? 0))
+            .slice(0, 5);
+    }, [data.detalleIngresos]);
+
+    const topEgresos = React.useMemo(() => {
+        const items = Array.isArray(data.detalleEgresos) ? data.detalleEgresos : [];
+        return [...items]
+            .sort((a, b) => Math.abs(Number(b?.total ?? 0)) - Math.abs(Number(a?.total ?? 0)))
+            .slice(0, 5);
+    }, [data.detalleEgresos]);
+
+    const totalIngresos = React.useMemo(
+        () => (Array.isArray(data.detalleIngresos)
+            ? data.detalleIngresos.reduce((sum, item) => sum + (Number(item?.total) || 0), 0)
+            : 0),
+        [data.detalleIngresos]
+    );
+
+    const totalEgresos = React.useMemo(
+        () => (Array.isArray(data.detalleEgresos)
+            ? data.detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item?.total) || 0), 0)
+            : 0),
+        [data.detalleEgresos]
+    );
+
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "reporte-mensual",
+            year: selectedYear,
+            month: selectedMonth + 1,
+            currency,
+            categoriasSeleccionadas: selectedCategoria,
+            ingresos: {
+                total: totalIngresos,
+                topCategorias: topIngresos,
+            },
+            egresos: {
+                total: totalEgresos,
+                topCategorias: topEgresos,
+            },
+        }),
+        [
+            selectedYear,
+            selectedMonth,
+            currency,
+            selectedCategoria,
+            totalIngresos,
+            totalEgresos,
+            topIngresos,
+            topEgresos,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
 
     // Formateo de moneda dependiente de la preferencia seleccionada
     const formatCurrency = React.useCallback(

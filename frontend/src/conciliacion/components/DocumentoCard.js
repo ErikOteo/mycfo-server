@@ -22,7 +22,9 @@ import { formatCurrencyByCode } from "../../utils/formatters";
 export default function DocumentoCard({ documento, onVincular }) {
   const formatMonto = (monto, moneda) => {
     if (!monto && monto !== 0) return "$0";
-    return formatCurrencyByCode(Math.abs(monto), moneda || "ARS", { fallback: "$0" });
+    return formatCurrencyByCode(Math.abs(monto), moneda || "ARS", {
+      fallback: "$0",
+    });
   };
 
   const formatFecha = (fecha) => {

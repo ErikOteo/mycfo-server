@@ -11,4 +11,3 @@ public class RegistroDTO {
     private String nombreEmpresa;
     private Boolean esInvitacion; // Indica si viene de una invitación
 }
-

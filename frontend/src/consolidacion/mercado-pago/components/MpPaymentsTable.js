@@ -24,16 +24,21 @@ import EditableCategory from "./EditableCategory";
 
 const formatDate = (value) => {
   if (!value) return "";
+
+  // Evita desfasajes de día cuando llega un ISO-date (YYYY-MM-DD)
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const [y, m, d] = value.slice(0, 10).split("-");
+    return `${d}/${m}/${y}`;
+  }
+
   const d = new Date(value);
-  // Solo mostrar la fecha (sin hora)
-  return d.toLocaleDateString("es-AR");
-  // Si algún día quieres mostrar la hora cuando corresponda, descomenta esto:
-  // const hasTime = d.getHours() + d.getMinutes() + d.getSeconds() !== 0;
-  // return hasTime ? d.toLocaleString("es-AR") : d.toLocaleDateString("es-AR");
+  return Number.isNaN(d.getTime())
+    ? String(value)
+    : d.toLocaleDateString("es-AR");
 };
 
 const formatAmount = (amount, currency, isEgreso) => {
-  if (amount == null) return "—";
+  if (amount == null) return "-";
 
   // Para egresos, mostrar con signo menos
   const displayAmount = isEgreso && amount > 0 ? -amount : amount;
@@ -100,9 +105,9 @@ export default function MpPaymentsTable({
             <TableCell sx={{ fontWeight: 600 }}>Tipo</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>Monto Total</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>Fecha</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Descripción</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Origen</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Categoría</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Descripcion</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Estado</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Categoria</TableCell>
           </TableRow>
         </TableHead>
 
@@ -153,7 +158,7 @@ export default function MpPaymentsTable({
                 <TableCell>
                   <Chip
                     size="small"
-                    label={r.tipo || r.estado || r.status || "—"}
+                    label={r.tipo || r.estado || r.status || "-"}
                     sx={{
                       backgroundColor:
                         r.tipo === "Egreso"
@@ -201,11 +206,42 @@ export default function MpPaymentsTable({
                 <TableCell>{fecha}</TableCell>
 
                 <TableCell>
-                  {r.descripcion || r.detalle || r.description || "—"}
+                  {r.descripcion || r.detalle || r.description || "-"}
                 </TableCell>
 
                 <TableCell>
-                  {r.origen || r.comprador || r.buyer || "—"}
+                  {r.esDuplicado ? (
+                    <Chip
+                      size="small"
+                      label={
+                        r.motivoDuplicado?.includes?.("base de datos")
+                          ? "Registrado"
+                          : "Duplicado"
+                      }
+                      sx={{
+                        backgroundColor: r.motivoDuplicado?.includes?.(
+                          "base de datos"
+                        )
+                          ? "#ffebee"
+                          : "#fff3e0",
+                        color: r.motivoDuplicado?.includes?.("base de datos")
+                          ? "#d32f2f"
+                          : "#f57c00",
+                        fontWeight: "bold",
+                        border: r.motivoDuplicado?.includes?.("base de datos")
+                          ? "1px solid #d32f2f"
+                          : "1px solid #f57c00",
+                      }}
+                      variant="outlined"
+                    />
+                  ) : (
+                    <Chip
+                      size="small"
+                      label="No registrado"
+                      color="success"
+                      variant="outlined"
+                    />
+                  )}
                 </TableCell>
 
                 <TableCell>

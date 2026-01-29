@@ -171,7 +171,6 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       <Typography component="h2" variant="h6" sx={{ mb: 3 }}>
         Carga Excel
       </Typography>
-      <CamposRequeridos sx={{ mb: 4 }} /> {/* margen debajo del ejemplo */}
       {/* Desplegable para tipo de archivo */}
       <FormControl fullWidth sx={{ mb: 4 }}>
         <InputLabel id="tipo-origen-label">Tipo de archivo</InputLabel>
@@ -192,6 +191,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           <MenuItem value="uala">Ualá (PDF)</MenuItem>
         </Select>
       </FormControl>
+      {tipoOrigen === "mycfo" && <CamposRequeridos sx={{ mb: 4 }} />}
       {tipoOrigen === "excel-libre" && (
         <Box sx={{ mb: 3 }}>
           <ExcelLibreMapper

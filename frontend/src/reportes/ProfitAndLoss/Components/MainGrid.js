@@ -11,6 +11,7 @@ import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 export default function MainGrid() {
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
@@ -89,6 +90,59 @@ export default function MainGrid() {
         const s = (c ?? '').toString().trim();
         return s.length ? s : 'Sin categoria';
     };
+
+    const totalIngresos = React.useMemo(
+        () => data.detalleIngresos.reduce((sum, item) => sum + (Number(item?.total) || 0), 0),
+        [data.detalleIngresos]
+    );
+
+    const totalEgresos = React.useMemo(
+        () => data.detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item?.total) || 0), 0),
+        [data.detalleEgresos]
+    );
+
+    const topIngresos = React.useMemo(
+        () =>
+            [...data.detalleIngresos]
+                .sort((a, b) => Number(b?.total ?? 0) - Number(a?.total ?? 0))
+                .slice(0, 5),
+        [data.detalleIngresos]
+    );
+
+    const topEgresos = React.useMemo(
+        () =>
+            [...data.detalleEgresos]
+                .sort((a, b) => Math.abs(Number(b?.total ?? 0)) - Math.abs(Number(a?.total ?? 0)))
+                .slice(0, 5),
+        [data.detalleEgresos]
+    );
+
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "estado-de-resultados",
+            year: selectedYear,
+            currency,
+            ingresosMensuales: data.ingresosMensuales,
+            egresosMensuales: data.egresosMensuales,
+            totalIngresos,
+            totalEgresos,
+            resultadoEjercicio: totalIngresos - totalEgresos,
+            topIngresos,
+            topEgresos,
+        }),
+        [
+            selectedYear,
+            currency,
+            data.ingresosMensuales,
+            data.egresosMensuales,
+            totalIngresos,
+            totalEgresos,
+            topIngresos,
+            topEgresos,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
 
     const handleExportExcel = () => {
         const { detalleIngresos, detalleEgresos } = data;

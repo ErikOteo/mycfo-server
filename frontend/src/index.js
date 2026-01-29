@@ -1,12 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
 import { AuthProvider } from "react-oidc-context";
-import { brand } from './shared-theme/themePrimitives';
+import AppTheme from './shared-theme/AppTheme';
 
 // --- DEBUG: Verificamos las variables ---
 console.log("📢 [index.js] BASE URL:", process.env.REACT_APP_BASE_URL);
@@ -25,26 +24,15 @@ const cognitoAuthConfig = {
   scope: "phone openid email",
 };
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      light: brand[300],
-      main: brand[400],
-      dark: brand[600],
-      contrastText: '#ffffff',
-    },
-  },
-});
-
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 // wrap the application with AuthProvider
 root.render(
   <React.StrictMode>
     <AuthProvider {...cognitoAuthConfig}>
-      <ThemeProvider theme={theme}>
+      <AppTheme>
         <App />
-      </ThemeProvider>
+      </AppTheme>
     </AuthProvider>
   </React.StrictMode>
 );

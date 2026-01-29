@@ -260,9 +260,9 @@ export default function PresupuestoDetalle() {
             console.log('🚀 Usando endpoint optimizado para obtener movimientos del presupuesto');
             const fechaDesde = formatDate(rangoInicioDate, 'yyyy-MM-dd');
             const fechaHasta = formatDate(rangoFinDate, 'yyyy-MM-dd');
-            
-            const movimientosData = await getMovimientosParaPresupuesto({ 
-              fechaDesde, 
+
+            const movimientosData = await getMovimientosParaPresupuesto({
+              fechaDesde,
               fechaHasta,
               moneda: currencyDetected
             });
@@ -657,7 +657,7 @@ export default function PresupuestoDetalle() {
         <>
           {/* KPIs con acciones rápidas */}
           <Grid container spacing={2} mb={2}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.ingresos, color: 'white', position: 'relative', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'success.main', mx: 'auto', mb: 1 }}>+</Avatar>
                 <Typography variant="h6">Ingresos</Typography>
@@ -682,7 +682,7 @@ export default function PresupuestoDetalle() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.egresos, color: 'white', position: 'relative', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'error.main', mx: 'auto', mb: 1 }}>-</Avatar>
                 <Typography variant="h6">Egresos</Typography>
@@ -707,7 +707,7 @@ export default function PresupuestoDetalle() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper
                 sx={{
                   p: 3,
@@ -749,7 +749,7 @@ export default function PresupuestoDetalle() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="overline">Marcador de salud</Typography>
                 <Stack alignItems="center" spacing={1}>
@@ -782,16 +782,16 @@ export default function PresupuestoDetalle() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       {/* Estimado */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                           onClick={() => fila && goToMes(fila)}>
+                        onClick={() => fila && goToMes(fila)}>
                         <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                         <Box sx={{ flex: 1, height: 30 }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                          <ResponsiveContainer width="100%" height={30} minWidth={0}>
                             <BarChart data={[{ name: item.mes, valor: item.estimado }]} layout="vertical">
                               <XAxis type="number" domain={[0, max]} hide />
                               <YAxis type="category" dataKey="name" hide />
                               <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                               <Bar dataKey="valor" fill={INGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
-                                   label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                             </BarChart>
                           </ResponsiveContainer>
                         </Box>
@@ -800,16 +800,16 @@ export default function PresupuestoDetalle() {
                       {/* Real */}
                       {!verSoloEstimados && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                             onClick={() => fila && goToMes(fila)}>
+                          onClick={() => fila && goToMes(fila)}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.mes, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                                 <Bar dataKey="valor" fill={INGRESO_REAL_COLOR} radius={[4, 4, 4, 4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -839,16 +839,16 @@ export default function PresupuestoDetalle() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       {/* Estimado */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                           onClick={() => fila && goToMes(fila)}>
+                        onClick={() => fila && goToMes(fila)}>
                         <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                         <Box sx={{ flex: 1, height: 30 }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                          <ResponsiveContainer width="100%" height={30} minWidth={0}>
                             <BarChart data={[{ name: item.mes, valor: item.estimado }]} layout="vertical">
                               <XAxis type="number" domain={[0, max]} hide />
                               <YAxis type="category" dataKey="name" hide />
                               <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                               <Bar dataKey="valor" fill={EGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
-                                   label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                             </BarChart>
                           </ResponsiveContainer>
                         </Box>
@@ -857,16 +857,16 @@ export default function PresupuestoDetalle() {
                       {/* Real */}
                       {!verSoloEstimados && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                             onClick={() => fila && goToMes(fila)}>
+                          onClick={() => fila && goToMes(fila)}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.mes, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                                 <Bar dataKey="valor" fill={EGRESO_REAL_COLOR} radius={[4, 4, 4, 4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -885,7 +885,7 @@ export default function PresupuestoDetalle() {
               Tendencia del Resultado Mensual
             </Typography>
             <Box ref={desvioChartRef}>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
                 <LineChart data={desvioData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">

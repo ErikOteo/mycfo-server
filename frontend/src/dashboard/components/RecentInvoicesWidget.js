@@ -184,7 +184,9 @@ const RecentInvoicesWidget = ({
                       </TableCell>
                       {!isMobile ? (
                         <TableCell>
-                          <Typography variant="body2">{numero}</Typography>
+                          <Typography variant="body2" sx={{ color: primaryTextColor }}>
+                            {numero}
+                          </Typography>
                         </TableCell>
                       ) : null}
                       <TableCell align="right" sx={{ color: amountColor, fontWeight: 600 }}>
@@ -195,7 +197,10 @@ const RecentInvoicesWidget = ({
                       </TableCell>
                       {!isMobile ? (
                         <TableCell>
-                          <Typography variant="body2" sx={{ color: secondaryTextColor }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: primaryTextColor, fontWeight: 500 }}
+                          >
                             {cliente}
                           </Typography>
                         </TableCell>

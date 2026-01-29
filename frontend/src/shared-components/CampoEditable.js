@@ -25,7 +25,7 @@ export default function CampoEditable({ label, value, onChange }) {
 
   return (
     <Box sx={{ width: "100%", mb: 2 }}>
-      <FormLabel>{label}</FormLabel>
+      <FormLabel sx={{ color: 'text.primary' }}>{label}</FormLabel>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
         <OutlinedInput
           value={isEditing ? tempValue : value}
