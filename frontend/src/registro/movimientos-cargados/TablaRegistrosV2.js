@@ -465,7 +465,7 @@ export default function TablaRegistrosV2() {
       console.error("Datos enviados:", formData);
       alert(
         "❌ Error al actualizar: " +
-          (error.response?.data?.mensaje || error.message),
+        (error.response?.data?.mensaje || error.message),
       );
     }
   };
@@ -494,7 +494,7 @@ export default function TablaRegistrosV2() {
       console.error("Error eliminando movimiento:", error);
       alert(
         "❌ Error al eliminar: " +
-          (error.response?.data?.mensaje || error.message),
+        (error.response?.data?.mensaje || error.message),
       );
     }
   };
@@ -722,6 +722,8 @@ export default function TablaRegistrosV2() {
       headerName: "Tipo",
       flex: 0.8,
       minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const tipo = params.value;
         if (!tipo)
@@ -751,6 +753,8 @@ export default function TablaRegistrosV2() {
       headerName: "Monto",
       flex: 0.8,
       minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const monto = params.row.montoTotal || 0;
         const moneda = params.row.moneda || "ARS";
@@ -792,6 +796,8 @@ export default function TablaRegistrosV2() {
       headerName: "Fecha",
       flex: 0.7,
       minWidth: 110,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
         <Typography variant="body2" sx={{ lineHeight: "24px" }}>
           {formatearFecha(params.value)}
@@ -804,6 +810,8 @@ export default function TablaRegistrosV2() {
       headerName: "Estado",
       flex: 0.8,
       minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
       hide: true,
       renderCell: (params) => {
         if (!params.value)
@@ -845,6 +853,8 @@ export default function TablaRegistrosV2() {
       headerName: "Categoría",
       flex: 1,
       minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         if (!params.value)
           return (
@@ -869,6 +879,8 @@ export default function TablaRegistrosV2() {
       headerName: "Origen",
       flex: 1,
       minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         return (
           <Typography variant="body2" sx={{ lineHeight: "24px" }}>
@@ -883,6 +895,8 @@ export default function TablaRegistrosV2() {
       headerName: "Destino",
       flex: 1,
       minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         return (
           <Typography variant="body2" sx={{ lineHeight: "24px" }}>
@@ -897,6 +911,8 @@ export default function TablaRegistrosV2() {
       headerName: "Descripción",
       flex: 1.2,
       minWidth: 150,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         return (
           <Typography variant="body2" sx={{ lineHeight: "24px" }}>
@@ -911,6 +927,8 @@ export default function TablaRegistrosV2() {
       headerName: "Acciones",
       flex: 1,
       minWidth: 140,
+      align: 'center',
+      headerAlign: 'center',
       sortable: false,
       filterable: false,
       renderCell: (params) => {
@@ -950,7 +968,7 @@ export default function TablaRegistrosV2() {
       },
     };
 
-    if (isMobile) return [tipoColumn, montoColumn, accionesColumn];
+    if (isMobile) return [montoColumn, accionesColumn];
 
     return [
       tipoColumn,
@@ -1223,11 +1241,12 @@ export default function TablaRegistrosV2() {
         </Box>
       </Box>
 
-      <Box sx={{ height: 700, width: "100%" }}>
+      <Box sx={{ width: "100%" }}>
         <DataGrid
           rows={movimientos}
           columns={columns}
           loading={loading}
+          autoHeight
           // Paginación del servidor
           paginationMode={paginationMode}
           paginationModel={paginationModel}
@@ -1268,11 +1287,10 @@ export default function TablaRegistrosV2() {
             columnMenuManageColumns: "Administrar columnas",
           }}
           disableRowSelectionOnClick
-          autoHeight={false}
           sx={{
             backgroundColor: "background.paper",
             borderRadius: 2,
-            border: "none",
+            border: (theme) => `1px solid ${theme.palette.divider}`,
             "& .MuiDataGrid-cell": {
               borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
               display: "flex",
@@ -1310,13 +1328,13 @@ export default function TablaRegistrosV2() {
               visibility: "hidden",
             },
             "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer":
-              {
-                visibility: "visible",
-              },
+            {
+              visibility: "visible",
+            },
             "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
-              {
-                display: "none",
-              },
+            {
+              display: "none",
+            },
             "& .MuiDataGrid-row:hover": {
               backgroundColor: (theme) => theme.palette.action.hover,
             },

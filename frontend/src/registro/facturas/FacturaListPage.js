@@ -478,6 +478,8 @@ const FacturaListPage = () => {
       headerName: "Acciones",
       flex: 0.9,
       minWidth: 140,
+      align: 'center',
+      headerAlign: 'center',
       sortable: false,
       filterable: false,
       renderCell: (params) => {
@@ -525,6 +527,8 @@ const FacturaListPage = () => {
       headerName: isMobile ? "Fecha" : "Fecha emisión",
       flex: isMobile ? 0.7 : 0.8,
       minWidth: isMobile ? 120 : 160,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
         <Typography variant="body2">
           {formatFechaEmision(params?.row?.fechaEmision)}
@@ -546,6 +550,8 @@ const FacturaListPage = () => {
           headerName: "Número",
           flex: 0.9,
           minWidth: 120,
+          align: 'center',
+          headerAlign: 'center',
           renderCell: (params) => {
             const value =
               params?.row?.numeroDocumento ??
@@ -567,7 +573,6 @@ const FacturaListPage = () => {
             );
           },
         },
-        fechaColumn,
         accionesColumn,
       ];
     }
@@ -578,12 +583,16 @@ const FacturaListPage = () => {
         headerName: "Número",
         flex: 1,
         minWidth: 140,
+        align: 'center',
+        headerAlign: 'center',
       },
       {
         field: "tipoFactura",
         headerName: "Tipo",
         flex: 0.6,
         minWidth: 100,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) => (
           <Chip
             label={params.value ?? "-"}
@@ -599,9 +608,14 @@ const FacturaListPage = () => {
         headerName: "Monto",
         flex: 1,
         minWidth: 140,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) =>
           params.row.montoTotal != null
-            ? formatCurrencyByCode(params.row.montoTotal, params.row.moneda || currency)
+            ? formatCurrencyByCode(
+              params.row.montoTotal,
+              params.row.moneda || currency,
+            )
             : "-",
       },
       {
@@ -609,12 +623,16 @@ const FacturaListPage = () => {
         headerName: "Moneda",
         flex: 0.5,
         minWidth: 90,
+        align: 'center',
+        headerAlign: 'center',
       },
       {
         field: "estadoPago",
         headerName: "Estado de pago",
         flex: 0.8,
         minWidth: 140,
+        align: 'center',
+        headerAlign: 'center',
         hide: true,
         renderCell: (params) => (
           <Chip
@@ -635,6 +653,8 @@ const FacturaListPage = () => {
         headerName: "Vendedor",
         flex: 1.2,
         minWidth: 160,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) => (
           <Box>
             <Typography variant="body2">{params.value ?? "-"}</Typography>
@@ -646,6 +666,8 @@ const FacturaListPage = () => {
         headerName: "Comprador",
         flex: 1.2,
         minWidth: 160,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) => (
           <Box>
             <Typography variant="body2">{params.value ?? "-"}</Typography>
@@ -915,11 +937,12 @@ const FacturaListPage = () => {
         </Box>
       </Box>
 
-      <Box sx={{ height: 700, width: "100%", mt: 0 }}>
+      <Box sx={{ width: "100%", mt: 0 }}>
         <DataGrid
           rows={facturas}
           columns={columns}
           loading={loading}
+          autoHeight
           getRowId={(row) =>
             row.id ??
             row.idDocumento ??
@@ -972,7 +995,7 @@ const FacturaListPage = () => {
           sx={{
             backgroundColor: "background.paper",
             borderRadius: 2,
-            border: "none",
+            border: (theme) => `1px solid ${theme.palette.divider}`,
             "& .MuiDataGrid-cell": {
               borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
               display: "flex",
@@ -989,6 +1012,7 @@ const FacturaListPage = () => {
             "& .MuiDataGrid-columnHeader": {
               "&:focus": { outline: "none" },
             },
+            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
             "& .MuiDataGrid-sortIcon": {
               display: "none",
             },
