@@ -101,11 +101,58 @@ export default function TablaRegistrosV2() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState(null);
   const [fechaHasta, setFechaHasta] = useState(null);
+  const [montoDesde, setMontoDesde] = useState("");
+  const [montoHasta, setMontoHasta] = useState("");
+  const [montoRangeLabel, setMontoRangeLabel] = useState("");
+  const [montoRangeOptions, setMontoRangeOptions] = useState([]);
   const searchDateISO = useMemo(() => {
     if (!searchText) return null;
     const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
+
+  const parseMontoInput = useCallback((valor) => {
+    if (valor === null || valor === undefined) return null;
+    const cleaned = String(valor)
+      .replace(/\s|\$/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".");
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, []);
+
+  const formatMonto = (valor) =>
+    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(
+      Math.round(valor ?? 0),
+    );
+
+  const buildMontoRanges = useCallback(
+    (max) => {
+      if (!Number.isFinite(max) || max <= 0) return [];
+      let step;
+      if (max <= 100) step = 10;
+      else if (max <= 1_000) step = 100;
+      else if (max <= 10_000) step = 1_000;
+      else if (max <= 100_000) step = 10_000;
+      else if (max <= 1_000_000) step = 50_000;
+      else step = 10 ** Math.max(3, Math.floor(Math.log10(max)) - 1);
+
+      let bucketCount = Math.ceil(max / step);
+      if (bucketCount > 15) {
+        step *= 2;
+        bucketCount = Math.ceil(max / step);
+      }
+
+      const upper = Math.ceil(max / step) * step;
+      const options = [];
+      for (let from = 0; from < upper; from += step) {
+        const to = from + step;
+        options.push(`${formatMonto(from)} - ${formatMonto(to)}`);
+      }
+      return options;
+    },
+    [formatMonto],
+  );
 
   useEffect(() => {
     const handler = setTimeout(
@@ -135,7 +182,7 @@ export default function TablaRegistrosV2() {
     setPaginationModel((prev) =>
       prev.page === 0 ? prev : { ...prev, page: 0 },
     );
-  }, [debouncedSearch, fechaDesde, fechaHasta]);
+  }, [debouncedSearch, fechaDesde, fechaHasta, montoDesde, montoHasta, montoRangeLabel]);
 
   const clearDeepLink = useCallback(() => {
     const hasQuery = searchParams.has("editMovementId");
@@ -210,8 +257,53 @@ export default function TablaRegistrosV2() {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   }, []);
 
+  const fetchMaxMonto = useCallback(async () => {
+    try {
+      const usuarioSub = sessionStorage.getItem("sub");
+      if (!usuarioSub) return;
+      const headers = { "X-Usuario-Sub": usuarioSub };
+      const params = {
+        page: 0,
+        size: 1,
+        sortBy: "montoTotal",
+        sortDir: "desc",
+        moneda: currency,
+      };
+      const res = await http.get(`${API_BASE}/movimientos`, {
+        headers,
+        params,
+      });
+      const firstRow = res?.data?.content?.[0] ?? res?.data?.[0];
+      const max = firstRow?.montoTotal;
+      if (Number.isFinite(max)) {
+        setMontoRangeOptions(buildMontoRanges(max));
+      } else {
+        setMontoRangeOptions([]);
+      }
+    } catch (err) {
+      console.error("Error obteniendo max monto:", err);
+      setMontoRangeOptions([]);
+    }
+  }, [API_BASE, buildMontoRanges, currency]);
+
+  useEffect(() => {
+    fetchMaxMonto();
+  }, [fetchMaxMonto]);
+
   const cargarMovimientos = useCallback(async () => {
     setLoading(true);
+    const montoMinParsed = parseMontoInput(montoDesde);
+    const montoMaxParsed = parseMontoInput(montoHasta);
+    if (
+      montoMinParsed !== null &&
+      montoMaxParsed !== null &&
+      montoMinParsed > montoMaxParsed
+    ) {
+      setMovimientos([]);
+      setRowCount(0);
+      setLoading(false);
+      return;
+    }
     try {
       const usuarioSub = sessionStorage.getItem("sub");
 
@@ -233,6 +325,8 @@ export default function TablaRegistrosV2() {
         // Si es fecha, usamos searchDate y no enviamos el texto para evitar condición AND que vacía resultados
         search: searchDateISO ? undefined : debouncedSearch || undefined,
         searchDate: searchDateISO || undefined,
+        montoMin: montoMinParsed ?? undefined,
+        montoMax: montoMaxParsed ?? undefined,
         fechaDesde: fechaDesde
           ? dayjs(fechaDesde).format("YYYY-MM-DD")
           : undefined,
@@ -285,6 +379,9 @@ export default function TablaRegistrosV2() {
     searchDateISO,
     fechaDesde,
     fechaHasta,
+    montoDesde,
+    montoHasta,
+    parseMontoInput,
   ]);
 
   const initializedRef = useRef(false);
@@ -653,6 +750,8 @@ export default function TablaRegistrosV2() {
     sortDir: "desc",
     search: searchDateISO ? undefined : debouncedSearch || undefined,
     searchDate: searchDateISO || undefined,
+    montoMin: parseMontoInput(montoDesde) ?? undefined,
+    montoMax: parseMontoInput(montoHasta) ?? undefined,
     fechaDesde: fechaDesde ? dayjs(fechaDesde).format("YYYY-MM-DD") : undefined,
     fechaHasta: fechaHasta ? dayjs(fechaHasta).format("YYYY-MM-DD") : undefined,
     moneda: currency,
@@ -1191,13 +1290,38 @@ export default function TablaRegistrosV2() {
             sx={{ width: 140, flex: "0 0 140px" }}
           />
         </LocalizationProvider>
-        {(fechaDesde || fechaHasta) && (
+        <CustomSelect
+          name="montoRange"
+          value={montoRangeLabel}
+          onChange={(value) => {
+            setMontoRangeLabel(value);
+            if (!value) {
+              setMontoDesde("");
+              setMontoHasta("");
+              return;
+            }
+            const numbers = value.match(/[\d.,]+/g) || [];
+            const [minRaw, maxRaw] = numbers;
+            const parseNumber = (txt) =>
+              parseFloat(txt.replace(/\./g, "").replace(/,/g, "."));
+            const minVal = parseNumber(minRaw ?? "0");
+            const maxVal = parseNumber(maxRaw ?? "0");
+            setMontoDesde(Number.isFinite(minVal) ? minVal.toString() : "");
+            setMontoHasta(Number.isFinite(maxVal) ? maxVal.toString() : "");
+          }}
+          options={montoRangeOptions}
+          width="180px"
+        />
+        {(fechaDesde || fechaHasta || montoDesde || montoHasta || montoRangeLabel) && (
           <Button
             size="small"
             variant="text"
             onClick={() => {
               setFechaDesde(null);
               setFechaHasta(null);
+              setMontoDesde("");
+              setMontoHasta("");
+              setMontoRangeLabel("");
             }}
             sx={{ ml: { xs: 0, md: "auto" } }}
           >

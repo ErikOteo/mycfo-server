@@ -235,6 +235,8 @@ public class MovimientoService {
                 conciliado,
                 nombreRelacionado,
                 null,
+                null,
+                null,
                 search,
                 searchDate,
                 pageable
@@ -250,6 +252,8 @@ public class MovimientoService {
             Boolean conciliado,
             String nombreRelacionado,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
             String search,
             LocalDate searchDate,
             Pageable pageable
@@ -264,6 +268,8 @@ public class MovimientoService {
                 fechaHastaTime,
                 tipos,
                 moneda,
+                montoMin,
+                montoMax,
                 conciliado,
                 nombreRelacionado,
                 search,
@@ -297,6 +303,8 @@ public class MovimientoService {
                 conciliado,
                 nombreRelacionado,
                 null,
+                null,
+                null,
                 search,
                 searchDate
         );
@@ -311,6 +319,8 @@ public class MovimientoService {
             Boolean conciliado,
             String nombreRelacionado,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
             String search,
             LocalDate searchDate
     ) {
@@ -325,6 +335,8 @@ public class MovimientoService {
                 fechaHastaTime,
                 tipos,
                 moneda,
+                montoMin,
+                montoMax,
                 conciliado,
                 nombreRelacionado,
                 search,
@@ -358,6 +370,8 @@ public class MovimientoService {
                 tipos,
                 conciliado,
                 nombreRelacionado,
+                null,
+                null,
                 null,
                 search,
                 searchDate

@@ -35,6 +35,7 @@ import {
 import { formatCurrencyByCode } from "../../utils/formatters";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import API_CONFIG from "../../config/api-config";
+import CustomSelect from "../../shared-components/CustomSelect";
 import CurrencyTabs, {
   usePreferredCurrency,
 } from "../../shared-components/CurrencyTabs";
@@ -82,11 +83,76 @@ const FacturaListPage = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState(null); // Dayjs | null
   const [fechaHasta, setFechaHasta] = useState(null); // Dayjs | null
+  const [montoDesde, setMontoDesde] = useState("");
+  const [montoHasta, setMontoHasta] = useState("");
+  const [montoRangeLabel, setMontoRangeLabel] = useState("");
+  const [maxMonto, setMaxMonto] = useState(null);
+  const [montoRangeOptions, setMontoRangeOptions] = useState([]);
   const searchDateISO = useMemo(() => {
     if (!searchText) return null;
     const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
+
+  const parseMontoInput = useCallback((valor) => {
+    if (valor === null || valor === undefined) return null;
+    const cleaned = String(valor)
+      .replace(/\s|\$/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".");
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, []);
+
+  const formatMonto = (valor) =>
+    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(
+      Math.round(valor ?? 0),
+    );
+
+  const buildMontoRanges = useCallback(
+    (max) => {
+      if (!Number.isFinite(max) || max <= 0) return [];
+      let step;
+      if (max <= 100) step = 10;
+      else if (max <= 1_000) step = 100;
+      else if (max <= 10_000) step = 1_000;
+      else if (max <= 100_000) step = 10_000;
+      else if (max <= 1_000_000) step = 50_000;
+      else step = 10 ** Math.max(3, Math.floor(Math.log10(max)) - 1);
+
+      let bucketCount = Math.ceil(max / step);
+      if (bucketCount > 15) {
+        step *= 2;
+        bucketCount = Math.ceil(max / step);
+      }
+
+      const upper = Math.ceil(max / step) * step;
+      const options = [];
+      for (let from = 0; from < upper; from += step) {
+        const to = from + step;
+        options.push(`${formatMonto(from)} - ${formatMonto(to)}`);
+      }
+      return options;
+    },
+    [formatMonto],
+  );
+
+  const handleMontoRangeChange = useCallback((label) => {
+    setMontoRangeLabel(label);
+    if (!label) {
+      setMontoDesde("");
+      setMontoHasta("");
+      return;
+    }
+    const numbers = label.match(/[\d.,]+/g) || [];
+    const [minRaw, maxRaw] = numbers;
+    const parseNumber = (txt) =>
+      parseFloat(txt.replace(/\./g, "").replace(/,/g, "."));
+    const minVal = parseNumber(minRaw ?? "0");
+    const maxVal = parseNumber(maxRaw ?? "0");
+    setMontoDesde(Number.isFinite(minVal) ? minVal.toString() : "");
+    setMontoHasta(Number.isFinite(maxVal) ? maxVal.toString() : "");
+  }, []);
 
   useEffect(() => {
     const handler = setTimeout(
@@ -100,7 +166,14 @@ const FacturaListPage = () => {
     setPaginationModel((prev) =>
       prev.page === 0 ? prev : { ...prev, page: 0 },
     );
-  }, [debouncedSearch, fechaDesde, fechaHasta]);
+  }, [
+    debouncedSearch,
+    fechaDesde,
+    fechaHasta,
+    montoDesde,
+    montoHasta,
+    montoRangeLabel,
+  ]);
 
   useEffect(() => {
     const loadLogo = async () => {
@@ -211,6 +284,36 @@ const FacturaListPage = () => {
     [parseFechaEmision],
   );
 
+  const fetchMaxMonto = useCallback(async () => {
+    try {
+      const params = {
+        page: 0,
+        size: 1,
+        sortBy: "montoTotal",
+        sortDir: "desc",
+        moneda: currency,
+      };
+      const res = await fetchFacturas(params);
+      const first = res?.content?.[0] ?? res?.[0];
+      const max = first?.montoTotal;
+      if (Number.isFinite(max)) {
+        setMaxMonto(max);
+        setMontoRangeOptions(buildMontoRanges(max));
+      } else {
+        setMaxMonto(null);
+        setMontoRangeOptions([]);
+      }
+    } catch (e) {
+      console.error("Error obteniendo max monto facturas:", e);
+      setMaxMonto(null);
+      setMontoRangeOptions([]);
+    }
+  }, [buildMontoRanges, currency]);
+
+  useEffect(() => {
+    fetchMaxMonto();
+  }, [fetchMaxMonto]);
+
   const loadFacturas = useCallback(async () => {
     setLoading(true);
     const fromDate =
@@ -230,6 +333,19 @@ const FacturaListPage = () => {
       return;
     }
 
+    const montoMinParsed = parseMontoInput(montoDesde);
+    const montoMaxParsed = parseMontoInput(montoHasta);
+    if (
+      montoMinParsed !== null &&
+      montoMaxParsed !== null &&
+      montoMinParsed > montoMaxParsed
+    ) {
+      setFacturas([]);
+      setRowCount(0);
+      setLoading(false);
+      return;
+    }
+
     try {
       const params = {
         page: paginationModel.page,
@@ -239,6 +355,8 @@ const FacturaListPage = () => {
         searchDate: searchDateISO || undefined,
         fechaDesde: fromDate ? fromDate.format("YYYY-MM-DD") : undefined,
         fechaHasta: toDate ? toDate.format("YYYY-MM-DD") : undefined,
+        montoMin: montoMinParsed ?? undefined,
+        montoMax: montoMaxParsed ?? undefined,
         ...filters,
         moneda: currency,
       };
@@ -269,6 +387,9 @@ const FacturaListPage = () => {
     searchDateISO,
     fechaDesde,
     fechaHasta,
+    montoDesde,
+    montoHasta,
+    parseMontoInput,
   ]);
 
   const fetchFacturasParaExportar = useCallback(async () => {
@@ -284,6 +405,8 @@ const FacturaListPage = () => {
         fechaHasta: fechaHasta
           ? dayjs(fechaHasta).format("YYYY-MM-DD")
           : undefined,
+        montoMin: parseMontoInput(montoDesde) ?? undefined,
+        montoMax: parseMontoInput(montoHasta) ?? undefined,
         ...filters,
         moneda: currency,
       });
@@ -306,6 +429,9 @@ const FacturaListPage = () => {
     fechaHasta,
     filters,
     currency,
+    montoDesde,
+    montoHasta,
+    parseMontoInput,
   ]);
 
   const cargarRolUsuario = useCallback(() => {
@@ -338,11 +464,14 @@ const FacturaListPage = () => {
     [],
   );
 
-  const handleCurrencyChange = useCallback((next) => {
-    if (!next) return;
-    setCurrency(next);
-    setPaginationModel((prev) => ({ ...prev, page: 0 }));
-  }, [setCurrency]);
+  const handleCurrencyChange = useCallback(
+    (next) => {
+      if (!next) return;
+      setCurrency(next);
+      setPaginationModel((prev) => ({ ...prev, page: 0 }));
+    },
+    [setCurrency],
+  );
 
   const initialState = useMemo(
     () => ({
@@ -601,7 +730,10 @@ const FacturaListPage = () => {
         minWidth: 140,
         renderCell: (params) =>
           params.row.montoTotal != null
-            ? formatCurrencyByCode(params.row.montoTotal, params.row.moneda || currency)
+            ? formatCurrencyByCode(
+                params.row.montoTotal,
+                params.row.moneda || currency,
+              )
             : "-",
       },
       {
@@ -682,7 +814,9 @@ const FacturaListPage = () => {
     const headers = exportColumns.map((c) => c.headerName);
     const excelData = [
       headers,
-      ...registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field))),
+      ...registros.map((row) =>
+        exportColumns.map((c) => formatValorExport(row, c.field)),
+      ),
     ];
     const colsConfig = exportColumns.map(() => ({ wch: 18 }));
 
@@ -706,7 +840,9 @@ const FacturaListPage = () => {
     if (!registros.length) return;
 
     const head = [exportColumns.map((c) => c.headerName)];
-    const body = registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field)));
+    const body = registros.map((row) =>
+      exportColumns.map((c) => formatValorExport(row, c.field)),
+    );
 
     await exportPdfReport({
       title: "Facturas",
@@ -726,12 +862,15 @@ const FacturaListPage = () => {
         ],
         kpis: [
           { label: "Total", value: registros.length.toString() },
-          { label: "Monedas", value: new Set(registros.map((r) => r.moneda || "ARS")).size.toString() },
+          {
+            label: "Monedas",
+            value: new Set(
+              registros.map((r) => r.moneda || "ARS"),
+            ).size.toString(),
+          },
           { label: "Orden", value: "Fecha desc" },
         ],
-        summary: [
-          "Incluye filtros aplicados y rango de fechas.",
-        ],
+        summary: ["Incluye filtros aplicados y rango de fechas."],
       },
     });
   };
@@ -789,9 +928,7 @@ const FacturaListPage = () => {
             format="DD/MM/YYYY"
             onChange={(newValue) =>
               setFechaDesde(
-                newValue && newValue.isValid()
-                  ? newValue.startOf("day")
-                  : null,
+                newValue && newValue.isValid() ? newValue.startOf("day") : null,
               )
             }
             slotProps={{
@@ -840,9 +977,7 @@ const FacturaListPage = () => {
             format="DD/MM/YYYY"
             onChange={(newValue) =>
               setFechaHasta(
-                newValue && newValue.isValid()
-                  ? newValue.startOf("day")
-                  : null,
+                newValue && newValue.isValid() ? newValue.startOf("day") : null,
               )
             }
             slotProps={{
@@ -886,13 +1021,27 @@ const FacturaListPage = () => {
             sx={{ width: 140, flex: "0 0 140px" }}
           />
         </LocalizationProvider>
-        {(fechaDesde || fechaHasta) && (
+        <CustomSelect
+          name="facturaMontoRange"
+          value={montoRangeLabel}
+          onChange={handleMontoRangeChange}
+          options={montoRangeOptions}
+          width="180px"
+        />
+        {(fechaDesde ||
+          fechaHasta ||
+          montoDesde ||
+          montoHasta ||
+          montoRangeLabel) && (
           <Button
             size="small"
             variant="text"
             onClick={() => {
               setFechaDesde(null);
               setFechaHasta(null);
+              setMontoDesde("");
+              setMontoHasta("");
+              setMontoRangeLabel("");
             }}
             sx={{ ml: { xs: 0, md: "auto" } }}
           >
@@ -908,10 +1057,16 @@ const FacturaListPage = () => {
             flexWrap: "wrap",
           }}
         >
-          <Button variant="contained" onClick={() => navigate("/carga/factura")}>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/carga/factura")}
+          >
             Cargar factura
           </Button>
-          <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
+          <ExportadorSimple
+            onExportPdf={handleExportPdf}
+            onExportExcel={handleExportExcel}
+          />
         </Box>
       </Box>
 
@@ -995,13 +1150,14 @@ const FacturaListPage = () => {
             "& .MuiDataGrid-iconButtonContainer": {
               visibility: "hidden",
             },
-            "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer": {
-              visibility: "visible",
-            },
+            "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer":
+              {
+                visibility: "visible",
+              },
             "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
-            {
-              display: "none",
-            },
+              {
+                display: "none",
+              },
             "& .MuiDataGrid-row:hover": {
               backgroundColor: (theme) => theme.palette.action.hover,
             },
