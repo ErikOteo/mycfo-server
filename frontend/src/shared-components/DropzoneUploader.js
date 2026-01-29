@@ -48,61 +48,90 @@ export default function DropzoneUploader({
 
   return (
     <Box sx={{ width }}>
-      <Paper
-        variant="outlined"
-        {...getRootProps()}
-        sx={{
-          width: "100%",
-          height: height,
-          p: 3,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          border: "2px dashed",
-          borderColor: isDragActive ? "primary.main" : "grey.400",
-          bgcolor: isDragActive ? "grey.100" : "inherit",
-          cursor: "pointer",
-          ...(theme.palette.mode === "dark" && {
-            borderColor: isDragActive ? "primary.light" : "grey.700",
-            bgcolor: isDragActive ? "grey.900" : "inherit",
-          }),
-        }}
-      >
-        <input {...getInputProps()} />
-        <CloudUploadIcon sx={{ fontSize: 60, mb: 1 }} color="action" />
-        {isDragActive ? (
-          <Typography variant="body1">Suelta el archivo aquí...</Typography>
-        ) : (
-          <Typography variant="body1">
-            Arrastrá y soltá un archivo aquí o hacé clic para seleccionarlo
-          </Typography>
-        )}
-      </Paper>
-
-      {file && (
-        <Box
+      {!file ? (
+        <Paper
+          variant="outlined"
+          {...getRootProps()}
           sx={{
-            mt: 2,
             width: "100%",
+            height: height,
+            p: 3,
             display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
             alignItems: "center",
-            justifyContent: "space-between",
-            p: 1.5,
-            border: "1px solid",
-            borderColor: "grey.300",
-            borderRadius: 1,
+            textAlign: "center",
+            border: "2px dashed",
+            borderColor: isDragActive ? "primary.main" : "grey.400",
+            bgcolor: isDragActive ? "grey.100" : "inherit",
+            cursor: "pointer",
+            transition: "all 0.2s ease-in-out",
             ...(theme.palette.mode === "dark" && {
-              borderColor: "grey.700",
+              borderColor: isDragActive ? "primary.light" : "grey.700",
+              bgcolor: isDragActive ? "grey.900" : "inherit",
             }),
           }}
         >
-          <Typography variant="body2">{file.name}</Typography>
-          <IconButton onClick={handleRemove} size="small" color="error">
+          <input {...getInputProps()} />
+          <CloudUploadIcon sx={{ fontSize: 60, mb: 1 }} color="action" />
+          {isDragActive ? (
+            <Typography variant="body1">Suelta el archivo aquí...</Typography>
+          ) : (
+            <Typography variant="body1">
+              Arrastrá y soltá un archivo aquí o hacé clic para seleccionarlo
+            </Typography>
+          )}
+        </Paper>
+      ) : (
+        <Paper
+          variant="outlined"
+          sx={{
+            width: "100%",
+            height: height,
+            p: 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            border: "2px solid",
+            borderColor: "primary.main",
+            bgcolor: theme.palette.mode === "dark" ? "action.hover" : "grey.50",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, overflow: "hidden" }}>
+            <Box
+              sx={{
+                p: 1,
+                borderRadius: "50%",
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CloudUploadIcon />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" fontWeight="bold" noWrap>
+                {file.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {(file.size / 1024).toFixed(1)} KB • Listo para procesar
+              </Typography>
+            </Box>
+          </Box>
+
+          <IconButton
+            onClick={handleRemove}
+            color="error"
+            sx={{
+              ml: 1,
+              "&:hover": { bgcolor: "error.light", color: "error.contrastText" }
+            }}
+          >
             <DeleteIcon />
           </IconButton>
-        </Box>
+        </Paper>
       )}
     </Box>
   );
