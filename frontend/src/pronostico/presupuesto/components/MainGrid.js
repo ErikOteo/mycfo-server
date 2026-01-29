@@ -835,7 +835,17 @@ export default function MainGrid() {
         align: 'center',
         headerAlign: 'center',
         renderCell: (params) => (
-          <Typography variant="body2">{params.value}</Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              lineHeight: 1.2,
+              py: 1
+            }}
+          >
+            {params.value}
+          </Typography>
         )
       },
       {
@@ -1070,6 +1080,7 @@ export default function MainGrid() {
                 <DataGrid
                   rows={searchPage.content}
                   columns={columns}
+                  getRowHeight={() => 'auto'}
                   autoHeight
                   density="standard"
                   hideFooter
@@ -1126,6 +1137,7 @@ export default function MainGrid() {
             <DataGrid
               rows={presupuestosPage.content || []}
               columns={columns}
+              getRowHeight={() => 'auto'}
               autoHeight
               density="standard"
               hideFooter
