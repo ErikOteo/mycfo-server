@@ -4,7 +4,7 @@ import { getNotifications, markAsRead } from "../services/notificationsApi";
 // Hook de uso general para el "centro de notificaciones"
 // - NO hace polling
 // - Carga solo cuando el componente se monta (o cuando cambia userId)
-// - Solo trae notificaciones NO leídas (status="unread")
+// Por defecto trae todas las notificaciones (status="all") y permite marcar sin quitarlas de la lista.
 export function useNotifications(userId) {
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -24,7 +24,7 @@ export function useNotifications(userId) {
 
       const data = await getNotifications({
         userId,
-        status: "unread",
+        status: "all",
         limit: 50,
       });
 
@@ -40,7 +40,7 @@ export function useNotifications(userId) {
     }
   }, [userId]);
 
-  // Polling cada 10s igual que la solapa (drawer)
+  // Polling cada 60s
   useEffect(() => {
     if (!userId) {
       setItems([]);
@@ -53,7 +53,7 @@ export function useNotifications(userId) {
     const loop = async () => {
       await fetchNotifications();
       if (!cancelled) {
-        setTimeout(loop, 10000); // 10 segundos
+        setTimeout(loop, 60000); // 60 segundos
       }
     };
 
@@ -95,8 +95,12 @@ export function useNotifications(userId) {
       try {
         await markAsRead({ userId, notifId: id });
 
-        // Eliminar del listado local (porque ya está leída y no debe mostrarse)
-        setItems((prev) => prev.filter((n) => n.id !== id));
+        // Marcar en el estado local
+        setItems((prev) =>
+          prev.map((n) =>
+            n.id === id ? { ...n, is_read: true } : n
+          )
+        );
         setUnread((prev) => Math.max(0, prev - 1));
 
         // Notificar a otros componentes (solapa) que esta notificación fue leída
@@ -118,8 +122,8 @@ export function useNotifications(userId) {
         const { markAllRead } = await import("../services/notificationsApi");
         await markAllRead(userId);
 
-        // Vaciar listado local (todas quedan leídas y no deben mostrarse)
-        setItems([]);
+        // Marcar todas como leídas en local
+        setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
         setUnread(0);
 
         // Notificar a otros componentes (solapa) que todas fueron leídas

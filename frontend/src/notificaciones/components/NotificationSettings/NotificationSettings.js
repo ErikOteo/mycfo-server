@@ -44,7 +44,6 @@ const timeStringToDayjs = (timeStr) => {
 export default function NotificationSettings() {
   const [preferences, setPreferences] = React.useState({
     emailEnabled: true,
-    inAppEnabled: true,
     pushEnabled: false,
     dailyDigestEnabled: true,
     weeklyDigestEnabled: false,
@@ -271,17 +270,6 @@ export default function NotificationSettings() {
                   }
                   label="Notificaciones por Email"
                 />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={preferences.inAppEnabled}
-                      onChange={(e) =>
-                        handlePreferenceChange("inAppEnabled", e.target.checked)
-                      }
-                    />
-                  }
-                  label="Notificaciones en la Aplicación"
-                />
                 {/*<FormControlLabel
                   control={
                     <Switch
@@ -456,10 +444,7 @@ export default function NotificationSettings() {
                             )
                           }
                           size="small"
-                          disabled={
-                            !preferences.emailEnabled &&
-                            !preferences.inAppEnabled
-                          }
+                      disabled={!preferences.emailEnabled}
                         />
                       }
                       label="Habilitado"
@@ -467,12 +452,12 @@ export default function NotificationSettings() {
                     <FormControlLabel
                       control={
                         <Switch
-                          checked={
-                            (preferences.emailEnabled &&
-                              preferences.typeConfigs[type.value]
-                                ?.emailEnabled) ??
-                            true
-                          }
+                        checked={
+                          (preferences.emailEnabled &&
+                            preferences.typeConfigs[type.value]
+                              ?.emailEnabled) ??
+                          true
+                        }
                           onChange={(e) =>
                             handleTypeConfigChange(
                               type.value,
@@ -485,28 +470,6 @@ export default function NotificationSettings() {
                         />
                       }
                       label="Email"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={
-                            (preferences.inAppEnabled &&
-                              preferences.typeConfigs[type.value]
-                                ?.inAppEnabled) ??
-                            true
-                          }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "inAppEnabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                          disabled={!preferences.inAppEnabled}
-                        />
-                      }
-                      label="En App"
                     />
                   </FormGroup>
                 </Paper>

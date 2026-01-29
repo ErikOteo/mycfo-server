@@ -27,6 +27,7 @@ import {
   MoreVert as MoreVertIcon,
   MarkEmailRead as MarkReadIcon,
   Settings as SettingsIcon,
+  DeleteOutline as DeleteIcon,
   CheckBox as CheckBoxIcon,
   CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
 } from "@mui/icons-material";
@@ -38,6 +39,7 @@ import {
   formatNumber,
   formatMovementDate,
 } from "../../utils/formatters";
+import { deleteNotification } from "../../services/notificationsApi";
 
 export default function NotificationCenter() {
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -102,6 +104,19 @@ export default function NotificationCenter() {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!userId || selectedNotifications.length === 0) return;
+    try {
+      await Promise.all(
+        selectedNotifications.map((id) => deleteNotification(id, userId))
+      );
+      setSelectedNotifications([]);
+      reload();
+    } catch (error) {
+      console.error("Error eliminando notificaciones:", error);
+    }
   };
 
   // Filtrar notificaciones
@@ -217,6 +232,15 @@ export default function NotificationCenter() {
               <IconButton onClick={handleMenuClick}>
                 <MoreVertIcon />
               </IconButton>
+              {selectedNotifications.length > 0 && (
+                <IconButton
+                  color="error"
+                  onClick={handleDeleteSelected}
+                  aria-label="Eliminar seleccionadas"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              )}
               <IconButton
                 onClick={() => navigate("/configuracion-notificaciones")}
               >
@@ -348,7 +372,7 @@ export default function NotificationCenter() {
                         flexDirection: "column",
                         opacity: notification.is_read ? 0.7 : 1,
                         borderLeft: notification.is_read
-                          ? "none"
+                          ? "4px solid #9e9e9e"
                           : "4px solid #008375",
                         backgroundColor: selectedNotifications.includes(
                           notification.id
