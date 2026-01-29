@@ -98,7 +98,7 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
       {/* Totales arriba */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Ingresos</Typography>
             <Typography variant="h6" color="green">
               {currencyFormatter(totalIngresos)}
@@ -106,7 +106,7 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
           </Paper>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Egresos</Typography>
             <Typography variant="h6" color="red">
               {currencyFormatter(totalEgresos)}
@@ -114,7 +114,7 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
           </Paper>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Balance</Typography>
             <Typography variant="h6" color={balance >= 0 ? 'green' : 'red'}>
               {currencyFormatter(balance)}
