@@ -38,7 +38,7 @@ export const usePreferredCurrency = (fallback = DEFAULT_CURRENCY) => {
   return [currency, handleChange];
 };
 
-const CurrencyTabs = ({ value, onChange, sx }) => {
+const CurrencyTabs = ({ value, onChange, sx, disabled }) => {
   const current = value || getStoredCurrencyPreference();
 
   const handleChange = (_event, newValue) => {
@@ -62,6 +62,7 @@ const CurrencyTabs = ({ value, onChange, sx }) => {
         value={current}
         exclusive
         onChange={handleChange}
+        disabled={disabled}
         color="standard"
         sx={(theme) => {
           // Forzamos apariencia consistente en ambos modos (igual que light).
@@ -86,14 +87,15 @@ const CurrencyTabs = ({ value, onChange, sx }) => {
               position: "absolute",
               top: 2,
               left: -2,
-              width: "calc(50% + 4px)", // solapa 2px para evitar línea central
+              width: disabled ? "calc(100% + 4px)" : "calc(50% + 4px)", // solapa 2px para evitar línea central
               height: "calc(100% - 4px)",
               backgroundImage: `${highlight}, ${gradient}`,
               borderRadius: "inherit",
               boxShadow: "none",
               transition: "transform 220ms ease",
-              transform:
-                current === "USD"
+              transform: disabled
+                ? "translateX(0%)"
+                : current === "USD"
                   ? "translateX(100%)"
                   : "translateX(0%)",
               zIndex: 0,
@@ -171,56 +173,60 @@ const CurrencyTabs = ({ value, onChange, sx }) => {
           return isDark ? darkGroup : lightGroup;
         }}
       >
-        <ToggleButton
-          value="ARS"
-          sx={(theme) => {
-            const inactiveColor =
-              theme.palette.mode === "light"
-                ? theme.palette.common.black
-                : theme.palette.grey[700];
-            const selectedColor = theme.palette.common.white;
-            return {
-              color: inactiveColor,
-              flex: 1,
-              minWidth: 0,
-              px: 2.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              whiteSpace: "nowrap",
-              "&&&.Mui-selected": {
-                color: `${selectedColor} !important`,
-              },
-            };
-          }}
-        >
-          Pesos (ARS)
-        </ToggleButton>
-        <ToggleButton
-          value="USD"
-          sx={(theme) => {
-            const inactiveColor =
-              theme.palette.mode === "light"
-                ? theme.palette.common.black
-                : theme.palette.grey[700];
-            const selectedColor = theme.palette.common.white;
-            return {
-              color: inactiveColor,
-              flex: 1,
-              minWidth: 0,
-              px: 2.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              whiteSpace: "nowrap",
-              "&&&.Mui-selected": {
-                color: `${selectedColor} !important`,
-              },
-            };
-          }}
-        >
-          Dólares (USD)
-        </ToggleButton>
+        {(!disabled || current === 'ARS') && (
+          <ToggleButton
+            value="ARS"
+            sx={(theme) => {
+              const inactiveColor =
+                theme.palette.mode === "light"
+                  ? theme.palette.common.black
+                  : theme.palette.grey[700];
+              const selectedColor = theme.palette.common.white;
+              return {
+                color: inactiveColor,
+                flex: 1,
+                minWidth: 0,
+                px: 2.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                whiteSpace: "nowrap",
+                "&&&.Mui-selected": {
+                  color: `${selectedColor} !important`,
+                },
+              };
+            }}
+          >
+            Pesos (ARS)
+          </ToggleButton>
+        )}
+        {(!disabled || current === 'USD') && (
+          <ToggleButton
+            value="USD"
+            sx={(theme) => {
+              const inactiveColor =
+                theme.palette.mode === "light"
+                  ? theme.palette.common.black
+                  : theme.palette.grey[700];
+              const selectedColor = theme.palette.common.white;
+              return {
+                color: inactiveColor,
+                flex: 1,
+                minWidth: 0,
+                px: 2.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                whiteSpace: "nowrap",
+                "&&&.Mui-selected": {
+                  color: `${selectedColor} !important`,
+                },
+              };
+            }}
+          >
+            Dólares (USD)
+          </ToggleButton>
+        )}
       </ToggleButtonGroup>
     </Box>
   );

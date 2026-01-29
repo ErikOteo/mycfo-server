@@ -6,7 +6,12 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Alert,
-  Button
+  Button,
+  FormControl,
+  Select,
+  MenuItem,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -25,10 +30,14 @@ import {
 import LoadingSpinner from '../../shared-components/LoadingSpinner';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
+import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
 
 export default function PronosticoFijoDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
   const [loading, setLoading] = React.useState(true);
   const [forecast, setForecast] = React.useState(null);
   const [error, setError] = React.useState(null);
@@ -36,14 +45,20 @@ export default function PronosticoFijoDetalle() {
 
   React.useEffect(() => {
     cargarForecast();
-  }, [id]);
+  }, [id]); // Removido currency de dependencias para evitar recargas innecesarias si es fijo
 
   const cargarForecast = async () => {
     setLoading(true);
     setError(null);
     try {
+      // Cargamos el forecast. El endpoint ignora el query param moneda si es fijo, pero lo dejamos por consistencia
       const response = await http.get(`${API_CONFIG.PRONOSTICO}/api/forecasts/${id}`);
       setForecast(response.data);
+
+      // Si el forecast tiene moneda fija, forzamos esa moneda
+      if (response.data.moneda) {
+        setCurrency(response.data.moneda);
+      }
     } catch (err) {
       console.error('Error cargando forecast:', err);
       setError(err.response?.data?.message || 'Error al cargar el pronóstico. Por favor intenta nuevamente.');
@@ -271,29 +286,51 @@ export default function PronosticoFijoDetalle() {
       {/* Controles de visualización del gráfico */}
       {chartData.length > 0 && (
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ mr: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <CurrencyTabs
+              value={currency}
+              onChange={setCurrency}
+              sx={{ mb: 0 }}
+              disabled={!!forecast?.moneda} // Determina si se deshabilita
+            />
+            <Typography variant="h6" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
               Visualización
             </Typography>
-            <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={(e, newMode) => newMode && setViewMode(newMode)}
-              size="small"
-            >
-              <ToggleButton value="todos">
-                Todos
-              </ToggleButton>
-              <ToggleButton value="ingresos">
-                Solo Ingresos
-              </ToggleButton>
-              <ToggleButton value="egresos">
-                Solo Egresos
-              </ToggleButton>
-              <ToggleButton value="balance">
-                Solo Balance
-              </ToggleButton>
-            </ToggleButtonGroup>
+
+            {isMobile ? (
+              <FormControl size="small" sx={{ minWidth: 100, flexGrow: 1 }}>
+                <Select
+                  value={viewMode}
+                  onChange={(e) => setViewMode(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="todos">Todos</MenuItem>
+                  <MenuItem value="ingresos">Solo Ingresos</MenuItem>
+                  <MenuItem value="egresos">Solo Egresos</MenuItem>
+                  <MenuItem value="balance">Solo Balance</MenuItem>
+                </Select>
+              </FormControl>
+            ) : (
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(e, newMode) => newMode && setViewMode(newMode)}
+                size="small"
+              >
+                <ToggleButton value="todos">
+                  Todos
+                </ToggleButton>
+                <ToggleButton value="ingresos">
+                  Solo Ingresos
+                </ToggleButton>
+                <ToggleButton value="egresos">
+                  Solo Egresos
+                </ToggleButton>
+                <ToggleButton value="balance">
+                  Solo Balance
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
           </Box>
 
           {/* Gráfico */}
@@ -301,7 +338,7 @@ export default function PronosticoFijoDetalle() {
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mes" />
-              <YAxis />
+              <YAxis width={70} />
               <Tooltip formatter={(value) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
               <Legend />
               {getSplitPointMes() && (

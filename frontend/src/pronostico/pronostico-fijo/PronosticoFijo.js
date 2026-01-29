@@ -19,7 +19,6 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel,
   CircularProgress,
   Tooltip,
   Button
@@ -35,6 +34,7 @@ import { useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../../shared-components/LoadingSpinner';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
+import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
 
 // Opciones de frecuencia
 const FRECUENCIAS = [
@@ -56,6 +56,7 @@ const HORIZONTES = [
 export default function PronosticoFijo() {
   const [forecasts, setForecasts] = React.useState([]);
   const [configs, setConfigs] = React.useState([]);
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
   const [success, setSuccess] = React.useState(null);
@@ -241,7 +242,10 @@ export default function PronosticoFijo() {
     setGeneratingForecastId(configId);
     setError(null);
     try {
-      await http.post(`${API_CONFIG.PRONOSTICO}/api/forecasts/generar/${configId}`);
+      // Pasamos la moneda como query param
+      await http.post(`${API_CONFIG.PRONOSTICO}/api/forecasts/generar/${configId}`, null, {
+        params: { moneda: currency }
+      });
       setSuccess('Pronóstico generado exitosamente');
       cargarDatos(); // Recargar para mostrar el nuevo pronóstico
     } catch (err) {
@@ -276,23 +280,29 @@ export default function PronosticoFijo() {
     }
   };
 
-  const formatearNombre = (nombre, createdAt) => {
-    if (nombre && nombre.trim() !== '') {
-      return nombre;
-    }
-    if (createdAt) {
-      try {
-        const fecha = new Date(createdAt);
-        const fechaFormateada = fecha.toLocaleDateString('es-AR', {
-          year: 'numeric',
-          month: 'long',
-        });
-        return `Pronóstico de ${fechaFormateada}`;
-      } catch (e) {
-        // ignore parse error and fallback below
+  const formatearNombre = (nombre, createdAt, moneda) => {
+    let nombreBase = nombre;
+    if (!nombreBase || nombreBase.trim() === '') {
+      if (createdAt) {
+        try {
+          const fecha = new Date(createdAt);
+          const fechaFormateada = fecha.toLocaleDateString('es-AR', {
+            year: 'numeric',
+            month: 'long',
+          });
+          nombreBase = `Pronóstico de ${fechaFormateada}`;
+        } catch (e) {
+          nombreBase = 'Pronóstico sin nombre';
+        }
+      } else {
+        nombreBase = 'Pronóstico sin nombre';
       }
     }
-    return 'Pronóstico sin nombre';
+    // Agregar indicador de moneda si existe
+    if (moneda) {
+      return `${nombreBase} (${moneda})`;
+    }
+    return nombreBase;
   };
 
   const esAdmin = (usuarioRol || '').toUpperCase().includes('ADMIN');
@@ -310,9 +320,12 @@ export default function PronosticoFijo() {
         p: 3,
       }}
     >
-      <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
-        Pronósticos Fijos
-      </Typography>
+      <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Pronósticos Fijos
+        </Typography>
+      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -346,9 +359,9 @@ export default function PronosticoFijo() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell><strong>Nombre</strong></TableCell>
-                <TableCell><strong>Frecuencia</strong></TableCell>
-                <TableCell><strong>Horizonte</strong></TableCell>
+                <TableCell align="center"><strong>Nombre</strong></TableCell>
+                <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Frecuencia</strong></TableCell>
+                <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Horizonte</strong></TableCell>
                 <TableCell align="center"><strong>Acciones</strong></TableCell>
               </TableRow>
             </TableHead>
@@ -356,7 +369,7 @@ export default function PronosticoFijo() {
               {/* Fila para nueva configuración */}
               {newConfigMode && (
                 <TableRow>
-                  <TableCell>
+                  <TableCell align="center">
                     <TextField
                       size="small"
                       value={newConfig.nombre}
@@ -365,7 +378,7 @@ export default function PronosticoFijo() {
                       fullWidth
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                     <FormControl size="small" fullWidth>
                       <Select
                         value={newConfig.mesesFrecuencia}
@@ -379,7 +392,7 @@ export default function PronosticoFijo() {
                       </Select>
                     </FormControl>
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                     <FormControl size="small" fullWidth>
                       <Select
                         value={newConfig.horizonteMeses}
@@ -428,7 +441,7 @@ export default function PronosticoFijo() {
                   <TableRow key={config.id} hover>
                     {editingConfigId === config.id ? (
                       <>
-                        <TableCell>
+                        <TableCell align="center">
                           <TextField
                             size="small"
                             value={editingConfig.nombre}
@@ -436,7 +449,7 @@ export default function PronosticoFijo() {
                             fullWidth
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                           <FormControl size="small" fullWidth>
                             <Select
                               value={editingConfig.mesesFrecuencia}
@@ -450,7 +463,7 @@ export default function PronosticoFijo() {
                             </Select>
                           </FormControl>
                         </TableCell>
-                        <TableCell>
+                        <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                           <FormControl size="small" fullWidth>
                             <Select
                               value={editingConfig.horizonteMeses}
@@ -485,11 +498,11 @@ export default function PronosticoFijo() {
                       </>
                     ) : (
                       <>
-                        <TableCell>{config.nombre}</TableCell>
-                        <TableCell>{getFrecuenciaLabel(config.mesesFrecuencia)}</TableCell>
-                        <TableCell>{getHorizonteLabel(config.horizonteMeses)}</TableCell>
+                        <TableCell align="center">{config.nombre}</TableCell>
+                        <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>{getFrecuenciaLabel(config.mesesFrecuencia)}</TableCell>
+                        <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>{getHorizonteLabel(config.horizonteMeses)}</TableCell>
                         <TableCell align="center">
-                          <Tooltip title="Calcular ahora">
+                          <Tooltip title={`Calcular ahora en ${currency}`}>
                             <IconButton
                               color="success"
                               onClick={() => handleGenerarForecast(config.id)}
@@ -543,53 +556,57 @@ export default function PronosticoFijo() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell><strong>Nombre</strong></TableCell>
-                <TableCell><strong>Horizonte</strong></TableCell>
-                <TableCell><strong>Frecuencia</strong></TableCell>
-                <TableCell><strong>Fecha Generación</strong></TableCell>
+                <TableCell align="center"><strong>Nombre</strong></TableCell>
+                <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Horizonte</strong></TableCell>
+                <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Frecuencia</strong></TableCell>
+                <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Fecha Generación</strong></TableCell>
                 <TableCell align="center"><strong>Acciones</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {forecasts.length === 0 ? (
+              {forecasts
+                .filter(forecast => (forecast.moneda || 'ARS') === currency)
+                .length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
                     <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                      No hay pronósticos generados aún.
+                      No hay pronósticos generados en {currency === 'ARS' ? 'Pesos' : 'Dólares'}.
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                forecasts.map((forecast) => (
-                  <TableRow key={forecast.id} hover>
-                    <TableCell>{formatearNombre(forecast.nombre, forecast.createdAt)}</TableCell>
-                    <TableCell>{getHorizonteLabel(forecast.horizonteMeses)}</TableCell>
-                    <TableCell>{getFrecuenciaLabel(forecast.mesesFrecuencia)}</TableCell>
-                    <TableCell>{formatearFecha(forecast.createdAt)}</TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Ver pronóstico">
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleVerForecast(forecast.id)}
-                          size="small"
-                        >
-                          <VisibilityIcon />
-                        </IconButton>
-                      </Tooltip>
-                      {esAdmin && (
-                        <Tooltip title="Eliminar">
+                forecasts
+                  .filter(forecast => (forecast.moneda || 'ARS') === currency)
+                  .map((forecast) => (
+                    <TableRow key={forecast.id} hover>
+                      <TableCell align="center">{formatearNombre(forecast.nombre, forecast.createdAt, forecast.moneda)}</TableCell>
+                      <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>{getHorizonteLabel(forecast.horizonteMeses)}</TableCell>
+                      <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>{getFrecuenciaLabel(forecast.mesesFrecuencia)}</TableCell>
+                      <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}>{formatearFecha(forecast.createdAt)}</TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Ver pronóstico">
                           <IconButton
-                            color="error"
-                            onClick={() => handleDeleteForecastClick(forecast)}
+                            color="primary"
+                            onClick={() => handleVerForecast(forecast.id)}
                             size="small"
                           >
-                            <DeleteIcon />
+                            <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
+                        {esAdmin && (
+                          <Tooltip title="Eliminar">
+                            <IconButton
+                              color="error"
+                              onClick={() => handleDeleteForecastClick(forecast)}
+                              size="small"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
               )}
             </TableBody>
           </Table>
@@ -601,7 +618,7 @@ export default function PronosticoFijo() {
         <DialogTitle>Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <Typography>
-            ¿Estás seguro de que deseas eliminar el pronóstico "{formatearNombre(forecastToDelete?.nombre, forecastToDelete?.createdAt)}"?
+            ¿Estás seguro de que deseas eliminar el pronóstico "{formatearNombre(forecastToDelete?.nombre, forecastToDelete?.createdAt, forecastToDelete?.moneda)}"?
             Esta acción no se puede deshacer.
           </Typography>
         </DialogContent>
