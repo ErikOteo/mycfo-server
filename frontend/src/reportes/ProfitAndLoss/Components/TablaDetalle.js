@@ -90,19 +90,19 @@ export default function TablaDetalle({ year, ingresos, egresos }) {
       {/* Totales (igual al reporte mensual) */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Ingresos</Typography>
             <Typography variant="h6" color="green">{formatCurrency(totalIngresos)}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Egresos</Typography>
             <Typography variant="h6" color="red">{formatCurrency(totalEgresos)}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Resultado</Typography>
             <Typography variant="h6" color={balance >= 0 ? 'green' : 'red'}>{formatCurrency(balance)}</Typography>
           </Paper>

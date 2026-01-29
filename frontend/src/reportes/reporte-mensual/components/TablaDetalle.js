@@ -97,7 +97,7 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
     <Box sx={{ width: '100%', px: 0, py: 2 }}>
       {/* Totales arriba */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid item xs={12} sm={4}>
           <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Ingresos</Typography>
             <Typography variant="h6" color="green">
@@ -105,7 +105,7 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
             </Typography>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid item xs={12} sm={4}>
           <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Egresos</Typography>
             <Typography variant="h6" color="red">
@@ -113,7 +113,7 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
             </Typography>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid item xs={12} sm={4}>
           <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Balance</Typography>
             <Typography variant="h6" color={balance >= 0 ? 'green' : 'red'}>
