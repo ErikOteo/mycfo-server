@@ -59,12 +59,12 @@ public class UsuarioService {
     public UsuarioDTO crearOActualizarUsuario(UsuarioDTO usuarioDTO) {
         Usuario usuario = usuarioRepository.findBySub(usuarioDTO.getSub())
                 .orElse(new Usuario());
-        
+
         usuario.setSub(usuarioDTO.getSub());
         usuario.setNombre(usuarioDTO.getNombre());
         usuario.setEmail(usuarioDTO.getEmail());
         usuario.setTelefono(usuarioDTO.getTelefono());
-        
+
         // REGLA: Solo asignar rol ADMINISTRADOR si viene explícitamente y es válido
         // Por defecto, todos los usuarios nuevos empiezan como NORMAL
         if (usuarioDTO.getRol() != null) {
@@ -72,7 +72,7 @@ public class UsuarioService {
         } else {
             usuario.setRol(Rol.NORMAL); // Rol por defecto para usuarios nuevos
         }
-        
+
         usuario.setActivo(true);
 
         if (usuarioDTO.getEmpresaId() != null) {
@@ -114,7 +114,7 @@ public class UsuarioService {
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
+
         if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
             throw new RuntimeException("Solo los administradores pueden actualizar empleados");
         }
@@ -122,18 +122,18 @@ public class UsuarioService {
         usuario.setNombre(dto.getNombre());
         usuario.setEmail(dto.getEmail());
         usuario.setTelefono(dto.getTelefono());
-        
+
         // Solo un administrador puede asignar rol de administrador
         if (dto.getRol() != null) {
             if (dto.getRol() == Rol.ADMINISTRADOR && usuarioActual.getRol() != Rol.ADMINISTRADOR) {
                 throw new RuntimeException("Solo un administrador puede asignar el rol de administrador");
             }
-            
+
             // Validación adicional: no permitir que un usuario normal cambie roles
             if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
                 throw new RuntimeException("Solo los administradores pueden cambiar roles de usuarios");
             }
-            
+
             usuario.setRol(dto.getRol());
         }
 
@@ -162,7 +162,7 @@ public class UsuarioService {
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
+
         if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
             throw new RuntimeException("Solo los administradores pueden eliminar empleados");
         }
@@ -184,7 +184,7 @@ public class UsuarioService {
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
+
         if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
             throw new RuntimeException("Solo los administradores pueden desactivar empleados");
         }
@@ -204,7 +204,7 @@ public class UsuarioService {
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
+
         if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
             throw new RuntimeException("Solo los administradores pueden activar empleados");
         }
@@ -224,7 +224,7 @@ public class UsuarioService {
         dto.setTelefono(usuario.getTelefono());
         dto.setRol(usuario.getRol());
         dto.setActivo(usuario.getActivo());
-        
+
         if (usuario.getEmpresa() != null) {
             dto.setEmpresaId(usuario.getEmpresa().getId());
             dto.setEmpresaNombre(usuario.getEmpresa().getNombre());
@@ -232,7 +232,15 @@ public class UsuarioService {
             dto.setEmpresaCondicionIVA(usuario.getEmpresa().getCondicionIVA());
             dto.setEmpresaDomicilio(usuario.getEmpresa().getDomicilio());
         }
-        
+
         return dto;
+    }
+
+    public void cambiarPassword(String token, String oldPassword, String newPassword) {
+        String accessToken = token;
+        if (token != null && token.startsWith("Bearer ")) {
+            accessToken = token.substring(7);
+        }
+        cognitoService.cambiarPassword(accessToken, oldPassword, newPassword);
     }
 }

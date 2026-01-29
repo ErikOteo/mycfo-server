@@ -19,27 +19,39 @@ import Logo from '../../shared-components/Logo';
 
 function SideMenuMobile({ open, toggleDrawer }) {
   const navigate = useNavigate();
-  
+
   // 🔹 Datos de usuario obtenidos de sessionStorage (desde la BD)
   const [userData, setUserData] = React.useState({
     nombre: '',
     email: '',
   });
+  const [avatarColor, setAvatarColor] = React.useState(localStorage.getItem('avatarColor') || '#008375');
 
   React.useEffect(() => {
-  const loadData = () => {
-    setUserData({
-      nombre: sessionStorage.getItem('nombre') || '',
-      email: sessionStorage.getItem('email') || '',
-    });
-  };
+    const loadData = () => {
+      setUserData({
+        nombre: sessionStorage.getItem('nombre') || '',
+        email: sessionStorage.getItem('email') || '',
+      });
+    };
 
-  loadData(); // lectura inicial
+    loadData(); // lectura inicial
 
-  const onStorageChange = () => loadData();
-  window.addEventListener('storage', onStorageChange);
+    const onStorageChange = () => loadData();
+    window.addEventListener('storage', onStorageChange);
 
-  return () => window.removeEventListener('storage', onStorageChange);
+    const handleAvatarUpdate = () => {
+      const newColor = localStorage.getItem('avatarColor');
+      if (newColor) {
+        setAvatarColor(newColor);
+      }
+    };
+    window.addEventListener('avatarUpdated', handleAvatarUpdate);
+
+    return () => {
+      window.removeEventListener('storage', onStorageChange);
+      window.removeEventListener('avatarUpdated', handleAvatarUpdate);
+    };
   }, []);
 
 
@@ -83,9 +95,9 @@ function SideMenuMobile({ open, toggleDrawer }) {
 
           {/* Botón Empresa */}
           <Tooltip title="Organización">
-            <IconButton 
-              size="small" 
-              color="primary" 
+            <IconButton
+              size="small"
+              color="primary"
               onClick={() => {
                 navigate('/organizacion');
                 toggleDrawer(false)(); // Cerrar el menú después de navegar
@@ -97,9 +109,9 @@ function SideMenuMobile({ open, toggleDrawer }) {
 
           {/* Botón Perfil */}
           <Tooltip title="Perfil">
-            <IconButton 
-              size="small" 
-              color="primary" 
+            <IconButton
+              size="small"
+              color="primary"
               onClick={() => {
                 navigate('/perfil');
                 toggleDrawer(false)(); // Cerrar el menú después de navegar
@@ -124,10 +136,17 @@ function SideMenuMobile({ open, toggleDrawer }) {
         <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
           <Avatar
             sizes="small"
-            alt={userData.nombre}
-            //src="/static/images/avatar/7.jpg"
-            sx={{ width: 24, height: 24 }}
-          />
+            alt={userData.nombre || 'Usuario'}
+            sx={{
+              width: 36,
+              height: 36,
+              bgcolor: avatarColor,
+              color: avatarColor === '#ffffff' ? '#000000' : '#ffffff',
+              border: avatarColor === '#ffffff' ? '1px solid #e0e0e0' : 'none'
+            }}
+          >
+            {(userData.nombre || 'Usuario').charAt(0).toUpperCase()}
+          </Avatar>
           <Box>
             <Typography component="p" variant="h6">
               {userData.nombre || 'Nombre Usuario'}

@@ -56,7 +56,7 @@ public class UsuarioController {
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub,
             @RequestBody ActualizarUsuarioDTO dto) {
-        
+
         try {
             UsuarioDTO actualizado = usuarioService.actualizarEmpleado(sub, dto, subUsuarioActual);
             return ResponseEntity.ok(actualizado);
@@ -69,7 +69,7 @@ public class UsuarioController {
     public ResponseEntity<Void> eliminarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub) {
-        
+
         try {
             usuarioService.eliminarEmpleado(sub, subUsuarioActual);
             return ResponseEntity.noContent().build();
@@ -82,7 +82,7 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> desactivarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub) {
-        
+
         try {
             UsuarioDTO desactivado = usuarioService.desactivarEmpleado(sub, subUsuarioActual);
             return ResponseEntity.ok(desactivado);
@@ -95,12 +95,20 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> activarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub) {
-        
+
         try {
             UsuarioDTO activado = usuarioService.activarEmpleado(sub, subUsuarioActual);
             return ResponseEntity.ok(activado);
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).build();
         }
+    }
+
+    @PostMapping("/cambiar-password")
+    public ResponseEntity<Void> cambiarPassword(
+            @RequestHeader("Authorization") String token,
+            @RequestBody administracion.dtos.CambiarPasswordDTO dto) {
+        usuarioService.cambiarPassword(token, dto.getOldPassword(), dto.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 }

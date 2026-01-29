@@ -306,7 +306,13 @@ const SideMenu = React.memo(function SideMenu({
             <Avatar
               sizes="small"
               alt={userData.nombre || 'Usuario'}
-              sx={{ width: 36, height: 36, bgcolor: avatarColor }}
+              sx={{
+                width: 36,
+                height: 36,
+                bgcolor: avatarColor,
+                color: avatarColor === '#ffffff' ? '#000000' : '#ffffff',
+                border: avatarColor === '#ffffff' ? '1px solid #e0e0e0' : 'none'
+              }}
             >
               {(userData.nombre || 'Usuario').charAt(0).toUpperCase()}
             </Avatar>
