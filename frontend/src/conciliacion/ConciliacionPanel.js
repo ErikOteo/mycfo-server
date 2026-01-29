@@ -288,92 +288,186 @@ export default function ConciliacionPanel() {
               `1px solid ${(theme.vars || theme).palette.divider}`,
           }}
         >
-          <Stack direction="row" spacing={3} alignItems="center">
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Total de movimientos
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                {estadisticas.total}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Sin conciliar
-              </Typography>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 600,
-                  color: (theme) => (theme.vars || theme).palette.warning.main,
-                }}
-              >
-                {estadisticas.sinConciliar}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Conciliados
-              </Typography>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 600,
-                  color: (theme) => (theme.vars || theme).palette.success.main,
-                }}
-              >
-                {estadisticas.conciliados}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Progreso
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={estadisticas.porcentajeConciliado}
-                  sx={{ flex: 1, height: 8, borderRadius: 4 }}
-                />
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {Math.round(estadisticas.porcentajeConciliado)}%
+          {isMobile ? (
+            <Grid container spacing={2}>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    {estadisticas.total}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Sin conciliar
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 600,
+                      color: (theme) => (theme.vars || theme).palette.warning.main,
+                    }}
+                  >
+                    {estadisticas.sinConciliar}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Conciliados
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 600,
+                      color: (theme) => (theme.vars || theme).palette.success.main,
+                    }}
+                  >
+                    {estadisticas.conciliados}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Progreso
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "60%" }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={estadisticas.porcentajeConciliado}
+                      sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                    />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {Math.round(estadisticas.porcentajeConciliado)}%
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          ) : (
+            <Stack direction="row" spacing={3} alignItems="center">
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Total de movimientos
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  {estadisticas.total}
                 </Typography>
               </Box>
-            </Box>
-          </Stack>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Sin conciliar
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 600,
+                    color: (theme) => (theme.vars || theme).palette.warning.main,
+                  }}
+                >
+                  {estadisticas.sinConciliar}
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Conciliados
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 600,
+                    color: (theme) => (theme.vars || theme).palette.success.main,
+                  }}
+                >
+                  {estadisticas.conciliados}
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Progreso
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={estadisticas.porcentajeConciliado}
+                    sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                  />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {Math.round(estadisticas.porcentajeConciliado)}%
+                  </Typography>
+                </Box>
+              </Box>
+            </Stack>
+          )}
         </Paper>
       )}
 
       {/* Filtros */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
-          direction="row"
+          direction={{ xs: "column", md: "row" }}
           spacing={2}
-          alignItems="center"
-          sx={{ flexWrap: "wrap", gap: 2 }}
+          alignItems={{ xs: "stretch", md: "center" }}
+          sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}
         >
           {/* Filtro de estado */}
-          <ToggleButtonGroup
-            value={filtroEstado}
-            exclusive
-            onChange={(e, value) => value && setFiltroEstado(value)}
-            size="small"
-          >
-            <ToggleButton value="sin-conciliar">
-              <PendingIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Sin conciliar
-            </ToggleButton>
-            <ToggleButton value="conciliados">
-              <CheckCircleIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Conciliados
-            </ToggleButton>
-            <ToggleButton value="todos">Todos</ToggleButton>
-          </ToggleButtonGroup>
+          {isMobile ? (
+            <FormControl size="small" sx={{ minWidth: 150, flex: "1 1 auto" }}>
+              <InputLabel>Estado</InputLabel>
+              <Select
+                value={filtroEstado}
+                label="Estado"
+                onChange={(e) => setFiltroEstado(e.target.value)}
+              >
+                <MenuItem value="sin-conciliar">
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <PendingIcon sx={{ mr: 1, fontSize: 18 }} />
+                    Sin conciliar
+                  </Box>
+                </MenuItem>
+                <MenuItem value="conciliados">
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <CheckCircleIcon sx={{ mr: 1, fontSize: 18 }} />
+                    Conciliados
+                  </Box>
+                </MenuItem>
+                <MenuItem value="todos">Todos</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <ToggleButtonGroup
+              value={filtroEstado}
+              exclusive
+              onChange={(e, value) => value && setFiltroEstado(value)}
+              size="small"
+              fullWidth
+            >
+              <ToggleButton value="sin-conciliar">
+                <PendingIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                Sin conciliar
+              </ToggleButton>
+              <ToggleButton value="conciliados">
+                <CheckCircleIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                Conciliados
+              </ToggleButton>
+              <ToggleButton value="todos">Todos</ToggleButton>
+            </ToggleButtonGroup>
+          )}
 
-          <Divider orientation="vertical" flexItem />
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ display: { xs: "none", md: "block" } }}
+          />
 
           {/* Filtro de tipo */}
           <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -411,6 +505,7 @@ export default function ConciliacionPanel() {
             startIcon={<RefreshIcon />}
             onClick={cargarDatos}
             size="small"
+            sx={{ minWidth: "fit-content", whiteSpace: "nowrap" }}
           >
             Recargar
           </Button>

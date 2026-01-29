@@ -911,7 +911,7 @@ export default function MainGrid() {
               variant="outlined"
               size="small"
               onClick={() => navigate(`/presupuestos/${slug}`)}
-              sx={isLightMode ? undefined : { color: "#42897f" }}
+              sx={isLightMode ? { lineHeight: 1.2 } : { color: "#42897f", lineHeight: 1.2 }}
             >
               Ver detalle
             </Button>

@@ -54,7 +54,8 @@ export default function DropzoneUploader({
           {...getRootProps()}
           sx={{
             width: "100%",
-            height: height,
+            minHeight: height,
+            height: "auto",
             p: 3,
             display: "flex",
             flexDirection: "column",

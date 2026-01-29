@@ -212,8 +212,9 @@ export default function ReminderManager() {
       <Box
         sx={{
           display: "flex",
+          flexDirection: { xs: "column", sm: "row" }, // Columna en mobile, fila en desktop
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: { xs: "flex-start", sm: "center" }, // Alinear al inicio en mobile
           mb: 3,
           gap: 3,
         }}
@@ -230,6 +231,7 @@ export default function ReminderManager() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
+          sx={{ lineHeight: 1.2 }}
         >
           Nuevo Recordatorio
         </Button>
@@ -263,6 +265,7 @@ export default function ReminderManager() {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenDialog()}
+                sx={{ lineHeight: 1.2 }}
               >
                 Crear Recordatorio
               </Button>
@@ -562,8 +565,8 @@ export default function ReminderManager() {
             {loading
               ? "Guardando..."
               : editingReminder
-              ? "Actualizar"
-              : "Crear"}
+                ? "Actualizar"
+                : "Crear"}
           </Button>
         </DialogActions>
       </Dialog>
