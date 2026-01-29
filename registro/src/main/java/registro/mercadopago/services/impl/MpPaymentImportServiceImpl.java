@@ -59,7 +59,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
        ========================= */
 
     @Override
-    public int importPaymentById(Long userIdApp, Long paymentId, String usuarioSub) {
+    public int importPaymentById(String userIdApp, Long paymentId, String usuarioSub) {
         TenantContext tenant = resolveTenant(usuarioSub);
         MpAccountLink link = requireLink(userIdApp);
         Map<String, Object> body = get("/v1/payments/" + paymentId, link.getAccessToken());
@@ -69,7 +69,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     @Override
-    public int importByMonth(Long userIdApp, int month, int year, String usuarioSub) {
+    public int importByMonth(String userIdApp, int month, int year, String usuarioSub) {
         TenantContext tenant = resolveTenant(usuarioSub);
         MpAccountLink link = requireLink(userIdApp);
 
@@ -109,7 +109,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     @Override
-    public int importByExternalReference(Long userIdApp, String externalRef, String usuarioSub) {
+    public int importByExternalReference(String userIdApp, String externalRef, String usuarioSub) {
         TenantContext tenant = resolveTenant(usuarioSub);
         MpAccountLink link = requireLink(userIdApp);
         int imported = 0;
@@ -233,7 +233,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
         }
     }
 
-    private MpAccountLink requireLink(Long userIdApp) {
+    private MpAccountLink requireLink(String userIdApp) {
         return linkRepo.findByUserIdApp(userIdApp)
                 .orElseThrow(() -> new IllegalStateException("No hay cuenta vinculada de Mercado Pago para el usuario"));
     }
@@ -613,7 +613,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
        ========================= */
 
     @Override
-    public List<PaymentDTO> previewPaymentById(Long userIdApp, Long paymentId, String usuarioSub) {
+    public List<PaymentDTO> previewPaymentById(String userIdApp, Long paymentId, String usuarioSub) {
         TenantContext tenant = resolveTenant(usuarioSub);
         MpAccountLink link = requireLink(userIdApp);
         Map<String, Object> body = get("/v1/payments/" + paymentId, link.getAccessToken());
@@ -627,7 +627,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     @Override
-    public List<PaymentDTO> previewByMonth(Long userIdApp, int month, int year, String usuarioSub) {
+    public List<PaymentDTO> previewByMonth(String userIdApp, int month, int year, String usuarioSub) {
         TenantContext tenant = resolveTenant(usuarioSub);
         MpAccountLink link = requireLink(userIdApp);
         List<PaymentDTO> previewData = new ArrayList<>();
@@ -669,7 +669,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     @Override
-    public List<PaymentDTO> previewByExternalReference(Long userIdApp, String externalRef, String usuarioSub) {
+    public List<PaymentDTO> previewByExternalReference(String userIdApp, String externalRef, String usuarioSub) {
         TenantContext tenant = resolveTenant(usuarioSub);
         MpAccountLink link = requireLink(userIdApp);
         List<PaymentDTO> previewData = new ArrayList<>();
@@ -700,7 +700,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     @Override
-    public int importSelectedPayments(Long userIdApp, List<Long> paymentIds, String usuarioSub) {
+    public int importSelectedPayments(String userIdApp, List<Long> paymentIds, String usuarioSub) {
         if (paymentIds == null || paymentIds.isEmpty()) {
             return 0;
         }
@@ -774,7 +774,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     @Override
-    public int updatePaymentCategory(Long userIdApp, Long registroId, String newCategory) {
+    public int updatePaymentCategory(String userIdApp, Long registroId, String newCategory) {
         System.out.println(">>> Actualizando categoría del registro " + registroId + " a: " + newCategory);
         
         // Buscar el registro por su ID

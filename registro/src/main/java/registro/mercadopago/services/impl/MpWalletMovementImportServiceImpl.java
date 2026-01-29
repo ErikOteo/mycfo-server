@@ -38,7 +38,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
     }
 
     @Override
-    public int importRange(Long userIdApp, LocalDate from, LocalDate to) {
+    public int importRange(String userIdApp, LocalDate from, LocalDate to) {
         MpAccountLink link = requireLink(userIdApp);
 
         ZoneId zone = ZoneId.systemDefault();
@@ -71,7 +71,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
     }
 
     @Override
-    public int importByMovementId(Long userIdApp, String movementId) {
+    public int importByMovementId(String userIdApp, String movementId) {
         MpAccountLink link = requireLink(userIdApp);
 
         // Probamos endpoints por ID
@@ -96,7 +96,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
 
     /* ============================ helpers ============================ */
 
-    private MpAccountLink requireLink(Long userIdApp) {
+    private MpAccountLink requireLink(String userIdApp) {
         return linkRepo.findByUserIdApp(userIdApp)
                 .orElseThrow(() -> new IllegalStateException("No hay cuenta vinculada de Mercado Pago"));
     }

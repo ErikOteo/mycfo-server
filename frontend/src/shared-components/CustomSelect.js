@@ -38,7 +38,7 @@ export default function CustomSelect({
         disabled={disabled}
       >
         <MenuItem value="" disabled>
-          Elegir...
+          Monto
         </MenuItem>
         {options.map((opt, i) => (
           <MenuItem key={i} value={opt}>
