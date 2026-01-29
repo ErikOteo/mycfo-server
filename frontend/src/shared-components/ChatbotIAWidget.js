@@ -5,7 +5,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { useChatbotContext } from './ChatbotContext';
-import API_CONFIG from '../config/api-config';
+import { sessionService } from '../shared-services/sessionService';
 
 // Asegúrate de configurar la URL correcta de tu backend de IA
 //const IA_API_URL = 'http://localhost:8083/api/chat';
@@ -23,6 +23,37 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
 
+    const getPerfilFromSession = () => {
+        try {
+            const usuario = sessionService.getUsuario();
+            const perfil = {
+                nombre: usuario?.nombre || "",
+                email: usuario?.email || "",
+                telefono: usuario?.telefono || ""
+            };
+            if (!perfil.nombre && !perfil.email && !perfil.telefono) {
+                return null;
+            }
+            return perfil;
+        } catch (error) {
+            return null;
+        }
+    };
+
+    const buildContextPayload = () => {
+        const route = typeof window !== 'undefined'
+            ? (window.location.hash || window.location.pathname || null)
+            : null;
+        const base = context && typeof context === 'object' ? context : {};
+        const perfil = base.perfil ?? getPerfilFromSession();
+        const payload = {
+            ...base,
+            ...(perfil ? { perfil } : {}),
+            ...(route ? { route } : {})
+        };
+        return Object.keys(payload).length ? payload : null;
+    };
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -30,6 +61,12 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    useEffect(() => {
+        if (isOpen) {
+            scrollToBottom();
+        }
+    }, [isOpen]);
 
     const handleSend = async () => {
         if (!input.trim()) return;
@@ -48,7 +85,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                 body: JSON.stringify({
                     message: userMessage.text,
                     module: currentModule,
-                    context: context || null
+                    context: buildContextPayload()
                 }),
             });
 
