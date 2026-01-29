@@ -21,8 +21,11 @@ import {
   FormControl,
   CircularProgress,
   Tooltip,
-  Button
+  Button,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -75,6 +78,11 @@ export default function PronosticoFijo() {
   const [saving, setSaving] = React.useState(false);
   const [generatingForecastId, setGeneratingForecastId] = React.useState(null);
   const [usuarioRol, setUsuarioRol] = React.useState(null);
+
+  const [detailDialogOpen, setDetailDialogOpen] = React.useState(false);
+  const [selectedForecastDetail, setSelectedForecastDetail] = React.useState(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -303,6 +311,13 @@ export default function PronosticoFijo() {
       return `${nombreBase} (${moneda})`;
     }
     return nombreBase;
+  };
+
+
+
+  const handleVerDetalleMobile = (forecast) => {
+    setSelectedForecastDetail(forecast);
+    setDetailDialogOpen(true);
   };
 
   const esAdmin = (usuarioRol || '').toUpperCase().includes('ADMIN');
@@ -604,6 +619,17 @@ export default function PronosticoFijo() {
                             </IconButton>
                           </Tooltip>
                         )}
+                        {isMobile && (
+                          <Tooltip title="Ver detalles">
+                            <IconButton
+                              color="info"
+                              onClick={() => handleVerDetalleMobile(forecast)}
+                              size="small"
+                            >
+                              <InfoOutlinedIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -644,6 +670,39 @@ export default function PronosticoFijo() {
           <Button onClick={handleDeleteConfigConfirm} color="error" variant="contained">
             Eliminar
           </Button>
+        </DialogActions>
+
+      </Dialog>
+
+      {/* Dialog de Detalle Mobile */}
+      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Detalle del Pronóstico</DialogTitle>
+        <DialogContent dividers>
+          {selectedForecastDetail && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">Nombre</Typography>
+                <Typography variant="body1">
+                  {formatearNombre(selectedForecastDetail.nombre, selectedForecastDetail.createdAt, selectedForecastDetail.moneda)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">Horizonte</Typography>
+                <Typography variant="body1">{getHorizonteLabel(selectedForecastDetail.horizonteMeses)}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">Frecuencia</Typography>
+                <Typography variant="body1">{getFrecuenciaLabel(selectedForecastDetail.mesesFrecuencia)}</Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">Fecha Generación</Typography>
+                <Typography variant="body1">{formatearFecha(selectedForecastDetail.createdAt)}</Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailDialogOpen(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>
