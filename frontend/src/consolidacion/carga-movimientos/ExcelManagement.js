@@ -15,6 +15,7 @@ import CargaMovimientos from "./CargaMovimientos";
 import ExcelHistoryTable from "./components/ExcelHistoryTable";
 import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function ExcelManagement() {
   const [activeTab, setActiveTab] = React.useState(0);
@@ -22,6 +23,21 @@ export default function ExcelManagement() {
   const [historialLoading, setHistorialLoading] = React.useState(false);
   const [historialPage, setHistorialPage] = React.useState(0);
   const [historialPageSize, setHistorialPageSize] = React.useState(20);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-movimientos",
+      tab: activeTab === 0 ? "cargar" : "historial",
+      historial: historialData.slice(0, 5),
+      historialTotal: Array.isArray(historialData) ? historialData.length : 0,
+      historialPage,
+      historialPageSize,
+      historialLoading,
+    }),
+    [activeTab, historialData, historialPage, historialPageSize, historialLoading]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const loadHistorial = async () => {
     setHistorialLoading(true);

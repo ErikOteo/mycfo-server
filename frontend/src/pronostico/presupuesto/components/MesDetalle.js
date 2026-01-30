@@ -35,6 +35,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { TODAS_LAS_CATEGORIAS } from '../../../shared-components/categorias';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 // ===== Helpers =====
 const safeNumber = (v) =>
@@ -747,6 +748,42 @@ export default function MesDetalle() {
   const vencidosEstimados = lineas.filter(
     (c) => safeNumber(c.montoEstimado) !== 0 && safeNumber(c.real) === 0
   ).length;
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuesto-mes-detalle",
+      presupuesto: {
+        id: presupuestoId,
+        nombre: presupuestoNombre,
+        moneda: presupuestoCurrency,
+      },
+      mes: ym,
+      resumen: {
+        totalIngresos,
+        totalEgresos,
+        resultado,
+        estimadoTotal,
+        cumplimiento,
+        vencidosEstimados,
+      },
+      lineas: lineasCompleto.slice(0, 20),
+    }),
+    [
+      presupuestoId,
+      presupuestoNombre,
+      presupuestoCurrency,
+      ym,
+      totalIngresos,
+      totalEgresos,
+      resultado,
+      estimadoTotal,
+      cumplimiento,
+      vencidosEstimados,
+      lineasCompleto,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const pieDataIngresos = ingresos.map((i) => ({ name: i.categoria, value: safeNumber(i.real) }));
   const barDataIngresos = ingresos.map((i) => ({

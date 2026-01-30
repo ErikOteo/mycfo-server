@@ -38,6 +38,7 @@ import {
   formatNumber,
   formatMovementDate,
 } from "../../utils/formatters";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 export default function NotificationCenter() {
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -153,6 +154,32 @@ export default function NotificationCenter() {
     page * itemsPerPage,
     (page + 1) * itemsPerPage
   );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "notificaciones",
+      filtros: {
+        searchTerm,
+        filterType,
+        filterSeverity,
+      },
+      total: filteredNotifications.length,
+      unread,
+      pagina: page + 1,
+      notificaciones: paginatedNotifications.slice(0, 5),
+    }),
+    [
+      searchTerm,
+      filterType,
+      filterSeverity,
+      filteredNotifications.length,
+      unread,
+      page,
+      paginatedNotifications,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   return (
     <Box
