@@ -37,7 +37,7 @@ public class ConciliacionController {
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(required = false) String moneda) {
-        
+
         Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
 
@@ -52,7 +52,8 @@ public class ConciliacionController {
 
         Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
 
-        Page<MovimientoDTO> movimientos = conciliacionService.obtenerMovimientosSinConciliar(pageable, empresaId, monedaEnum);
+        Page<MovimientoDTO> movimientos = conciliacionService.obtenerMovimientosSinConciliar(pageable, empresaId,
+                monedaEnum);
         return ResponseEntity.ok(movimientos);
     }
 
@@ -67,7 +68,7 @@ public class ConciliacionController {
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(required = false) String moneda) {
-        
+
         Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
 
@@ -82,7 +83,8 @@ public class ConciliacionController {
 
         Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
 
-        Page<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientos(pageable, empresaId, monedaEnum);
+        Page<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientos(pageable, empresaId,
+                monedaEnum);
         return ResponseEntity.ok(movimientos);
     }
 
@@ -91,8 +93,8 @@ public class ConciliacionController {
      */
     @GetMapping("/movimientos/{movimientoId}/sugerencias")
     public ResponseEntity<SugerenciasResponseDTO> obtenerSugerencias(@RequestHeader("X-Usuario-Sub") String usuarioSub,
-                                                                     @PathVariable Long movimientoId,
-                                                                     @RequestParam(required = false) String moneda) {
+            @PathVariable Long movimientoId,
+            @RequestParam(required = false) String moneda) {
         registro.cargarDatos.models.TipoMoneda monedaEnum = null;
         if (moneda != null) {
             try {
@@ -104,10 +106,12 @@ public class ConciliacionController {
 
         Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
 
-        List<DocumentoSugeridoDTO> sugerencias = conciliacionService.sugerirDocumentos(movimientoId, empresaId, monedaEnum);
-        
+        List<DocumentoSugeridoDTO> sugerencias = conciliacionService.sugerirDocumentos(movimientoId, empresaId,
+                monedaEnum);
+
         // Obtener el movimiento para incluirlo en la respuesta
-        List<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientosPorMoneda(empresaId, monedaEnum);
+        List<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientosPorMoneda(empresaId,
+                monedaEnum);
         MovimientoDTO movimiento = movimientos.stream()
                 .filter(m -> m.getId().equals(movimientoId))
                 .findFirst()
@@ -126,15 +130,14 @@ public class ConciliacionController {
      */
     @PostMapping("/vincular")
     public ResponseEntity<MovimientoDTO> vincularMovimiento(@RequestHeader("X-Usuario-Sub") String usuarioSub,
-                                                            @RequestBody ConciliacionRequestDTO request) {
+            @RequestBody ConciliacionRequestDTO request) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
 
             MovimientoDTO movimiento = conciliacionService.vincularMovimientoConDocumento(
-                    request.getMovimientoId(), 
+                    request.getMovimientoId(),
                     request.getDocumentoId(),
-                    empresaId
-            );
+                    empresaId);
             return ResponseEntity.ok(movimiento);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -146,7 +149,7 @@ public class ConciliacionController {
      */
     @PostMapping("/desvincular/{movimientoId}")
     public ResponseEntity<MovimientoDTO> desvincularMovimiento(@RequestHeader("X-Usuario-Sub") String usuarioSub,
-                                                               @PathVariable Long movimientoId) {
+            @PathVariable Long movimientoId) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
 
@@ -162,7 +165,7 @@ public class ConciliacionController {
      */
     @GetMapping("/estadisticas")
     public ResponseEntity<Map<String, Object>> obtenerEstadisticas(@RequestHeader("X-Usuario-Sub") String usuarioSub,
-                                                                    @RequestParam(required = false) String moneda) {
+            @RequestParam(required = false) String moneda) {
         registro.cargarDatos.models.TipoMoneda monedaEnum = null;
         if (moneda != null) {
             try {
@@ -173,18 +176,7 @@ public class ConciliacionController {
         }
 
         Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-
-        List<MovimientoDTO> todos = conciliacionService.obtenerTodosLosMovimientosPorMoneda(empresaId, monedaEnum);
-        
-        long sinConciliar = todos.stream().filter(m -> !m.getConciliado()).count();
-        long conciliados = todos.stream().filter(MovimientoDTO::getConciliado).count();
-        
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("total", todos.size());
-        stats.put("sinConciliar", sinConciliar);
-        stats.put("conciliados", conciliados);
-        stats.put("porcentajeConciliado", todos.isEmpty() ? 0 : (conciliados * 100.0 / todos.size()));
-
+        Map<String, Object> stats = conciliacionService.obtenerResumenEstadisticas(empresaId, monedaEnum);
         return ResponseEntity.ok(stats);
     }
 }

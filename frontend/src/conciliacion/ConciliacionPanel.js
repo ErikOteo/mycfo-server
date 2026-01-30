@@ -21,6 +21,7 @@ import {
   LinearProgress,
   Pagination,
   useMediaQuery,
+  Skeleton,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -43,6 +44,7 @@ export default function ConciliacionPanel() {
   const [loading, setLoading] = useState(false);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
+  const [loadingEstadisticas, setLoadingEstadisticas] = useState(false);
   const [error, setError] = useState(null);
 
   // Paginación real del backend
@@ -105,11 +107,14 @@ export default function ConciliacionPanel() {
   }, [currency, filtroEstado, paginaActual, tamanioPagina]);
 
   const cargarEstadisticas = useCallback(async () => {
+    setLoadingEstadisticas(true);
     try {
       const stats = await conciliacionApi.obtenerEstadisticas(currency);
       setEstadisticas(stats);
     } catch (err) {
       console.error("Error cargando estadísticas:", err);
+    } finally {
+      setLoadingEstadisticas(false);
     }
   }, [currency]);
 
@@ -276,7 +281,7 @@ export default function ConciliacionPanel() {
       </Box>
 
       {/* Estadísticas */}
-      {estadisticas && (
+      {(estadisticas || loadingEstadisticas) && (
         <Paper
           sx={{
             p: 2,
@@ -286,9 +291,35 @@ export default function ConciliacionPanel() {
               (theme.vars || theme).palette.background.paper,
             border: (theme) =>
               `1px solid ${(theme.vars || theme).palette.divider}`,
+            minHeight: isMobile ? 120 : 80, // Mantener altura mínima para evitar saltos
           }}
         >
-          {isMobile ? (
+          {loadingEstadisticas ? (
+            isMobile ? (
+              <Grid container spacing={2}>
+                {[1, 2, 3, 4].map((i) => (
+                  <Grid key={i} size={6}>
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
+                      <Skeleton width={40} height={15} />
+                      <Skeleton width={60} height={30} />
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Stack direction="row" spacing={3} alignItems="center">
+                {[1, 2, 3, 4].map((i) => (
+                  <React.Fragment key={i}>
+                    <Box sx={{ flex: 1 }}>
+                      <Skeleton width="60%" height={15} sx={{ mb: 0.5 }} />
+                      <Skeleton width="40%" height={30} />
+                    </Box>
+                    {i < 4 && <Divider orientation="vertical" flexItem />}
+                  </React.Fragment>
+                ))}
+              </Stack>
+            )
+          ) : isMobile ? (
             <Grid container spacing={2}>
               <Grid size={6}>
                 <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
@@ -296,7 +327,7 @@ export default function ConciliacionPanel() {
                     Total
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                    {estadisticas.total}
+                    {estadisticas?.total}
                   </Typography>
                 </Box>
               </Grid>
@@ -312,7 +343,7 @@ export default function ConciliacionPanel() {
                       color: (theme) => (theme.vars || theme).palette.warning.main,
                     }}
                   >
-                    {estadisticas.sinConciliar}
+                    {estadisticas?.sinConciliar}
                   </Typography>
                 </Box>
               </Grid>
@@ -328,7 +359,7 @@ export default function ConciliacionPanel() {
                       color: (theme) => (theme.vars || theme).palette.success.main,
                     }}
                   >
-                    {estadisticas.conciliados}
+                    {estadisticas?.conciliados}
                   </Typography>
                 </Box>
               </Grid>
@@ -340,11 +371,11 @@ export default function ConciliacionPanel() {
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "60%" }}>
                     <LinearProgress
                       variant="determinate"
-                      value={estadisticas.porcentajeConciliado}
+                      value={estadisticas?.porcentajeConciliado || 0}
                       sx={{ flex: 1, height: 8, borderRadius: 4 }}
                     />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {Math.round(estadisticas.porcentajeConciliado)}%
+                      {Math.round(estadisticas?.porcentajeConciliado || 0)}%
                     </Typography>
                   </Box>
                 </Box>
@@ -357,7 +388,7 @@ export default function ConciliacionPanel() {
                   Total de movimientos
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                  {estadisticas.total}
+                  {estadisticas?.total}
                 </Typography>
               </Box>
               <Divider orientation="vertical" flexItem />
@@ -372,7 +403,7 @@ export default function ConciliacionPanel() {
                     color: (theme) => (theme.vars || theme).palette.warning.main,
                   }}
                 >
-                  {estadisticas.sinConciliar}
+                  {estadisticas?.sinConciliar}
                 </Typography>
               </Box>
               <Divider orientation="vertical" flexItem />
@@ -387,7 +418,7 @@ export default function ConciliacionPanel() {
                     color: (theme) => (theme.vars || theme).palette.success.main,
                   }}
                 >
-                  {estadisticas.conciliados}
+                  {estadisticas?.conciliados}
                 </Typography>
               </Box>
               <Divider orientation="vertical" flexItem />
@@ -398,11 +429,11 @@ export default function ConciliacionPanel() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <LinearProgress
                     variant="determinate"
-                    value={estadisticas.porcentajeConciliado}
+                    value={estadisticas?.porcentajeConciliado || 0}
                     sx={{ flex: 1, height: 8, borderRadius: 4 }}
                   />
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {Math.round(estadisticas.porcentajeConciliado)}%
+                    {Math.round(estadisticas?.porcentajeConciliado || 0)}%
                   </Typography>
                 </Box>
               </Box>
