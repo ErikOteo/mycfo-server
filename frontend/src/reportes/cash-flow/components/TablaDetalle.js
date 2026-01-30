@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper, useTheme } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
 const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
     const theme = useTheme();
@@ -209,6 +210,9 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     disableColumnResize
                     disableRowSelectionOnClick
                     sx={dataGridStyles}
+                    slots={{
+                        noRowsOverlay: () => <CustomNoRowsOverlay message="No hay ingresos registrados este año" />,
+                    }}
                 />
             </Box>
 
@@ -225,6 +229,9 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     disableColumnResize
                     disableRowSelectionOnClick
                     sx={dataGridStyles}
+                    slots={{
+                        noRowsOverlay: () => <CustomNoRowsOverlay message="No hay egresos registrados este año" />,
+                    }}
                 />
             </Box>
 
@@ -241,6 +248,9 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     disableColumnResize
                     disableRowSelectionOnClick
                     sx={dataGridStyles}
+                    slots={{
+                        noRowsOverlay: () => <CustomNoRowsOverlay message="No hay datos para el resumen financiero" />,
+                    }}
                 />
             </Box>
         </Box>

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Box, Typography, Grid, Paper, useTheme } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
 // Utilidad de moneda con separador de miles y símbolo "$"
 const formatCurrency = (value) => {
@@ -126,6 +127,9 @@ export default function TablaDetalle({ year, ingresos, egresos }) {
               disableColumnResize
               disableRowSelectionOnClick
               sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: () => <CustomNoRowsOverlay message="No hay ingresos registrados este año" />,
+              }}
             />
           </Box>
         </Box>
@@ -146,6 +150,9 @@ export default function TablaDetalle({ year, ingresos, egresos }) {
               disableColumnResize
               disableRowSelectionOnClick
               sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: () => <CustomNoRowsOverlay message="No hay egresos registrados este año" />,
+              }}
             />
           </Box>
         </Box>
