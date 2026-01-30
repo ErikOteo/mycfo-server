@@ -2,6 +2,7 @@ import * as React from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Chip } from '@mui/material';
 import dayjs from 'dayjs';
+import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
 function calcularAnchoTexto(texto) {
   const promedioPxPorCaracter = 8; // aproximación Roboto
@@ -104,6 +105,9 @@ export default function TablaDinamica({
       pageSizeOptions={[10, 20, 50]}
       disableColumnResize
       density="compact"
+      slots={{
+        noRowsOverlay: () => <CustomNoRowsOverlay message="No hay registros para mostrar" />,
+      }}
       localeText={{
         columnMenuSortAsc: "Ordenar Ascendente",
         columnMenuSortDesc: "Ordenar Descendente",

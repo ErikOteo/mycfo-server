@@ -29,6 +29,7 @@ import {
   CircularProgress,
   Divider,
   useMediaQuery,
+  InputAdornment,
 } from "@mui/material";
 import { DataGrid } from '@mui/x-data-grid';
 import { alpha, useTheme } from "@mui/material/styles";
@@ -37,11 +38,13 @@ import http from "../../../api/http";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import API_CONFIG from "../../../config/api-config";
 import LoadingSpinner from "../../../shared-components/LoadingSpinner";
 import CurrencyTabs, { usePreferredCurrency } from "../../../shared-components/CurrencyTabs";
 import { matchesCurrencyFilter } from "../utils/currencyTag";
 import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
+import CustomNoRowsOverlay from "../../../shared-components/CustomNoRowsOverlay";
 
 const tableRowStyle = {
   backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -128,6 +131,61 @@ const HeaderLabelAligned = ({ label, ghost }) => (
       {label}
     </Box>
   </Box>
+
+);
+
+
+
+// Estilos estáticos fuera del componente para evitar re-renders
+// Se mantienen los bordes originales requeridos por el usuario
+const dataGridStyles = {
+  backgroundColor: "background.paper",
+  borderRadius: 2,
+  border: (theme) => `1px solid ${theme.palette.divider}`,
+  "& .MuiDataGrid-cell": {
+    borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+    display: "flex",
+    alignItems: "center",
+    fontSize: "0.875rem",
+  },
+  "& .MuiDataGrid-columnHeaders": {
+    backgroundColor: (theme) =>
+      theme.palette.mode === "dark"
+        ? "rgba(255, 255, 255, 0.05)"
+        : "#f5f5f5",
+    color: "text.primary",
+    borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+  },
+  "& .MuiDataGrid-columnHeader": {
+    "&:focus": { outline: "none" },
+  },
+  "& .MuiDataGrid-sortIcon": {
+    display: "none",
+  },
+  "& .MuiDataGrid-menuIcon": {
+    display: "none",
+  },
+  "& .MuiDataGrid-iconButtonContainer": {
+    display: "none",
+  },
+  "& .MuiDataGrid-row:hover": {
+    backgroundColor: (theme) => theme.palette.action.hover,
+  },
+  "& .MuiDataGrid-footerContainer": {
+    borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+  },
+  // Hide default footer since we use custom pagination below
+  "& .MuiDataGrid-footerContainer": {
+    display: "none"
+  }
+};
+
+const CustomNoRowsPresupuestos = () => (
+  <CustomNoRowsOverlay message="No se encontraron presupuestos registrados" />
+);
+
+const CustomNoSearchResults = () => (
+  <CustomNoRowsOverlay message="No se encontraron coincidencias para tu búsqueda" />
 );
 
 export default function MainGrid() {
@@ -309,10 +367,8 @@ export default function MainGrid() {
     async (statusValue, pageValue) => {
       setLoadingAll(true);
       try {
-        const trimmedQuery = query.trim();
-        const shouldExpand = trimmedQuery.length >= 2;
-        const effectivePage = shouldExpand ? 0 : Math.max(pageValue, 0);
-        const effectiveSize = shouldExpand ? LARGE_PAGE_SIZE : LARGE_PAGE_SIZE;
+        const effectivePage = Math.max(pageValue, 0);
+        const effectiveSize = LARGE_PAGE_SIZE;
         const params = new URLSearchParams();
         params.set("status", statusValue);
         params.set("page", String(effectivePage));
@@ -324,7 +380,6 @@ export default function MainGrid() {
         );
         const pageData = applyCurrencyFilter(normalizePage(res.data));
         if (
-          !shouldExpand &&
           pageValue > 0 &&
           pageData.totalPages > 0 &&
           pageValue >= pageData.totalPages
@@ -335,9 +390,6 @@ export default function MainGrid() {
         setPresupuestosPage(pageData);
         mergeYearOptions(pageData.content);
         setListError("");
-        if (shouldExpand && pageValue !== 0) {
-          setPageIndex(0);
-        }
       } catch (e) {
         console.error("Error cargando presupuestos desde el backend:", e);
         setPresupuestosPage(createEmptyPage());
@@ -348,7 +400,7 @@ export default function MainGrid() {
         setLoadingAll(false);
       }
     },
-    [baseURL, mergeYearOptions, normalizePage, query, currency, applyCurrencyFilter],
+    [baseURL, mergeYearOptions, normalizePage, currency, applyCurrencyFilter],
   );
   const fetchSearchPresupuestos = React.useCallback(
     async (searchParamsString, statusValue, pageValue) => {
@@ -363,7 +415,42 @@ export default function MainGrid() {
         const res = await http.get(
           `${baseURL}/api/presupuestos?${params.toString()}`,
         );
-        const pageData = applyCurrencyFilter(normalizePage(res.data));
+        let data = res.data;
+
+        // Fallback: Filtrado local si el backend devuelve todo
+        // Verificamos si hay un filtro de "nombre" en los parametros
+        const nameFilter = params.get("nombre");
+        if (nameFilter && Array.isArray(data.content)) {
+          const lowerTerm = nameFilter.toLowerCase();
+          const filteredContent = data.content.filter((item) => {
+            const nombre = (item.nombre || "").toLowerCase();
+            const desde = (item.desde || "").toLowerCase();
+            const hasta = (item.hasta || "").toLowerCase();
+            const desdeMes = monthName(item.desde || "").toLowerCase();
+            const hastaMes = monthName(item.hasta || "").toLowerCase();
+            return (
+              nombre.includes(lowerTerm) ||
+              desde.includes(lowerTerm) ||
+              hasta.includes(lowerTerm) ||
+              desdeMes.includes(lowerTerm) ||
+              hastaMes.includes(lowerTerm)
+            );
+          });
+
+          // Recalculamos totales si filtramos localmente
+          // Nota: Esto es una aproximación, idealmente el backend debe filtrar.
+          // Pero si el backend ignora el filtro, corregimos aquí.
+          if (filteredContent.length !== data.content.length) {
+            data = {
+              ...data,
+              content: filteredContent,
+              totalElements: filteredContent.length,
+              totalPages: data.size > 0 ? Math.ceil(filteredContent.length / data.size) : 1
+            };
+          }
+        }
+
+        const pageData = applyCurrencyFilter(normalizePage(data));
         if (
           pageValue > 0 &&
           pageData.totalPages > 0 &&
@@ -557,27 +644,7 @@ export default function MainGrid() {
   const searchTotalPages = searchPage ? Number(searchPage.totalPages) || 0 : 0;
   const searchCurrentPage =
     searchTotalPages > 0 && searchPage ? searchPage.number + 1 : 1;
-  const visiblePresupuestos = React.useMemo(() => {
-    const term = query.trim().toLowerCase();
-    const data = Array.isArray(presupuestosPage.content)
-      ? presupuestosPage.content
-      : [];
-    if (!term) return data;
-    return data.filter((p) => {
-      const nombre = (p?.nombre || "").toLowerCase();
-      const desde = (p?.desde || "").toLowerCase();
-      const hasta = (p?.hasta || "").toLowerCase();
-      const desdeMes = monthName(p?.desde || "").toLowerCase();
-      const hastaMes = monthName(p?.hasta || "").toLowerCase();
-      return (
-        nombre.includes(term) ||
-        desde.includes(term) ||
-        hasta.includes(term) ||
-        desdeMes.includes(term) ||
-        hastaMes.includes(term)
-      );
-    });
-  }, [presupuestosPage.content, query, monthName]);
+  /* Memos eliminados: visiblePresupuestos y visibleSearchResults para evitar filtrado local */
   const handleFilterChange = (field) => (event) => {
     const value = event.target.value;
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -585,6 +652,15 @@ export default function MainGrid() {
   const handleSearch = () => {
     setSearchError("");
     const params = new URLSearchParams();
+
+    // Filtro por término de búsqueda (nombre)
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      params.set("nombre", trimmedQuery);
+    }
+
+
+
     const hasYear = Boolean(filters.year);
     const hasFrom = Boolean(filters.fromMonth);
     const hasTo = Boolean(filters.toMonth);
@@ -598,18 +674,11 @@ export default function MainGrid() {
         : new Date().getFullYear();
       const fromMonth = Number(filters.fromMonth);
       const toMonth = Number(filters.toMonth);
-      if (fromMonth > toMonth) {
-        setSearchError("El mes Desde no puede ser posterior al mes Hasta.");
-        return;
-      }
-      const fromDate = `${baseYear}-${pad2(fromMonth)}-01`;
-      const toDateValue = `${baseYear}-${pad2(toMonth)}-${pad2(lastDayOfMonth(baseYear, toMonth))}`;
-      params.set("from", fromDate);
-      params.set("to", toDateValue);
+      params.set("desde", `${baseYear}-${pad2(fromMonth)}-01`);
+      params.set("hasta", `${baseYear}-${pad2(toMonth)}-${pad2(lastDayOfMonth(baseYear, toMonth))}`);
     } else if (hasYear) {
-      const fromDate = `${filters.year}-01-01`;
-      const toDateValue = `${filters.year}-12-31`;
-      params.set("year", filters.year);
+      params.set("desde", `${filters.year}-01-01`);
+      params.set("hasta", `${filters.year}-12-31`);
     }
     const queryString = params.toString();
     if (!queryString) {
@@ -783,48 +852,7 @@ export default function MainGrid() {
     ),
   };
 
-  // --- DataGrid Styles (copied from reports for consistency) ---
-  const dataGridStyles = {
-    backgroundColor: "background.paper",
-    borderRadius: 2,
-    border: (theme) => `1px solid ${theme.palette.divider}`,
-    "& .MuiDataGrid-cell": {
-      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-      display: "flex",
-      alignItems: "center",
-      fontSize: "0.875rem",
-    },
-    "& .MuiDataGrid-columnHeaders": {
-      backgroundColor: (theme) =>
-        theme.palette.mode === "dark"
-          ? "rgba(255, 255, 255, 0.05)"
-          : "#f5f5f5",
-      color: "text.primary",
-      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-    },
-    "& .MuiDataGrid-columnHeader": {
-      "&:focus": { outline: "none" },
-    },
-    "& .MuiDataGrid-sortIcon": {
-      display: "none",
-    },
-    "& .MuiDataGrid-menuIcon": {
-      display: "none",
-    },
-    "& .MuiDataGrid-iconButtonContainer": {
-      display: "none",
-    },
-    "& .MuiDataGrid-row:hover": {
-      backgroundColor: (theme) => theme.palette.action.hover,
-    },
-    "& .MuiDataGrid-footerContainer": {
-      borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-    },
-    // Hide default footer since we use custom pagination below
-    "& .MuiDataGrid-footerContainer": {
-      display: "none"
-    }
-  };
+
 
   const columns = React.useMemo(() => {
     const cols = [
@@ -835,7 +863,17 @@ export default function MainGrid() {
         align: 'center',
         headerAlign: 'center',
         renderCell: (params) => (
-          <Typography variant="body2">{params.value}</Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              lineHeight: 1.2,
+              py: 1
+            }}
+          >
+            {params.value}
+          </Typography>
         )
       },
       {
@@ -901,7 +939,7 @@ export default function MainGrid() {
               variant="outlined"
               size="small"
               onClick={() => navigate(`/presupuestos/${slug}`)}
-              sx={isLightMode ? undefined : { color: "#42897f" }}
+              sx={isLightMode ? { lineHeight: 1.2 } : { color: "#42897f", lineHeight: 1.2 }}
             >
               Ver detalle
             </Button>
@@ -1038,11 +1076,34 @@ export default function MainGrid() {
         variant="outlined"
         size="small"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          const newVal = e.target.value;
+          setQuery(newVal);
+          // Si el usuario borra todo el texto, limpiamos la búsqueda activa
+          if (newVal.trim() === "") {
+            setHasActiveSearch(false);
+            setSearchPage(null);
+            setSearchPageIndex(0);
+            setSearchError("");
+            searchParamsRef.current = "";
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSearch();
+        }}
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton onClick={handleSearch} size="small" edge="end">
+                <SearchRoundedIcon />
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
         sx={{
           mt: 1,
           mb: 2,
-          width: { xs: "100%", sm: 250 },
+          width: { xs: "100%", sm: 350 },
         }}
       />
       {searchError && (
@@ -1063,13 +1124,12 @@ export default function MainGrid() {
           <Paper sx={{ width: "100%", mb: 3 }}>
             {loadingSearch ? (
               <LoadingSpinner message="Cargando presupuestos..." />
-            ) : searchPage &&
-              Array.isArray(searchPage.content) &&
-              searchPage.content.length > 0 ? (
+            ) : searchPage ? (
               <>
                 <DataGrid
-                  rows={searchPage.content}
+                  rows={searchPage.content || []}
                   columns={columns}
+                  getRowHeight={() => 'auto'}
                   autoHeight
                   density="standard"
                   hideFooter
@@ -1080,6 +1140,9 @@ export default function MainGrid() {
                     hasta: !isMobile,
                   }}
                   sx={dataGridStyles}
+                  slots={{
+                    noRowsOverlay: CustomNoSearchResults,
+                  }}
                 />
                 {searchTotalPages > 1 && (
                   <Box mt={2} mb={2} display="flex" justifyContent="center">
@@ -1095,13 +1158,7 @@ export default function MainGrid() {
                   </Box>
                 )}
               </>
-            ) : (
-              !searchError && (
-                <Alert severity="info">
-                  No encontramos presupuestos para el rango seleccionado.
-                </Alert>
-              )
-            )}
+            ) : null}
           </Paper>
         </>
       )}
@@ -1126,6 +1183,7 @@ export default function MainGrid() {
             <DataGrid
               rows={presupuestosPage.content || []}
               columns={columns}
+              getRowHeight={() => 'auto'}
               autoHeight
               density="standard"
               hideFooter
@@ -1136,7 +1194,9 @@ export default function MainGrid() {
                 hasta: !isMobile,
               }}
               sx={dataGridStyles}
-              localeText={{ noRowsLabel: "No hay presupuestos para mostrar." }}
+              slots={{
+                noRowsOverlay: CustomNoRowsPresupuestos,
+              }}
             />
           </>
         )}

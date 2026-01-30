@@ -8,6 +8,8 @@ import {
   Button,
   Stack,
   Alert,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import HistoryIcon from "@mui/icons-material/History";
 import UploadIcon from "@mui/icons-material/Upload";
@@ -23,6 +25,8 @@ export default function ExcelManagement() {
   const [historialLoading, setHistorialLoading] = React.useState(false);
   const [historialPage, setHistorialPage] = React.useState(0);
   const [historialPageSize, setHistorialPageSize] = React.useState(20);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const chatbotContext = React.useMemo(
     () => ({
@@ -114,7 +118,11 @@ export default function ExcelManagement() {
         }}
       >
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant={isMobile ? "fullWidth" : "standard"}
+          >
             <Tab
               icon={<UploadIcon />}
               label="Cargar Excel"
@@ -122,7 +130,7 @@ export default function ExcelManagement() {
             />
             <Tab
               icon={<HistoryIcon />}
-              label="Historial de Cargas"
+              label={isMobile ? "Historial" : "Historial de Cargas"}
               iconPosition="start"
             />
           </Tabs>

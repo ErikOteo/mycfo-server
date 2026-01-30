@@ -11,7 +11,9 @@ export function useNotifications(userId) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (options = {}) => {
+    const { isBackground = false } = options;
+
     if (!userId) {
       setItems([]);
       setUnread(0);
@@ -19,7 +21,9 @@ export function useNotifications(userId) {
     }
 
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      }
       setError(null);
 
       const data = await getNotifications({
@@ -36,7 +40,9 @@ export function useNotifications(userId) {
       console.error("Error obteniendo notificaciones:", err);
       setError(err);
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   }, [userId]);
 
@@ -51,14 +57,39 @@ export function useNotifications(userId) {
     let cancelled = false;
 
     const loop = async () => {
-      await fetchNotifications();
+      // La primera vez (o al cambiar userId) podría no ser background si queremos mostrar spinner,
+      // pero como este efecto corre después del montaje, podemos asumir que la primera carga
+      // explicita (si la hubiese) o este loop manejan la carga.
+      // Para simplificar y mantener comportamiento:
+      // La primera ejecución del loop será isBackground: false (para mostrar spinner inicial)
+      // Las siguientes serán isBackground: true.
+
+      // NOTA: Para evitar race conditions con el "loop", idealmente deberíamos tener un flag.
+      // Pero dado el código actual, haremos que la PRIMERA de este efecto sea con loading
+      // y las subsiguientes (setTimeout) sean background.
+
+      await fetchNotifications({ isBackground: false });
+
       if (!cancelled) {
-        setTimeout(loop, 10000); // 10 segundos
+        const runBackgroundLoop = async () => {
+          if (cancelled) return;
+          await fetchNotifications({ isBackground: true });
+          if (!cancelled) setTimeout(runBackgroundLoop, 10000);
+        };
+        setTimeout(runBackgroundLoop, 10000);
       }
     };
 
-    // Primera carga inmediata + inicio del loop
-    loop();
+    // Sin embargo, para no complicar la lógica del loop recursivo original:
+    const simpleLoop = async (firstTime) => {
+      if (cancelled) return;
+      await fetchNotifications({ isBackground: !firstTime });
+      if (!cancelled) {
+        setTimeout(() => simpleLoop(false), 10000);
+      }
+    }
+
+    simpleLoop(true);
 
     return () => {
       cancelled = true;
