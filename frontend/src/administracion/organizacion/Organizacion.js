@@ -24,6 +24,7 @@ import { sessionService } from "../../shared-services/sessionService";
 import { organizacionService } from "../../shared-services/organizacionService";
 import InvitarColaboradores from "../invitaciones/InvitarColaboradores";
 import API_CONFIG from "../../config/api-config";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function Organizacion() {
   const [empresa, setEmpresa] = useState(null);
@@ -35,6 +36,41 @@ export default function Organizacion() {
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [empresaEditada, setEmpresaEditada] = useState({});
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "organizacion",
+      empresa: empresa
+        ? {
+            nombre: empresa.nombre,
+            cuit: empresa.cuit,
+            condicionIVA: empresa.condicionIVA,
+            domicilio: empresa.domicilio,
+          }
+        : null,
+      empleadosTotal: empleados.length,
+      empleados: empleados.slice(0, 5).map((empleado) => ({
+        nombre: empleado.nombre,
+        email: empleado.email,
+        rol: empleado.rol,
+        activo: empleado.activo,
+      })),
+      usuarioRol,
+      editandoEmpresa,
+      editandoEmpleado: Boolean(editandoEmpleado),
+      loading,
+    }),
+    [
+      empresa,
+      empleados,
+      usuarioRol,
+      editandoEmpresa,
+      editandoEmpleado,
+      loading,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const sub = sessionStorage.getItem("sub");
   const organizacionId = sessionStorage.getItem("organizacionId");

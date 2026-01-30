@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -61,7 +62,8 @@ public class ChatbotVertexService {
                     ".*\\b(aca|aqui|aquí|esta pantalla|este modulo|este módulo|esta seccion|esta sección|este lugar)\\b");
     private static final Pattern LOCATION_QUESTION_PATTERN = Pattern.compile(
             "(?i)\\b(donde estoy|en que modulo estoy|en qué modulo estoy|que modulo es este|" +
-                    "que m[oó]dulo es este|que pantalla es|que estoy viendo|que es esto que veo|donde estoy parado)\\b");
+                    "que m[oó]dulo es este|que pantalla es|que estoy viendo|que veo|que veo aca|que veo aquí|" +
+                    "que es esto que veo|donde estoy parado)\\b");
     private static final Pattern GREETING_ONLY_PATTERN = Pattern.compile(
             "(?i)^\\s*(hola|buenas|buenos dias|buen d[ií]a|buen dia|buenas tardes|buenas noches|hello|hey)\\s*[!.?]*\\s*$");
     private static final Pattern INTERPRETATION_PATTERN = Pattern.compile(
@@ -74,7 +76,7 @@ public class ChatbotVertexService {
     private static final Pattern PHONE_QUESTION_PATTERN = Pattern.compile("(?i)\\b(tel[ée]fono|telefono|celular|celu|m[oó]vil|movil)\\b");
     private static final Pattern NAME_QUESTION_PATTERN = Pattern.compile("(?i)\\b(nombre|usuario)\\b");
     private static final Pattern DATE_QUESTION_PATTERN = Pattern.compile(
-            "(?i)\\b(qu[eé] fecha es|qu[eé] d[ií]a es|qu[eé] d[ií]a|fecha|d[ií]a|hoy|ahora|" +
+            "(?i)\\b(qu[eé] fecha es|qu[eé] d[ií]a es|qu[eé] d[ií]a|fecha|d[ií]a|hoy|" +
                     "en qu[eé] d[ií]a estamos|en qu[eé] fecha estamos|qu[eé] hora es|hora)\\b");
     private static final Pattern TIME_QUESTION_PATTERN = Pattern.compile("(?i)\\bhora\\b");
     private static final Pattern DATA_REQUEST_PATTERN = Pattern.compile(
@@ -88,11 +90,17 @@ public class ChatbotVertexService {
                     "d[oó]nde encuentro|d[oó]nde esta|d[oó]nde está|configurar|activar|desactivar|crear|" +
                     "editar|cargar|importar|conciliar|generar)\\b");
     private static final Pattern BUDGET_PATTERN = Pattern.compile("(?i)\\bpresupuesto(s)?\\b");
+    private static final Pattern BUDGET_EXISTENCE_PATTERN = Pattern.compile(
+            "(?i)\\b(tengo|tenes|hay|existe|existen|alg[uú]n|alguna|alguno|ningun|ningÃºn|ninguna)\\b");
+    private static final Pattern BUDGET_COUNT_PATTERN = Pattern.compile(
+            "(?i)\\b(cuantos|cuÃ¡ntos|cantidad|numero|nÃºmero)\\b");
     private static final Pattern EMOJI_PATTERN = Pattern.compile(
             "[\\x{1F300}-\\x{1FAFF}\\x{2600}-\\x{27BF}]");
     private static final Pattern LIST_PREFIX_PATTERN = Pattern.compile("^\\s*([\\-*+•·]|\\d+\\.)\\s+");
     private static final Pattern HEADING_PREFIX_PATTERN = Pattern.compile("^\\s*#{1,6}\\s+");
     private static final Pattern QUOTE_PREFIX_PATTERN = Pattern.compile("^\\s*>\\s+");
+    private static final Pattern MANUAL_REFERENCE_PATTERN = Pattern.compile("(?i)\\b(manual|pdf|documento adjunto|base de conocimiento)\\b");
+    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile("@@CALL_TOOL:([A-Z_]+)(?:\\s*(\\{.*?\\}))?@@", Pattern.DOTALL);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Set<String> CONTEXT_IGNORE_KEYS = Set.of(
@@ -108,9 +116,10 @@ public class ChatbotVertexService {
 
     private final VertexAiProperties properties;
     private final ObjectMapper objectMapper;
+    private final DataRetrievalService dataRetrievalService;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public ChatbotResult chat(String message, String module, Map<String, Object> context) {
+    public ChatbotResult chat(String message, String module, Map<String, Object> context, String userSub, String authorization) {
         if (!StringUtils.hasText(message)) {
             throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "El mensaje no puede estar vacio.");
         }
@@ -139,10 +148,6 @@ public class ChatbotVertexService {
             return new ChatbotResult(buildProfileResponse(trimmedMessage, context), "");
         }
 
-        if (isDateQuestion(trimmedMessage)) {
-            return new ChatbotResult(buildDateResponse(trimmedMessage), "");
-        }
-
         if (isLocationQuestion(trimmedMessage)) {
             String locationPrompt = buildLocationSummaryPrompt(resolvedModule, context);
             if (!StringUtils.hasText(locationPrompt)) {
@@ -152,57 +157,93 @@ public class ChatbotVertexService {
             forceManual = true;
         }
 
+        if (isDateQuestion(trimmedMessage)) {
+            return new ChatbotResult(buildDateResponse(trimmedMessage), "");
+        }
+
         if (isOutOfScope(trimmedMessage)) {
             return new ChatbotResult(ChatbotPolicy.OUT_OF_SCOPE_RESPONSE, "");
         }
 
-        if (isBudgetQuestion(trimmedMessage) && !isHowToQuestion(trimmedMessage) && !hasBudgetData(context)) {
-            return new ChatbotResult(ChatbotPolicy.NO_BUDGETS_RESPONSE, "");
+        String targetHint = resolveTargetScreenHint(trimmedMessage);
+        boolean dataRequest = isDataRequest(trimmedMessage) && !isHowToQuestion(trimmedMessage);
+        ToolExecution autoTool = dataRequest
+                ? maybeAutoTool(trimmedMessage, context, userSub, authorization)
+                : null;
+        if (autoTool != null && !autoTool.ok() && "missing_params".equals(autoTool.error())) {
+            return new ChatbotResult(buildMissingParamsResponse(autoTool), "");
         }
 
-        if (isDataRequest(trimmedMessage) && !isHowToQuestion(trimmedMessage) && !hasUsableData(context)) {
+        ExternalFetchInfo externalFetch = extractExternalFetchInfo(context);
+        if (autoTool == null && externalFetch != null && !externalFetch.isOk()) {
+            return new ChatbotResult(buildExternalFetchResponse(externalFetch), "");
+        }
+        boolean externalFetchOk = externalFetch != null && externalFetch.isOk();
+        if (autoTool != null && autoTool.ok()) {
+            promptMessage = buildToolFollowupMessage(promptMessage, autoTool);
+        }
+
+        if (autoTool == null && dataRequest
+                && StringUtils.hasText(targetHint) && isTargetScreenDifferent(context, targetHint) && !externalFetchOk) {
+            return new ChatbotResult(buildMissingDataResponse(targetHint), "");
+        }
+
+        if (autoTool == null && isBudgetQuestion(trimmedMessage) && !isHowToQuestion(trimmedMessage)) {
+            if (StringUtils.hasText(targetHint) && isTargetScreenDifferent(context, targetHint) && !externalFetchOk) {
+                return new ChatbotResult(buildMissingDataResponse(targetHint), "");
+            }
+            if (isBudgetExistenceQuestion(trimmedMessage) || isBudgetCountQuestion(trimmedMessage) || wantsBudgetNames(trimmedMessage)) {
+                BudgetInfo budgetInfo = extractBudgetInfo(context);
+                if (budgetInfo != null && budgetInfo.count > 0) {
+                    return new ChatbotResult(buildBudgetSummaryResponse(trimmedMessage, budgetInfo), "");
+                }
+                if (hasExplicitBudgetZero(context)) {
+                    return new ChatbotResult(ChatbotPolicy.NO_BUDGETS_RESPONSE, "");
+                }
+                String hint = StringUtils.hasText(targetHint) ? targetHint : "Pronostico > Presupuestos";
+                return new ChatbotResult(buildMissingDataResponse(hint), "");
+            }
+        }
+
+        if (autoTool == null && isBudgetQuestion(trimmedMessage) && !isHowToQuestion(trimmedMessage) && !hasBudgetData(context)) {
+            if (hasExplicitBudgetZero(context)) {
+                return new ChatbotResult(ChatbotPolicy.NO_BUDGETS_RESPONSE, "");
+            }
+            String hint = StringUtils.hasText(targetHint) ? targetHint : "Pronostico > Presupuestos";
+            return new ChatbotResult(buildMissingDataResponse(hint), "");
+        }
+
+        if (autoTool == null && dataRequest && !hasUsableData(context)) {
+            if (StringUtils.hasText(targetHint)) {
+                return new ChatbotResult(buildMissingDataResponse(targetHint), "");
+            }
             return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, "");
+        }
+
+        if (isHowToQuestion(trimmedMessage) && !isLocalActionQuestion(trimmedMessage)) {
+            if (StringUtils.hasText(targetHint)) {
+                promptMessage = "Pantalla solicitada: " + targetHint + ".\n" + promptMessage;
+            }
         }
 
         if (isInterpretationRequest(trimmedMessage)) {
             promptMessage = buildInterpretationPrompt(promptMessage, context);
         }
-        String prompt = buildPrompt(resolvedModule, promptMessage, context);
-        String endpoint = String.format(
-                "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
-                properties.getLocation(),
-                properties.getProjectId(),
-                properties.getLocation(),
-                properties.getModel());
-
-        String token = resolveAccessToken();
         boolean includeManual = forceManual || shouldAttachManual(promptMessage);
-        Map<String, Object> requestBody = buildRequestBody(ChatbotPolicy.SYSTEM_PROMPT, prompt, includeManual);
 
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(token);
-
-            String payload = objectMapper.writeValueAsString(requestBody);
-            log.info("Enviando mensaje a Vertex AI. Modulo: {}, Endpoint: {}", resolvedModule, endpoint);
-            ResponseEntity<String> response = restTemplate.exchange(
-                    endpoint,
-                    HttpMethod.POST,
-                    new HttpEntity<>(payload, headers),
-                    String.class);
-
-            String raw = extractTextFromResponse(response.getBody());
-            String cleaned = normalizePlainText(stripCodeFences(raw)).trim();
-            log.info("Respuesta de Vertex AI (recortada): {}", truncate(cleaned, 1000));
-            return new ChatbotResult(cleaned, raw);
-        } catch (RestClientResponseException ex) {
-            log.error("Vertex AI respondio con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al consultar Vertex AI.");
-        } catch (Exception ex) {
-            log.error("Error consultando Vertex AI", ex);
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al procesar el mensaje.");
+        VertexResponse first = callVertex(resolvedModule, promptMessage, context, includeManual);
+        ToolCall toolCall = parseToolCall(first.cleaned());
+        if (toolCall != null) {
+            ToolExecution execution = executeTool(toolCall.name(), toolCall.params(), userSub, authorization);
+            String toolPromptMessage = buildToolFollowupMessage(promptMessage, execution);
+            VertexResponse second = callVertex(resolvedModule, toolPromptMessage, context, includeManual);
+            ToolCall secondCall = parseToolCall(second.cleaned());
+            if (secondCall != null) {
+                return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, second.raw());
+            }
+            return new ChatbotResult(second.cleaned(), second.raw());
         }
+        return new ChatbotResult(first.cleaned(), first.raw());
     }
 
     private String resolveAccessToken() {
@@ -228,6 +269,44 @@ public class ChatbotVertexService {
         } catch (Exception ex) {
             log.error("Error obteniendo token de Google", ex);
             throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "No se pudo autenticar con Google.");
+        }
+    }
+
+    private VertexResponse callVertex(String module, String promptMessage, Map<String, Object> context, boolean includeManual) {
+        String prompt = buildPrompt(module, promptMessage, context);
+        String endpoint = String.format(
+                "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+                properties.getLocation(),
+                properties.getProjectId(),
+                properties.getLocation(),
+                properties.getModel());
+
+        String token = resolveAccessToken();
+        Map<String, Object> requestBody = buildRequestBody(ChatbotPolicy.SYSTEM_PROMPT, prompt, includeManual);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            String payload = objectMapper.writeValueAsString(requestBody);
+            log.info("Enviando mensaje a Vertex AI. Modulo: {}, Endpoint: {}", module, endpoint);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    endpoint,
+                    HttpMethod.POST,
+                    new HttpEntity<>(payload, headers),
+                    String.class);
+
+            String raw = extractTextFromResponse(response.getBody());
+            String cleaned = normalizePlainText(stripCodeFences(raw)).trim();
+            log.info("Respuesta de Vertex AI (recortada): {}", truncate(cleaned, 1000));
+            return new VertexResponse(cleaned, raw);
+        } catch (RestClientResponseException ex) {
+            log.error("Vertex AI respondio con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al consultar Vertex AI.");
+        } catch (Exception ex) {
+            log.error("Error consultando Vertex AI", ex);
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al procesar el mensaje.");
         }
     }
 
@@ -313,6 +392,10 @@ public class ChatbotVertexService {
         };
 
         String contextBlock = buildContextBlock(context);
+        if (isHowToQuestion(message) && !isLocalActionQuestion(message)) {
+            contextBlock = "Contexto de pantalla: no relevante para esta consulta.";
+            moduleHint = "Estas asistiendo en MyCFO. Responde con foco en la funcionalidad solicitada, aunque sea de otro modulo.";
+        }
 
         return String.join(
                 "\n",
@@ -352,9 +435,313 @@ public class ChatbotVertexService {
                 .map(line -> LIST_PREFIX_PATTERN.matcher(line).replaceAll(""))
                 .map(line -> HEADING_PREFIX_PATTERN.matcher(line).replaceAll(""))
                 .map(line -> QUOTE_PREFIX_PATTERN.matcher(line).replaceAll(""))
+                .filter(line -> !MANUAL_REFERENCE_PATTERN.matcher(line).find())
                 .collect(Collectors.toList());
 
         return String.join("\n", lines);
+    }
+
+    private ToolCall parseToolCall(String text) {
+        if (!StringUtils.hasText(text)) {
+            return null;
+        }
+        Matcher matcher = TOOL_CALL_PATTERN.matcher(text);
+        if (!matcher.find()) {
+            return null;
+        }
+        String name = matcher.group(1);
+        String json = matcher.group(2);
+        Map<String, Object> params = parseToolParams(json);
+        return new ToolCall(name, params);
+    }
+
+    private Map<String, Object> parseToolParams(String json) {
+        if (!StringUtils.hasText(json)) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            log.warn("No se pudo parsear parametros de tool call: {}", json);
+            return Map.of();
+        }
+    }
+
+    private ToolExecution executeTool(String toolName, Map<String, Object> params, String userSub, String authorization) {
+        String safeToolName = StringUtils.hasText(toolName) ? toolName : "UNKNOWN_TOOL";
+        ToolName tool = ToolName.from(toolName);
+        if (tool == null) {
+            return ToolExecution.error(safeToolName, "unsupported_tool");
+        }
+        if (!StringUtils.hasText(userSub)) {
+            return ToolExecution.error(tool.name(), "missing_user");
+        }
+        try {
+            Map<String, Object> data = switch (tool) {
+                case GET_BALANCE -> dataRetrievalService.getBalance(
+                        userSub,
+                        authorization,
+                        stringValue(params != null ? params.get("moneda") : null));
+                case SEARCH_MOVEMENTS -> dataRetrievalService.searchMovements(
+                        userSub,
+                        authorization,
+                        params != null ? params : Map.of());
+                case GET_PENDING_TASKS -> dataRetrievalService.getPendingTasks(
+                        userSub,
+                        authorization,
+                        params != null ? params : Map.of());
+                case GET_SCREEN_DATA -> dataRetrievalService.getScreenData(
+                        stringValue(params != null ? params.get("screen") : null),
+                        params != null ? params : Map.of(),
+                        userSub,
+                        authorization);
+            };
+            if (data == null || data.isEmpty()) {
+                return ToolExecution.error(tool.name(), "no_data");
+            }
+            if (data.containsKey("error")) {
+                String error = stringValue(data.get("error"));
+                if ("missing_params".equals(error)) {
+                    List<String> missing = toStringList(data.get("missing"));
+                    return ToolExecution.missing(tool.name(), missing);
+                }
+                return ToolExecution.error(tool.name(), error);
+            }
+            return ToolExecution.ok(tool.name(), data);
+        } catch (Exception ex) {
+            log.error("Error ejecutando herramienta {}", tool.name(), ex);
+            return ToolExecution.error(tool.name(), "tool_error");
+        }
+    }
+
+    private String buildToolFollowupMessage(String promptMessage, ToolExecution execution) {
+        String base = StringUtils.hasText(promptMessage) ? promptMessage.trim() : "Consulta del usuario.";
+        String payload = safeWriteJson(execution.toPayload());
+        return String.join(
+                "\n",
+                base,
+                "Resultado herramienta " + execution.tool() + ": " + payload,
+                "Si ok es false o hay error, indica que no tenes acceso a esos datos.",
+                "Responde solo con estos datos reales."
+        );
+    }
+
+    private ToolExecution maybeAutoTool(String message, Map<String, Object> context, String userSub, String authorization) {
+        if (!StringUtils.hasText(userSub)) {
+            return null;
+        }
+        String lower = normalizeKey(message);
+        Map<String, Object> params = buildAutoToolParams(message, context);
+        ToolName tool = resolveToolForMessage(lower, params);
+        if (tool == null) {
+            return null;
+        }
+        if (tool == ToolName.GET_SCREEN_DATA && !params.containsKey("screen")) {
+            return null;
+        }
+        return executeTool(tool.name(), params, userSub, authorization);
+    }
+
+    private ToolName resolveToolForMessage(String normalizedMessage, Map<String, Object> params) {
+        if (!StringUtils.hasText(normalizedMessage)) {
+            return null;
+        }
+        if (matchesAny(normalizedMessage, "saldo", "balance", "caja", "saldo total")) {
+            return ToolName.GET_BALANCE;
+        }
+        if (matchesAny(normalizedMessage, "conciliacion", "conciliar", "pendiente", "pendientes")) {
+            return ToolName.GET_PENDING_TASKS;
+        }
+        String screenKey = stringValue(params.get("screen"));
+        if (StringUtils.hasText(screenKey)) {
+            return ToolName.GET_SCREEN_DATA;
+        }
+        if (matchesAny(normalizedMessage, "movimiento", "movimientos", "ingreso", "egreso", "factura")) {
+            return ToolName.SEARCH_MOVEMENTS;
+        }
+        return null;
+    }
+
+    private Map<String, Object> buildAutoToolParams(String message, Map<String, Object> context) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        String screenKey = resolveTargetScreenKey(message);
+        if (!StringUtils.hasText(screenKey)) {
+            screenKey = resolveCurrentScreenKey(context);
+        }
+        if (StringUtils.hasText(screenKey)) {
+            params.put("screen", screenKey);
+        }
+        Integer year = extractYearFromMessage(message);
+        Integer month = extractMonthFromMessage(message);
+        if (year != null) params.put("anio", year);
+        if (month != null) params.put("mes", month);
+        String currency = extractCurrencyFromContext(context);
+        if (StringUtils.hasText(currency)) params.put("moneda", currency);
+        Integer userId = extractUserIdFromContext(context);
+        if (userId != null) params.put("userId", userId);
+        return params;
+    }
+
+    private String resolveCurrentScreenKey(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return null;
+        }
+        String routeSegment = extractLastRouteSegment(context);
+        if (StringUtils.hasText(routeSegment)) {
+            return routeSegment.toLowerCase();
+        }
+        Object screen = context.get("screen");
+        if (screen != null && StringUtils.hasText(screen.toString())) {
+            return screen.toString().trim().toLowerCase();
+        }
+        return null;
+    }
+
+    private String resolveTargetScreenKey(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        String lower = normalizeKey(message);
+        if (matchesAny(lower, "dashboard", "tablero")) {
+            return "dashboard";
+        }
+        if (matchesAny(lower, "reporte mensual", "resumen mensual")) {
+            return "reporte-mensual";
+        }
+        if (matchesAny(lower, "flujo de caja", "cashflow", "cash flow")) {
+            return "flujo-de-caja";
+        }
+        if (matchesAny(lower, "estado de resultados", "estado de resultado", "p l", "p&l", "pyl")) {
+            return "estado-de-resultados";
+        }
+        if (matchesAny(lower, "presupuesto", "presupuestos")) {
+            return "presupuestos";
+        }
+        if (matchesAny(lower, "pronostico continuo", "pronostico continuo", "rolling")) {
+            return "pronostico-continuo";
+        }
+        if (matchesAny(lower, "pronostico fijo")) {
+            return "pronostico-fijo";
+        }
+        if (matchesAny(lower, "ver movimientos", "movimientos cargados", "movimientos")) {
+            return "ver-movimientos";
+        }
+        if (matchesAny(lower, "ver facturas", "facturas")) {
+            return "ver-facturas";
+        }
+        if (matchesAny(lower, "conciliacion", "conciliar")) {
+            return "conciliacion";
+        }
+        if (matchesAny(lower, "carga movimientos", "carga de movimientos")) {
+            return "carga-movimientos";
+        }
+        if (matchesAny(lower, "mercado pago", "mercado-pago")) {
+            return "mercado-pago";
+        }
+        if (matchesAny(lower, "recordatorios")) {
+            return "recordatorios";
+        }
+        if (matchesAny(lower, "configuracion notificaciones", "configuracion de notificaciones")) {
+            return "configuracion-notificaciones";
+        }
+        if (matchesAny(lower, "notificaciones", "notificacion", "alertas")) {
+            return "listado-notificaciones";
+        }
+        if (matchesAny(lower, "perfil")) {
+            return "perfil";
+        }
+        if (matchesAny(lower, "organizacion", "empresa")) {
+            return "organizacion";
+        }
+        return null;
+    }
+
+    private Integer extractYearFromMessage(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        Matcher matcher = Pattern.compile("\\b(20\\d{2}|19\\d{2})\\b").matcher(message);
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException ignore) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Integer extractMonthFromMessage(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        String normalized = normalizeKey(message);
+        if (normalized.contains("enero")) return 1;
+        if (normalized.contains("febrero")) return 2;
+        if (normalized.contains("marzo")) return 3;
+        if (normalized.contains("abril")) return 4;
+        if (normalized.contains("mayo")) return 5;
+        if (normalized.contains("junio")) return 6;
+        if (normalized.contains("julio")) return 7;
+        if (normalized.contains("agosto")) return 8;
+        if (normalized.contains("septiembre") || normalized.contains("setiembre")) return 9;
+        if (normalized.contains("octubre")) return 10;
+        if (normalized.contains("noviembre")) return 11;
+        if (normalized.contains("diciembre")) return 12;
+        return null;
+    }
+
+    private String extractCurrencyFromContext(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return null;
+        }
+        String currency = stringValue(context.get("currency"));
+        if (StringUtils.hasText(currency)) {
+            return currency;
+        }
+        return stringValue(context.get("moneda"));
+    }
+
+    private Integer extractUserIdFromContext(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return null;
+        }
+        Object userId = context.get("userId");
+        if (userId instanceof Number number) {
+            return number.intValue();
+        }
+        if (userId instanceof String text) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignore) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String buildMissingParamsResponse(ToolExecution execution) {
+        String missing = formatMissingParams(execution.missing());
+        if (StringUtils.hasText(missing)) {
+            return String.join(
+                    "\n",
+                    "Para responder necesito " + missing + ".",
+                    "Decime esos datos y vuelvo a intentarlo."
+            );
+        }
+        return ChatbotPolicy.NO_DATA_RESPONSE;
+    }
+
+    private String safeWriteJson(Map<String, Object> payload) {
+        if (payload == null) {
+            return "{}";
+        }
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception ex) {
+            return "{}";
+        }
     }
 
     private boolean isOutOfScope(String message) {
@@ -431,6 +818,9 @@ public class ChatbotVertexService {
         if (message == null) {
             return false;
         }
+        if (isLocationQuestion(message)) {
+            return false;
+        }
         return DATE_QUESTION_PATTERN.matcher(message).find();
     }
 
@@ -453,6 +843,39 @@ public class ChatbotVertexService {
             return false;
         }
         return BUDGET_PATTERN.matcher(message).find();
+    }
+
+    private boolean isBudgetExistenceQuestion(String message) {
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        if (!lower.contains("presupuesto")) {
+            return false;
+        }
+        return BUDGET_EXISTENCE_PATTERN.matcher(lower).find();
+    }
+
+    private boolean isBudgetCountQuestion(String message) {
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        if (!lower.contains("presupuesto")) {
+            return false;
+        }
+        return BUDGET_COUNT_PATTERN.matcher(lower).find();
+    }
+
+    private boolean wantsBudgetNames(String message) {
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        if (!lower.contains("presupuesto")) {
+            return false;
+        }
+        return matchesAny(lower, "nombre", "nombres", "se llama", "se llaman", "como se llama", "cómo se llama");
     }
 
     private boolean shouldAttachManual(String message) {
@@ -499,6 +922,10 @@ public class ChatbotVertexService {
         if (context == null || context.isEmpty()) {
             return false;
         }
+        String screenLabel = resolveScreenLabel(context);
+        if (StringUtils.hasText(screenLabel) && screenLabel.toLowerCase().contains("presupuesto")) {
+            return true;
+        }
         Object totalPresupuestos = context.get("totalPresupuestos");
         if (totalPresupuestos instanceof Number && ((Number) totalPresupuestos).longValue() > 0) {
             return true;
@@ -515,11 +942,206 @@ public class ChatbotVertexService {
         if (muestra instanceof java.util.Collection && !((java.util.Collection<?>) muestra).isEmpty()) {
             return true;
         }
+        Object presupuesto = context.get("presupuesto");
+        if (presupuesto instanceof Map && !((Map<?, ?>) presupuesto).isEmpty()) {
+            return true;
+        }
+        if (presupuesto != null && !(presupuesto instanceof Map) && !(presupuesto instanceof java.util.Collection)) {
+            return true;
+        }
+        Object detalleMensual = context.get("detalleMensual");
+        if (detalleMensual instanceof java.util.Collection && !((java.util.Collection<?>) detalleMensual).isEmpty()) {
+            return true;
+        }
         Object budget = context.get("budget");
         if (budget instanceof Map && !((Map<?, ?>) budget).isEmpty()) {
             return true;
         }
         return budget != null && !(budget instanceof Map) && !(budget instanceof java.util.Collection);
+    }
+
+    private boolean hasBudgetDataForExistence(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return false;
+        }
+        Object totalPresupuestos = context.get("totalPresupuestos");
+        if (totalPresupuestos instanceof Number && ((Number) totalPresupuestos).longValue() > 0) {
+            return true;
+        }
+        if (totalPresupuestos instanceof String) {
+            try {
+                if (Long.parseLong(((String) totalPresupuestos).trim()) > 0) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        Object muestra = context.get("muestra");
+        if (muestra instanceof java.util.Collection && !((java.util.Collection<?>) muestra).isEmpty()) {
+            return true;
+        }
+        Object presupuesto = context.get("presupuesto");
+        if (presupuesto instanceof Map && !((Map<?, ?>) presupuesto).isEmpty()) {
+            return true;
+        }
+        if (presupuesto != null && !(presupuesto instanceof Map) && !(presupuesto instanceof java.util.Collection)) {
+            return true;
+        }
+        Object detalleMensual = context.get("detalleMensual");
+        if (detalleMensual instanceof java.util.Collection && !((java.util.Collection<?>) detalleMensual).isEmpty()) {
+            return true;
+        }
+        Object budget = context.get("budget");
+        if (budget instanceof Map && !((Map<?, ?>) budget).isEmpty()) {
+            return true;
+        }
+        return budget != null && !(budget instanceof Map) && !(budget instanceof java.util.Collection);
+    }
+
+    private BudgetInfo extractBudgetInfo(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return null;
+        }
+        int count = -1;
+        Object totalPresupuestos = context.get("totalPresupuestos");
+        if (totalPresupuestos instanceof Number) {
+            count = ((Number) totalPresupuestos).intValue();
+        } else if (totalPresupuestos instanceof String) {
+            try {
+                count = Integer.parseInt(((String) totalPresupuestos).trim());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        List<String> names = new java.util.ArrayList<>();
+        Object externalData = context.get("externalData");
+        if (externalData instanceof Map<?, ?> externalMap) {
+            Object presupuestosBlock = externalMap.get("presupuestos");
+            if (presupuestosBlock instanceof Map<?, ?> presupuestosMap) {
+                Object list = presupuestosMap.get("presupuestos");
+                names.addAll(extractBudgetNamesFromList(list));
+                if (count < 0) {
+                    Object total = presupuestosMap.get("totalPresupuestos");
+                    if (total instanceof Number) {
+                        count = ((Number) total).intValue();
+                    } else if (total instanceof String) {
+                        try {
+                            count = Integer.parseInt(((String) total).trim());
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                }
+            }
+        }
+
+        if (names.isEmpty()) {
+            Object muestra = context.get("muestra");
+            names.addAll(extractBudgetNamesFromList(muestra));
+        }
+        if (names.isEmpty()) {
+            Object presupuestos = context.get("presupuestos");
+            names.addAll(extractBudgetNamesFromList(presupuestos));
+        }
+
+        if (count < 0) {
+            if (!names.isEmpty()) {
+                count = names.size();
+            } else if (hasBudgetDataForExistence(context)) {
+                count = 1;
+            }
+        }
+
+        if (count <= 0 && names.isEmpty()) {
+            return null;
+        }
+        if (count < 0) {
+            count = names.size();
+        }
+        return new BudgetInfo(count, names);
+    }
+
+    private List<String> extractBudgetNamesFromList(Object list) {
+        if (!(list instanceof java.util.Collection<?> collection)) {
+            return List.of();
+        }
+        List<String> names = new java.util.ArrayList<>();
+        for (Object item : collection) {
+            if (item instanceof Map<?, ?> map) {
+                Object nombre = map.get("nombre");
+                if (nombre == null) {
+                    nombre = map.get("name");
+                }
+                if (nombre != null) {
+                    String text = nombre.toString().trim();
+                    if (!text.isEmpty()) {
+                        names.add(text);
+                    }
+                }
+            } else if (item != null) {
+                String text = item.toString().trim();
+                if (!text.isEmpty()) {
+                    names.add(text);
+                }
+            }
+        }
+        return names;
+    }
+
+    private String buildBudgetSummaryResponse(String message, BudgetInfo info) {
+        boolean wantsCount = isBudgetCountQuestion(message);
+        boolean wantsNames = wantsBudgetNames(message);
+        StringBuilder sb = new StringBuilder();
+        if (wantsCount) {
+            sb.append("Tenes ").append(info.count).append(" presupuestos cargados en el sistema.");
+        } else {
+            sb.append("Tenes presupuestos cargados en el sistema.");
+        }
+        if (wantsNames) {
+            List<String> names = info.names.stream().filter(StringUtils::hasText).distinct().collect(Collectors.toList());
+            if (!names.isEmpty()) {
+                sb.append("\n");
+                sb.append("Los nombres son: ").append(String.join(", ", names)).append(".");
+            } else {
+                sb.append("\n");
+                sb.append("No tengo los nombres disponibles en este momento.");
+            }
+        }
+        return sb.toString();
+    }
+
+    private record BudgetInfo(int count, List<String> names) {
+    }
+
+    private boolean hasExplicitBudgetZero(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return false;
+        }
+        Object totalPresupuestos = context.get("totalPresupuestos");
+        if (totalPresupuestos instanceof Number) {
+            return ((Number) totalPresupuestos).longValue() == 0L;
+        }
+        if (totalPresupuestos instanceof String) {
+            try {
+                return Long.parseLong(((String) totalPresupuestos).trim()) == 0L;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        String screenLabel = resolveScreenLabel(context);
+        boolean isPresupuestoScreen = StringUtils.hasText(screenLabel)
+                && screenLabel.toLowerCase().contains("presupuesto");
+        Object muestra = context.get("muestra");
+        if (isPresupuestoScreen && context.containsKey("muestra")
+                && muestra instanceof java.util.Collection
+                && ((java.util.Collection<?>) muestra).isEmpty()) {
+            return true;
+        }
+        Object presupuestos = context.get("presupuestos");
+        if (isPresupuestoScreen && context.containsKey("presupuestos")
+                && presupuestos instanceof java.util.Collection
+                && ((java.util.Collection<?>) presupuestos).isEmpty()) {
+            return true;
+        }
+        return false;
     }
 
     private String buildProfileResponse(String message, Map<String, Object> context) {
@@ -690,10 +1312,11 @@ public class ChatbotVertexService {
                 "El usuario pregunta donde esta dentro de MyCFO.",
                 locationLine,
                 routeLine,
-                "Usa el manual para la pantalla indicada y responde en texto plano con 2 o 3 parrafos cortos.",
+                "Responde en texto plano con 2 o 3 parrafos cortos.",
                 "Primero indica la ubicacion. Si la pantalla es Dashboard, responde solo 'Estas en el Dashboard' sin mencionar otro modulo.",
                 "Luego resume que se ve en esa pantalla y que puede hacer el usuario ahi.",
-                "No uses listas ni ejemplos con datos."
+                "No uses listas ni ejemplos con datos.",
+                "No menciones el manual ni PDF."
         );
     }
 
@@ -896,7 +1519,8 @@ public class ChatbotVertexService {
         }
         String lower = message.toLowerCase();
 
-        if (matchesAny(lower, "registro", "carga", "movimientos", "facturas", "conciliacion")) {
+        if (matchesAny(lower, "registro", "carga", "carga de datos", "cargar datos", "movimientos",
+                "factura", "facturas", "facturacion", "facturación", "comprobante", "comprobantes", "conciliacion")) {
             return "registro";
         }
         if (matchesAny(lower, "reporte", "reportes", "cashflow", "flujo de caja", "estado de resultado",
@@ -916,6 +1540,304 @@ public class ChatbotVertexService {
         return currentModule;
     }
 
+    private String resolveTargetScreenHint(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        String lower = message.toLowerCase();
+
+        if (matchesAny(lower, "ver movimientos", "movimientos cargados")) {
+            return "Registro > Movimientos";
+        }
+        if (matchesAny(lower, "ver facturas")) {
+            return "Registro > Facturas";
+        }
+        if (matchesAny(lower, "carga movimientos", "carga de movimientos")) {
+            return "Vinculacion bancaria > Carga de movimientos";
+        }
+        if (matchesAny(lower, "mercado pago", "mercado-pago")) {
+            return "Vinculacion bancaria > Mercado Pago";
+        }
+        if (matchesAny(lower, "presupuesto nuevo", "nuevo presupuesto")) {
+            return "Pronostico > Presupuestos > Nuevo";
+        }
+        if (matchesAny(lower, "conciliacion", "conciliaciÃ³n", "conciliar")) {
+            return "Conciliacion";
+        }
+        if (matchesAny(lower, "factura", "facturas", "facturacion", "facturaciÃ³n", "comprobante", "comprobantes")) {
+            return "Carga de datos > Facturas";
+        }
+        if (matchesAny(lower, "movimientos bancarios", "movimiento bancario", "movimientos", "movimiento", "extracto")) {
+            return "Carga de datos > Movimientos bancarios";
+        }
+        if (matchesAny(lower, "ingreso", "ingresos")) {
+            return "Carga de datos > Ingresos";
+        }
+        if (matchesAny(lower, "egreso", "egresos")) {
+            return "Carga de datos > Egresos";
+        }
+        if (matchesAny(lower, "deuda", "deudas")) {
+            return "Carga de datos > Deudas";
+        }
+        if (matchesAny(lower, "acreencia", "acreencias")) {
+            return "Carga de datos > Acreencias";
+        }
+        if (matchesAny(lower, "presupuesto", "presupuestos")) {
+            return "Pronostico > Presupuestos";
+        }
+        if (matchesAny(lower, "pronostico fijo", "pronÃ³stico fijo")) {
+            return "Pronostico > Pronostico fijo";
+        }
+        if (matchesAny(lower, "pronostico continuo", "pronÃ³stico continuo", "rolling forecast")) {
+            return "Pronostico > Pronostico continuo";
+        }
+        if (matchesAny(lower, "reporte mensual")) {
+            return "Reportes > Reporte mensual";
+        }
+        if (matchesAny(lower, "flujo de caja", "cashflow", "cash flow")) {
+            return "Reportes > Flujo de caja";
+        }
+        if (matchesAny(lower, "estado de resultados", "estado de resultado", "p&l", "pyl")) {
+            return "Reportes > Estado de resultados";
+        }
+        if (matchesAny(lower, "dashboard", "tablero")) {
+            return "Dashboard";
+        }
+        if (matchesAny(lower, "recordatorios", "recordatorio")) {
+            return "Notificaciones > Recordatorios";
+        }
+        if (matchesAny(lower, "configuracion de notificaciones", "configurar notificaciones", "preferencias de notificaciones")) {
+            return "Notificaciones > Configuracion";
+        }
+        if (matchesAny(lower, "notificaciones", "notificacion", "alertas")) {
+            return "Notificaciones > Centro de notificaciones";
+        }
+        if (matchesAny(lower, "perfil")) {
+            return "Administracion > Perfil";
+        }
+        if (matchesAny(lower, "organizacion", "organizaciÃ³n")) {
+            return "Administracion > Organizacion";
+        }
+        if (matchesAny(lower, "roles")) {
+            return "Administracion > Roles";
+        }
+        if (matchesAny(lower, "invitaciones", "invitar")) {
+            return "Administracion > Invitaciones";
+        }
+        if (matchesAny(lower, "carga de datos", "cargar datos", "carga")) {
+            return "Carga de datos";
+        }
+        return null;
+    }
+
+    private boolean isTargetScreenDifferent(Map<String, Object> context, String targetHint) {
+        if (!StringUtils.hasText(targetHint)) {
+            return false;
+        }
+        String current = resolveScreenLabel(context);
+        if (!StringUtils.hasText(current)) {
+            return true;
+        }
+        String target = targetHint;
+        int marker = target.lastIndexOf('>');
+        if (marker >= 0 && marker < target.length() - 1) {
+            target = target.substring(marker + 1).trim();
+        }
+        String normTarget = normalizeKey(target);
+        String normCurrent = normalizeKey(current);
+        if (!StringUtils.hasText(normTarget)) {
+            return false;
+        }
+        return !normCurrent.contains(normTarget) && !normTarget.contains(normCurrent);
+    }
+
+    private String normalizeKey(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = value.toLowerCase()
+                .replace("Ã¡", "a")
+                .replace("Ã©", "e")
+                .replace("Ã­", "i")
+                .replace("Ã³", "o")
+                .replace("Ãº", "u")
+                .replace("Ã±", "n");
+        normalized = normalized.replaceAll("[^a-z0-9 ]", " ").trim();
+        return normalized.replaceAll("\\s+", " ");
+    }
+
+    private String buildMissingDataResponse(String targetHint) {
+        String hint = StringUtils.hasText(targetHint) ? targetHint.trim() : "esa pantalla";
+        return String.join(
+                "\n",
+                "Para responder necesito los datos reales de " + hint + ".",
+                "Abrila y volve a hacer la consulta."
+        );
+    }
+
+    private ExternalFetchInfo extractExternalFetchInfo(Map<String, Object> context) {
+        if (context == null || context.isEmpty()) {
+            return null;
+        }
+        Object external = context.get("externalFetch");
+        if (!(external instanceof Map)) {
+            return null;
+        }
+        Map<?, ?> externalMap = (Map<?, ?>) external;
+        String status = stringValue(externalMap.get("status"));
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        String target = stringValue(externalMap.get("target"));
+        List<String> missing = toStringList(externalMap.get("missing"));
+        return new ExternalFetchInfo(status.trim().toLowerCase(), target, missing);
+    }
+
+    private String buildExternalFetchResponse(ExternalFetchInfo info) {
+        String target = StringUtils.hasText(info.target) ? info.target : "esa pantalla";
+        if ("missing-params".equals(info.status)) {
+            String missingText = formatMissingParams(info.missing);
+            if (StringUtils.hasText(missingText)) {
+                return String.join(
+                        "\n",
+                        "Para responder necesito " + missingText + " de " + target + ".",
+                        "Decime esos datos o abrila y volve a hacer la consulta."
+                );
+            }
+            return String.join(
+                    "\n",
+                    "Para responder necesito datos reales de " + target + ".",
+                    "Abrila y volve a hacer la consulta."
+            );
+        }
+        if ("failed".equals(info.status) || "unsupported".equals(info.status)) {
+            return String.join(
+                    "\n",
+                    "No pude obtener los datos reales de " + target + " desde esta pantalla.",
+                    "Abrila y volve a hacer la consulta."
+            );
+        }
+        return null;
+    }
+
+    private String formatMissingParams(List<String> missing) {
+        if (missing == null || missing.isEmpty()) {
+            return "";
+        }
+        List<String> labels = missing.stream()
+                .map(this::mapMissingParamLabel)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        if (labels.isEmpty()) {
+            return "";
+        }
+        if (labels.size() == 1) {
+            return labels.get(0);
+        }
+        return String.join(" y ", labels);
+    }
+
+    private String mapMissingParamLabel(String key) {
+        if (!StringUtils.hasText(key)) {
+            return "";
+        }
+        return switch (key.trim().toLowerCase()) {
+            case "anio", "aÃ±o", "year" -> "el anio";
+            case "mes", "month" -> "el mes";
+            default -> key;
+        };
+    }
+
+    private String stringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = value.toString().trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private List<String> toStringList(Object value) {
+        if (value instanceof List<?> list) {
+            return list.stream()
+                    .map(this::stringValue)
+                    .filter(StringUtils::hasText)
+                    .collect(Collectors.toList());
+        }
+        String single = stringValue(value);
+        if (StringUtils.hasText(single)) {
+            return List.of(single);
+        }
+        return List.of();
+    }
+
+    private static final class ExternalFetchInfo {
+        private final String status;
+        private final String target;
+        private final List<String> missing;
+
+        private ExternalFetchInfo(String status, String target, List<String> missing) {
+            this.status = status;
+            this.target = target;
+            this.missing = missing == null ? List.of() : missing;
+        }
+
+        private boolean isOk() {
+            return "ok".equals(status);
+        }
+    }
+
+    private enum ToolName {
+        GET_BALANCE,
+        SEARCH_MOVEMENTS,
+        GET_PENDING_TASKS,
+        GET_SCREEN_DATA;
+
+        private static ToolName from(String value) {
+            if (!StringUtils.hasText(value)) {
+                return null;
+            }
+            try {
+                return ToolName.valueOf(value.trim().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                return null;
+            }
+        }
+    }
+
+    private record ToolCall(String name, Map<String, Object> params) {
+    }
+
+    private record ToolExecution(String tool, boolean ok, Map<String, Object> data, String error, List<String> missing) {
+        private static ToolExecution ok(String tool, Map<String, Object> data) {
+            return new ToolExecution(tool, true, data, null, List.of());
+        }
+
+        private static ToolExecution error(String tool, String error) {
+            return new ToolExecution(tool, false, Map.of(), error, List.of());
+        }
+
+        private static ToolExecution missing(String tool, List<String> missing) {
+            return new ToolExecution(tool, false, Map.of(), "missing_params", missing == null ? List.of() : missing);
+        }
+
+        private Map<String, Object> toPayload() {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("tool", tool);
+            payload.put("ok", ok);
+            if (data != null && !data.isEmpty()) {
+                payload.put("data", data);
+            }
+            if (StringUtils.hasText(error)) {
+                payload.put("error", error);
+            }
+            if (missing != null && !missing.isEmpty()) {
+                payload.put("missing", missing);
+            }
+            return payload;
+        }
+    }
+
     private boolean matchesAny(String haystack, String... needles) {
         for (String needle : needles) {
             if (needle != null && !needle.isBlank() && haystack.contains(needle)) {
@@ -930,6 +1852,9 @@ public class ChatbotVertexService {
             return value;
         }
         return value.substring(0, maxLen) + "...";
+    }
+
+    private record VertexResponse(String cleaned, String raw) {
     }
 
     public record ChatbotResult(String responseText, String rawText) {

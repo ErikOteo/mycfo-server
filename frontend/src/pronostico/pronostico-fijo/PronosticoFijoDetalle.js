@@ -31,6 +31,7 @@ import LoadingSpinner from '../../shared-components/LoadingSpinner';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
 import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
 
 export default function PronosticoFijoDetalle() {
   const { id } = useParams();
@@ -88,6 +89,57 @@ export default function PronosticoFijoDetalle() {
   };
 
   const chartData = prepareChartData();
+
+  const chartSummary = React.useMemo(() => {
+    if (!chartData || chartData.length === 0) return null;
+    const first = chartData[0];
+    const last = chartData[chartData.length - 1];
+    const realCount = chartData.filter((item) => item.tipo === 'real').length;
+    return {
+      meses: chartData.length,
+      rango: {
+        desde: first.mes,
+        hasta: last.mes,
+      },
+      reales: realCount,
+      estimados: chartData.length - realCount,
+      ultimo: {
+        mes: last.mes,
+        tipo: last.tipo,
+        ingresos: last.ingresos,
+        egresos: last.egresos,
+        balance: last.balance,
+      },
+    };
+  }, [chartData]);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "pronostico-fijo-detalle",
+      forecastId: id,
+      currency,
+      loading,
+      error,
+      viewMode,
+      forecast: forecast
+        ? {
+            id: forecast.id,
+            nombre: forecast.nombre,
+            horizonteMeses: forecast.horizonteMeses,
+            mesesFrecuencia: forecast.mesesFrecuencia,
+            periodosAnalizados: forecast.periodosAnalizados,
+            createdAt: forecast.createdAt,
+            mesInicioPronostico: forecast.mesInicioPronostico,
+            mesFinPronostico: forecast.mesFinPronostico,
+            moneda: forecast.moneda,
+          }
+        : null,
+      resumen: chartSummary,
+    }),
+    [id, currency, loading, error, viewMode, forecast, chartSummary]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   // Determinar el punto de cambio entre real y estimado
   const getSplitPoint = () => {

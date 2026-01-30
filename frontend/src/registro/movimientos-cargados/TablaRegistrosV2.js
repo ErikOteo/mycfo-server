@@ -54,6 +54,7 @@ import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
 import CustomNoRowsOverlay from "../../shared-components/CustomNoRowsOverlay";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 // ✅ IMPORTANTE: usar tu cliente central con interceptors
 import http from "../../api/http";
@@ -111,6 +112,40 @@ export default function TablaRegistrosV2() {
     const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
+
+  const chatbotContext = useMemo(
+    () => ({
+      screen: "movimientos",
+      currency,
+      totalMovimientos: rowCount,
+      filtros: {
+        searchText,
+        fechaDesde: fechaDesde?.format ? fechaDesde.format("YYYY-MM-DD") : null,
+        fechaHasta: fechaHasta?.format ? fechaHasta.format("YYYY-MM-DD") : null,
+      },
+      movimientos: movimientos.slice(0, 5),
+      movimientoSeleccionado: selectedMovimiento
+        ? {
+          id: selectedMovimiento.id,
+          tipo: selectedMovimiento.tipo,
+          monto: selectedMovimiento.montoTotal ?? selectedMovimiento.monto,
+          fecha: selectedMovimiento.fechaEmision ?? selectedMovimiento.fecha,
+          categoria: selectedMovimiento.categoria,
+        }
+        : null,
+    }),
+    [
+      currency,
+      rowCount,
+      searchText,
+      fechaDesde,
+      fechaHasta,
+      movimientos,
+      selectedMovimiento,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const parseMontoInput = useCallback((valor) => {
     if (valor === null || valor === undefined) return null;

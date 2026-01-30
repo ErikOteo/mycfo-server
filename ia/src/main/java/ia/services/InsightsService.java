@@ -2,15 +2,21 @@ package ia.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
+import ia.config.VertexAiProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.FileInputStream;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -19,22 +25,39 @@ import java.util.*;
 @Slf4j
 public class InsightsService {
 
+    private static final String CLOUD_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
     private static final String[] MESES = {
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
     };
+    private static final String INSIGHTS_SYSTEM_PROMPT = String.join(
+            "\n",
+            "Actua como un analista financiero experto. Tu tono debe ser simple, directo y accionable.",
+            "Tarea: Analiza los siguientes datos financieros de mi empresa (Ingresos, Egresos, Categorias y Presupuesto)",
+            "y genera un diagnostico de la situacion actual.",
+            "Por favor incluye en tu analisis:",
+            "Diagnostico Corto (3 puntos clave):",
+            "Liquidez: Compara mi flujo de caja (dinero real) vs. lo devengado (facturado/comprometido) del ultimo mes.",
+            "Solvencia: Analiza el resultado acumulado del anio (P&L). Es la empresa solvente?",
+            "Estado del Mes: Genere caja positiva o tuve deficit este mes? Menciona mis mayores ingresos y egresos por categoria.",
+            "Senales: Identifica alertas financieras (ej. si estoy gastando mas de lo que ingreso o si tengo problemas de cobro).",
+            "Riesgos y Recomendaciones: Dame 3 tips breves para mejorar mi situacion financiera basados en estos numeros.",
+            "Responde SOLO en JSON con la forma exacta:",
+            "{diagnostico_corto:string, senales:object, detalles:object, riesgos_clave:[], tips:[], alerta:boolean}.",
+            "En diagnostico_corto genera 3 frases cortas, una por cada punto clave, separadas por \\n.",
+            "En detalles incluye ingresoMaximo y egresoMaximo con las categorias principales.",
+            "Si no hay datos suficientes, indicalo sin inventar."
+    );
 
     @Value("${mycfo.reporte.url}")
     private String reporteUrl;
 
-    @Value("${deepseek.api.key:}")
-    private String deepseekApiKey;
+    @Value("${mycfo.pronostico.url}")
+    private String pronosticoUrl;
 
-    @Value("${deepseek.base.url:https://api.deepseek.com}")
-    private String deepseekBaseUrl;
-
+    private final VertexAiProperties vertexProperties;
+    private final ObjectMapper mapper;
     private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper mapper = new ObjectMapper();
 
     public Map<String, Object> generarInsights(String userSub, String authorization, Integer anio, Integer mes) {
         LocalDate now = LocalDate.now();
@@ -55,6 +78,8 @@ public class InsightsService {
         payload.put("mesAnalisis", analysisMonth);
 
         try {
+            log.info("Generando insights: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}",
+                    userSub, year, month, analysisYear, analysisMonth);
             var headers = new HttpHeaders();
             headers.add("X-Usuario-Sub", userSub);
             headers.add("Authorization", authorization);
@@ -83,12 +108,17 @@ public class InsightsService {
             );
             Map<String, Object> resumen = Optional.ofNullable(resResp.getBody()).orElse(Map.of());
 
+            Map<String, Object> presupuestos = fetchPresupuestos(headers);
+
             // Reducir datos a lo esencial para el prompt
             Map<String, Object> compact = compactarDatos(year, month, analysisYear, analysisMonth, pyl, cash, resumen);
+            compact.put("presupuestos", compactarPresupuestos(presupuestos));
             payload.put("datos", compact);
 
-            Map<String, Object> ai = llamarDeepSeek(compact);
+            log.info("Datos listos para Vertex: userSub={}, keys={}", userSub, compact.keySet());
+            Map<String, Object> ai = llamarVertex(compact);
             payload.put("ai", ai);
+            log.info("Vertex response recibida: userSub={}, keys={}", userSub, ai != null ? ai.keySet() : "null");
             return ai;
         } catch (Exception e) {
             log.error("Error generando insights para userSub={}, anio={}, mes={}", userSub, anio, mes, e);
@@ -310,70 +340,66 @@ public class InsightsService {
         return resp;
     }
 
-    private Map<String, Object> llamarDeepSeek(Map<String, Object> compact) throws Exception {
-        if (deepseekApiKey == null || deepseekApiKey.isBlank()) {
-            throw new IllegalStateException("No se configuró la propiedad deepseek.api.key.");
+    private Map<String, Object> llamarVertex(Map<String, Object> compact) throws Exception {
+        if (vertexProperties == null || !org.springframework.util.StringUtils.hasText(vertexProperties.getProjectId())) {
+            throw new IllegalStateException("vertex.ai.project-id no esta configurado.");
         }
+        String endpoint = String.format(
+                "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+                vertexProperties.getLocation(),
+                vertexProperties.getProjectId(),
+                vertexProperties.getLocation(),
+                vertexProperties.getModel());
 
-        String url = deepseekBaseUrl + "/chat/completions";
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(deepseekApiKey);
+        String token = resolveAccessToken();
+        String userPrompt = "Datos financieros (JSON): " + mapper.writeValueAsString(compact);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("model", "deepseek-chat");
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content",
-                "Eres un analista financiero. Explica en lenguaje simple, directo y accionable. No inventes datos."));
-        messages.add(Map.of("role", "user", "content",
-                "Analiza estos datos de la empresa (JSON) y responde SOLO en JSON con la forma exacta: "
-                        + "{diagnostico_corto,string, senales:{liquidez,rentabilidad}, detalles:{ingresoMaximo,egresoMaximo},"
-                        + " riesgos_clave:[], tips:[], alerta:boolean}. "
-                        + "Usa mesAnalisis/mesAnalisisNombre/anioAnalisis para interpretar el ULTIMO mes (cashflow/resumen) "
-                        + "y mesActual/mesActualNombre/anio (anio P&L) para los datos anuales. "
-                        + "diagnostico_corto DEBE tener 3 lineas separadas por \\n en este orden exacto: "
-                        + "\"Liquidez (cashflow vs devengado mesAnalisisNombre anioAnalisis): ...\", "
-                        + "\"Solvencia (P&L anio acumulado a mesActualNombre): ...\", "
-                        + "\"Estado reportes mesAnalisisNombre anioAnalisis: ...\". "
-                        + "En cada linea indica si el indicador esta bien/mal/mejorable, menciona el reporte usado y explica el calculo "
-                        + "(ej. gap = devengadoNetoMes - cajaNetaMes, devengadoYtd = ingresosYtd - egresosYtd, ingresosMes/egresosMes del cashflow/resumen). "
-                        + "En detalles.ingresoMaximo y detalles.egresoMaximo describe la categoria top del mes analizado usando resumen.detalle* "
-                        + "y formatea los montos como $1,234,567. "
-                        + "En riesgos_clave y tips agrega frases cortas basadas en los datos (si no aplican, deja listas vacias). "
-                        + "No inventes datos ni menciones otras empresas. Datos: "
-                        + mapper.writeValueAsString(compact)));
-        body.put("messages", messages);
-        body.put("temperature", 0.4);
-        body.put("max_tokens", 700);
+        Map<String, Object> textPart = new LinkedHashMap<>();
+        textPart.put("text", userPrompt);
 
-        String req = mapper.writeValueAsString(body);
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("role", "user");
+        content.put("parts", List.of(textPart));
+
+        Map<String, Object> systemPart = new LinkedHashMap<>();
+        systemPart.put("text", INSIGHTS_SYSTEM_PROMPT);
+        Map<String, Object> systemInstruction = new LinkedHashMap<>();
+        systemInstruction.put("parts", List.of(systemPart));
+
+        Map<String, Object> generationConfig = new LinkedHashMap<>();
+        generationConfig.put("temperature", vertexProperties.getTemperature());
+        generationConfig.put("maxOutputTokens", vertexProperties.getMaxOutputTokens());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("contents", List.of(content));
+        body.put("systemInstruction", systemInstruction);
+        body.put("generationConfig", generationConfig);
+
         try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            String payload = mapper.writeValueAsString(body);
             ResponseEntity<String> resp = restTemplate.exchange(
-                    url, HttpMethod.POST, new HttpEntity<>(req, headers), String.class);
-            String json = Optional.ofNullable(resp.getBody()).orElse("{}");
+                    endpoint, HttpMethod.POST, new HttpEntity<>(payload, headers), String.class);
 
-            // Parse respuesta tipo OpenAI
-            JsonNode root = mapper.readTree(json);
-            String content = Optional.ofNullable(root.path("choices").get(0))
-                    .map(n -> n.path("message").path("content").asText())
-                    .orElse("");
-
-            // Intentar parsear contenido a JSON; si falla, devolver texto crudo
+            String rawText = extractTextFromResponse(resp.getBody());
+            String contentText = normalizarContenido(rawText);
             try {
                 Map<String, Object> parsed = mapper.readValue(
-                        normalizarContenido(content),
-                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>(){}
+                        contentText,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
                 );
                 return adaptarRespuestaLlm(parsed, compact);
             } catch (Exception ex) {
-                log.warn("No se pudo parsear respuesta de DeepSeek como JSON estructurado: {}", content, ex);
+                log.warn("No se pudo parsear respuesta de Vertex como JSON estructurado: {}", rawText, ex);
                 return construirInsightBasico(compact);
             }
         } catch (RestClientResponseException ex) {
-            log.error("DeepSeek API respondió con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
+            log.error("Vertex AI respondio con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
             throw ex;
         } catch (Exception ex) {
-            log.error("Error inesperado al invocar DeepSeek", ex);
+            log.error("Error inesperado al invocar Vertex AI", ex);
             throw ex;
         }
     }
@@ -455,6 +481,86 @@ public class InsightsService {
         return nombre.substring(0, 1).toUpperCase() + nombre.substring(1);
     }
 
+    private Map<String, Object> compactarPresupuestos(Map<String, Object> presupuestos) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (presupuestos == null || presupuestos.isEmpty()) {
+            out.put("total", 0);
+            out.put("nombres", List.of());
+            return out;
+        }
+        int total = asInt(presupuestos.get("totalElements"), 0);
+        List<String> nombres = new ArrayList<>();
+        Object content = presupuestos.get("content");
+        if (content instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    Object nombre = map.get("nombre");
+                    if (nombre != null && !nombre.toString().isBlank()) {
+                        nombres.add(nombre.toString());
+                    }
+                }
+            }
+        }
+        out.put("total", total);
+        out.put("nombres", nombres);
+        return out;
+    }
+
+    private Map<String, Object> fetchPresupuestos(HttpHeaders headers) {
+        try {
+            String url = pronosticoUrl + "/api/presupuestos?page=0&size=5&status=active";
+            var resp = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers),
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+            return Optional.ofNullable(resp.getBody()).orElse(Map.of());
+        } catch (Exception ex) {
+            log.warn("No se pudieron obtener presupuestos para insights: {}", ex.getMessage());
+            return Map.of();
+        }
+    }
+
+    private String resolveAccessToken() {
+        try {
+            GoogleCredentials credentials;
+            if (StringUtils.hasText(vertexProperties.getCredentialsPath())) {
+                try (FileInputStream stream = new FileInputStream(vertexProperties.getCredentialsPath())) {
+                    credentials = GoogleCredentials.fromStream(stream);
+                }
+            } else {
+                credentials = GoogleCredentials.getApplicationDefault();
+            }
+            credentials = credentials.createScoped(Collections.singleton(CLOUD_SCOPE));
+            AccessToken token = credentials.getAccessToken();
+            if (token == null || token.getExpirationTime() == null
+                    || token.getExpirationTime().before(Date.from(Instant.now()))) {
+                token = credentials.refreshAccessToken();
+            }
+            if (token == null) {
+                throw new IllegalStateException("No se pudo obtener access token de Google.");
+            }
+            return token.getTokenValue();
+        } catch (Exception ex) {
+            log.error("Error obteniendo token de Google", ex);
+            throw new IllegalStateException("No se pudo autenticar con Google.");
+        }
+    }
+
+    private String extractTextFromResponse(String json) throws Exception {
+        if (json == null || json.isBlank()) {
+            return "";
+        }
+        JsonNode root = mapper.readTree(json);
+        JsonNode textNode = root.path("candidates").path(0).path("content").path(0).path("text");
+        if (textNode.isMissingNode()) {
+            textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
+        }
+        if (textNode.isMissingNode()) {
+            return "";
+        }
+        return textNode.asText("");
+    }
+
     private String normalizarContenido(String content) {
         String sanitized = content == null ? "" : content.trim();
         if (sanitized.startsWith("```")) {
@@ -476,3 +582,4 @@ public class InsightsService {
         return sanitized.trim();
     }
 }
+
