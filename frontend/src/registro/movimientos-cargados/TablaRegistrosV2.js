@@ -112,7 +112,7 @@ export default function TablaRegistrosV2() {
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
 
-  const chatbotContext = React.useMemo(
+  const chatbotContext = useMemo(
     () => ({
       screen: "movimientos",
       currency,
