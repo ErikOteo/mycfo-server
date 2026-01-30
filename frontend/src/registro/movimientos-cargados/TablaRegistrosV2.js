@@ -53,6 +53,7 @@ import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
+import CustomNoRowsOverlay from "../../shared-components/CustomNoRowsOverlay";
 
 // ✅ IMPORTANTE: usar tu cliente central con interceptors
 import http from "../../api/http";
@@ -1396,6 +1397,7 @@ export default function TablaRegistrosV2() {
                 }}
               />
             ),
+            noRowsOverlay: () => <CustomNoRowsOverlay message="No se encontraron movimientos registrados" />,
           }}
           slotProps={{
             toolbar: {

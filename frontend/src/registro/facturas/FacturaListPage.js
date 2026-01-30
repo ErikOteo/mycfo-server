@@ -42,6 +42,7 @@ import CurrencyTabs, {
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
+import CustomNoRowsOverlay from "../../shared-components/CustomNoRowsOverlay";
 
 const FACTURA_PAGE_SIZE = 10;
 
@@ -1129,6 +1130,7 @@ const FacturaListPage = () => {
                 }}
               />
             ),
+            noRowsOverlay: () => <CustomNoRowsOverlay message="No se encontraron facturas registradas" />,
           }}
           slotProps={{
             toolbar: {
