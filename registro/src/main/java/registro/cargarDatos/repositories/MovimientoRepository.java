@@ -237,6 +237,11 @@ public interface MovimientoRepository extends JpaRepository<Movimiento, Long>, J
         List<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNullAndMoneda(Long organizacionId,
                         TipoMoneda moneda);
 
+        Page<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNotNull(Long organizacionId, Pageable pageable);
+
+        Page<Movimiento> findByOrganizacionIdAndDocumentoComercialIsNotNullAndMoneda(Long organizacionId,
+                        TipoMoneda moneda, Pageable pageable);
+
         // Métodos de conteo optimizados para estadísticas de conciliación
         long countByOrganizacionId(Long organizacionId);
 

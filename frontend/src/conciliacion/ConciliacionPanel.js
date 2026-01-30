@@ -76,35 +76,90 @@ export default function ConciliacionPanel() {
     setError(null);
     try {
       let response;
+      // Determinar si necesitamos fetching masivo para filtrado local
+      // Solo si hay Busqueda de texto (que el backend aun no soporta nativamente en estos endpoints)
+      // El cambio de ESTADO ahora sí es nativo y eficiente.
+      // El cambio de TIPO ahora es puramente visual (frontend) sobre los datos cargados.
+      const filtrosAvanzadosActivos = filtroBusqueda !== "";
+
+      const sizeToUse = filtrosAvanzadosActivos ? 1000 : tamanioPagina;
+      // Si filtramos localmente, pedimos la pagina 0 del backend para tener todo el lote y paginar nosotros
+      const pageToUse = filtrosAvanzadosActivos ? 0 : paginaActual;
+
       if (filtroEstado === "sin-conciliar") {
         response = await conciliacionApi.obtenerMovimientosSinConciliar(
-          paginaActual,
-          tamanioPagina,
+          pageToUse,
+          sizeToUse,
+          'fechaEmision',
+          'desc',
+          currency
+        );
+      } else if (filtroEstado === "conciliados") {
+        response = await conciliacionApi.obtenerMovimientosConciliados(
+          pageToUse,
+          sizeToUse,
           'fechaEmision',
           'desc',
           currency
         );
       } else {
         response = await conciliacionApi.obtenerTodosLosMovimientos(
-          paginaActual,
-          tamanioPagina,
+          pageToUse,
+          sizeToUse,
           'fechaEmision',
           'desc',
           currency
         );
       }
 
-      // El backend devuelve un objeto Page con content, totalPages, totalElements, etc.
-      setMovimientos(response.content || []);
-      setTotalPaginas(response.totalPages || 0);
-      setTotalElementos(response.totalElements || 0);
+      let content = response.content || [];
+
+      // --- FILTRADO LOCAL ---
+      if (filtrosAvanzadosActivos) {
+        // 1. Filtro Estado 
+        // 'sin-conciliar' ya viene filtrado del endpoint.
+        // 'conciliados': filtramos explicitamente.
+        if (filtroEstado === "conciliados") {
+          content = content.filter(m => m.conciliado);
+        }
+        // 'todos': no filtramos estado.
+
+        // 2. Filtro Tipo (Ingreso / Egreso) -> MOVIDO A FILTRO VISUAL EN RENDER
+
+        // 3. Filtro Busqueda
+        if (filtroBusqueda) {
+          const term = filtroBusqueda.toLowerCase();
+          content = content.filter(m =>
+            (m.descripcion || "").toLowerCase().includes(term) ||
+            (m.referencia || "").toLowerCase().includes(term) ||
+            String(m.importe || "").includes(term)
+          );
+        }
+
+        // Recalcular paginacion basada en resultados filtrados
+        setTotalElementos(content.length);
+        // Ojo: Si filterResults < sizeToUse, totalPages = 1 (o calculo local)
+        // Si trajimos 1000, asumimos que "todo" esta aqui.
+        setTotalPaginas(Math.ceil(content.length / tamanioPagina));
+
+        // Aplicar "Paginacion Local" (slicing)
+        const start = paginaActual * tamanioPagina;
+        const end = start + tamanioPagina;
+        setMovimientos(content.slice(start, end));
+
+      } else {
+        // Caso nativo original (solo sin-conciliar, sin busqueda)
+        setMovimientos(content);
+        setTotalPaginas(response.totalPages || 0);
+        setTotalElementos(response.totalElements || 0);
+      }
     } catch (err) {
       console.error("Error cargando movimientos:", err);
       setError("Error al cargar los movimientos");
     } finally {
       setLoading(false);
     }
-  }, [currency, filtroEstado, paginaActual, tamanioPagina]);
+  }, [currency, filtroEstado, filtroBusqueda, paginaActual, tamanioPagina]);
 
   const cargarEstadisticas = useCallback(async () => {
     setLoadingEstadisticas(true);
@@ -122,12 +177,12 @@ export default function ConciliacionPanel() {
     await Promise.all([cargarMovimientos(), cargarEstadisticas()]);
   }, [cargarMovimientos, cargarEstadisticas]);
 
-  // Cargar movimientos y estadísticas al montar el componente
+  // Cargar estadísticas independientemente de los filtros
   useEffect(() => {
-    cargarDatos();
-  }, [cargarDatos]);
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
 
-  // Recargar cuando cambia el filtro de estado
+  // Recargar movimientos cuando cambia el filtro de estado/tipo/busqueda
   useEffect(() => {
     cargarMovimientos();
   }, [cargarMovimientos]);
@@ -249,6 +304,18 @@ export default function ConciliacionPanel() {
     setSugerencias([]);
     setPaginaActual(0);
   };
+
+  // Filtrado visual instantáneo por TIPO sobre los datos ya cargados
+  const movimientosFiltrados = React.useMemo(() => {
+    let result = movimientos;
+    // 2. Filtro Tipo (Ingreso / Egreso) - Visual Only
+    if (filtroTipo === "Ingreso") {
+      result = result.filter(m => m.tipo === "Ingreso");
+    } else if (filtroTipo === "Egreso") {
+      result = result.filter(m => m.tipo === "Egreso");
+    }
+    return result;
+  }, [movimientos, filtroTipo]);
 
   return (
     <Box
@@ -545,9 +612,7 @@ export default function ConciliacionPanel() {
         {/* Contador de resultados */}
         <Box sx={{ mt: 1 }}>
           <Typography variant="caption" color="text.primary">
-            Mostrando {movimientos.length} de{" "}
-            {totalElementos} movimientos (página{" "}
-            {paginaActual + 1}/{totalPaginas})
+            Mostrando {movimientosFiltrados.length} visualizados (de {movimientos.length} cargados) / Total en servidor: {totalElementos}
           </Typography>
         </Box>
       </Paper>
@@ -614,7 +679,7 @@ export default function ConciliacionPanel() {
                 >
                   <CircularProgress />
                 </Box>
-              ) : movimientos.length === 0 ? (
+              ) : movimientosFiltrados.length === 0 ? (
                 <Box sx={{ textAlign: "center", py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     No hay movimientos que coincidan con los filtros
@@ -623,7 +688,7 @@ export default function ConciliacionPanel() {
               ) : (
                 <>
                   <Box sx={{ flex: 1, overflow: "auto", pr: 1 }}>
-                    {movimientos.map((mov) => (
+                    {movimientosFiltrados.map((mov) => (
                       <MovimientoCard
                         key={mov.id}
                         movimiento={mov}

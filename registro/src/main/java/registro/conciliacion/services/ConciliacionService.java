@@ -44,6 +44,19 @@ public class ConciliacionService {
     }
 
     /**
+     * Obtiene movimientos conciliados con paginación
+     */
+    @Transactional(readOnly = true)
+    public Page<MovimientoDTO> obtenerMovimientosConciliados(Pageable pageable, Long empresaId, TipoMoneda moneda) {
+        Page<Movimiento> registros = moneda != null
+                ? movimientoRepository.findByOrganizacionIdAndDocumentoComercialIsNotNullAndMoneda(empresaId, moneda,
+                        pageable)
+                : movimientoRepository.findByOrganizacionIdAndDocumentoComercialIsNotNull(empresaId, pageable);
+
+        return registros.map(this::convertirAMovimientoDTO);
+    }
+
+    /**
      * Obtiene todos los movimientos (conciliados y sin conciliar) con paginación
      */
     @Transactional(readOnly = true)

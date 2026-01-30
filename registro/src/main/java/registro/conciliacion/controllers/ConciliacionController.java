@@ -58,6 +58,37 @@ public class ConciliacionController {
     }
 
     /**
+     * Obtiene movimientos conciliados con paginación
+     */
+    @GetMapping("/movimientos/conciliados")
+    public ResponseEntity<Page<MovimientoDTO>> obtenerMovimientosConciliados(
+            @RequestHeader("X-Usuario-Sub") String usuarioSub,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fechaEmision") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String moneda) {
+
+        Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+
+        registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+        if (moneda != null) {
+            try {
+                monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+        Page<MovimientoDTO> movimientos = conciliacionService.obtenerMovimientosConciliados(pageable, empresaId,
+                monedaEnum);
+        return ResponseEntity.ok(movimientos);
+    }
+
+    /**
      * Obtiene todos los movimientos (conciliados y sin conciliar) con paginación
      */
     @GetMapping("/movimientos")
