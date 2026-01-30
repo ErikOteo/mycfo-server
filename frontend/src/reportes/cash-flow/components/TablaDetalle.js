@@ -1,16 +1,29 @@
 import React from 'react';
-import { Box, Typography, Paper, useTheme } from '@mui/material';
+import { Box, Typography, Paper, useTheme, IconButton, useMediaQuery } from '@mui/material';
+import { NavigateBefore, NavigateNext } from '@mui/icons-material';
 import { DataGrid } from '@mui/x-data-grid';
 import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
-const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
+const TablaDetalle = ({ year, ingresos, egresos, saldoInicial, mobileMonthIndex, onMonthChange }) => {
     const theme = useTheme();
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
     // const ahora = new Date();
     // const ultimoMes = (year === ahora.getFullYear()) ? ahora.getMonth() : 11;
     // const mesesVisibles = meses.slice(0, ultimoMes + 1);
-    const mesesVisibles = meses; // Show all months always
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const handlePrevMonth = () => {
+        const newIndex = mobileMonthIndex > 0 ? mobileMonthIndex - 1 : 11;
+        onMonthChange(newIndex);
+    };
+
+    const handleNextMonth = () => {
+        const newIndex = mobileMonthIndex < 11 ? mobileMonthIndex + 1 : 0;
+        onMonthChange(newIndex);
+    };
+
+    const mesesVisibles = meses; // Show all months always (filtered in columns for mobile)
 
     const formatCurrency = (value) => {
         const num = Number(value);
@@ -64,11 +77,13 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
     for (let i = 1; i < 12; i++) saldoFinal[i] = saldoFinal[i - 1] + netos[i];
 
     // --- Dynamic Columns Configuration ---
+    // --- Dynamic Columns Configuration ---
     const monthColumns = mesesVisibles.map((monthName, index) => ({
         field: `month_${index}`,
         headerName: monthName,
-        width: 85, // Compact width
-        align: 'right',
+        flex: 1,
+        minWidth: 85,
+        align: 'center',
         headerAlign: 'center',
         renderCell: (params) => {
             // Custom styling for Totals section colors
@@ -84,20 +99,34 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
         }
     }));
 
+    // Mobile: Show only selected month
+    // Desktop: Show all months
+    const visibleMonthColumns = isMobile
+        ? [monthColumns[mobileMonthIndex]]
+        : monthColumns;
+
     const columns = [
         {
             field: 'concepto',
             headerName: 'Concepto',
             width: 150, // Compact width
             headerAlign: 'center',
-            frozen: true,
+            frozen: !isMobile, // Only freeze on desktop ideally, or keep it. Sticky + filtered might be odd but fine.
+            flex: isMobile ? 1 : 0, // Expand to fill space on mobile
             renderCell: (params) => (
-                <Box sx={{ pl: params.row.isTotal ? 0 : 2, fontWeight: (params.row.isBold || params.row.isTotal) ? 'bold' : 'normal' }}>
+                <Box sx={{
+                    pl: params.row.isTotal ? 0 : 2,
+                    fontWeight: (params.row.isBold || params.row.isTotal) ? 'bold' : 'normal',
+                    whiteSpace: isMobile ? 'normal' : 'nowrap',
+                    wordBreak: 'break-word',
+                    lineHeight: isMobile ? 1.2 : 'inherit',
+                    py: isMobile ? 1 : 0
+                }}>
                     {params.value}
                 </Box>
             )
         },
-        ...monthColumns
+        ...visibleMonthColumns
     ];
 
     // --- Row Generation ---
@@ -169,6 +198,10 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
             color: "text.primary",
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
             fontSize: "0.75rem", // Compact header font
+            fontWeight: "bold",
+        },
+        "& .MuiDataGrid-columnHeaderTitle": {
+            fontWeight: "bold",
         },
         "& .MuiDataGrid-columnHeader": {
             "&:focus": { outline: "none" },
@@ -197,6 +230,20 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
     return (
         <Box sx={{ width: '100%', py: 2 }}>
 
+            {isMobile && (
+                <Paper variant="outlined" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 1, borderRadius: 2 }}>
+                    <IconButton onClick={handlePrevMonth} color="primary">
+                        <NavigateBefore />
+                    </IconButton>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', minWidth: 100, textAlign: 'center' }}>
+                        {meses[mobileMonthIndex]}
+                    </Typography>
+                    <IconButton onClick={handleNextMonth} color="primary">
+                        <NavigateNext />
+                    </IconButton>
+                </Paper>
+            )}
+
             {/* Ingresos Grid */}
             <Typography variant="h6" gutterBottom>Ingresos</Typography>
             <Box sx={{ width: '100%', mb: 4 }}>
@@ -205,6 +252,7 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     columns={columns}
                     density="standard"
                     autoHeight
+                    getRowHeight={() => isMobile ? 'auto' : null}
                     hideFooter
                     disableColumnMenu
                     disableColumnResize
@@ -224,6 +272,7 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     columns={columns}
                     density="standard"
                     autoHeight
+                    getRowHeight={() => isMobile ? 'auto' : null}
                     hideFooter
                     disableColumnMenu
                     disableColumnResize
@@ -243,6 +292,7 @@ const TablaDetalle = ({ year, ingresos, egresos, saldoInicial }) => {
                     columns={columns}
                     density="standard"
                     autoHeight
+                    getRowHeight={() => isMobile ? 'auto' : null}
                     hideFooter
                     disableColumnMenu
                     disableColumnResize
