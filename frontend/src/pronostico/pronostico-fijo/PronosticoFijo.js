@@ -38,6 +38,7 @@ import LoadingSpinner from '../../shared-components/LoadingSpinner';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
 import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
 
 // Opciones de frecuencia
 const FRECUENCIAS = [
@@ -321,6 +322,57 @@ export default function PronosticoFijo() {
   };
 
   const esAdmin = (usuarioRol || '').toUpperCase().includes('ADMIN');
+
+  const filteredForecasts = React.useMemo(
+    () => forecasts.filter((forecast) => (forecast.moneda || 'ARS') === currency),
+    [forecasts, currency]
+  );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: 'pronostico-fijo',
+      currency,
+      loading,
+      error,
+      success,
+      configsCount: configs.length,
+      configs: configs.slice(0, 5).map((config) => ({
+        id: config.id,
+        nombre: config.nombre,
+        mesesFrecuencia: config.mesesFrecuencia,
+        horizonteMeses: config.horizonteMeses,
+      })),
+      forecastsCount: filteredForecasts.length,
+      forecasts: filteredForecasts.slice(0, 5).map((forecast) => ({
+        id: forecast.id,
+        nombre: forecast.nombre,
+        moneda: forecast.moneda,
+        mesesFrecuencia: forecast.mesesFrecuencia,
+        horizonteMeses: forecast.horizonteMeses,
+        createdAt: forecast.createdAt,
+      })),
+      editingConfigId,
+      newConfigMode,
+      generatingForecastId,
+      deleteDialogOpen,
+      deleteConfigDialogOpen,
+    }),
+    [
+      currency,
+      loading,
+      error,
+      success,
+      configs,
+      filteredForecasts,
+      editingConfigId,
+      newConfigMode,
+      generatingForecastId,
+      deleteDialogOpen,
+      deleteConfigDialogOpen,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   if (loading) {
     return <LoadingSpinner />;

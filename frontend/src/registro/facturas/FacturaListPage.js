@@ -41,6 +41,7 @@ import CurrencyTabs, {
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 const FACTURA_PAGE_SIZE = 10;
 
@@ -87,6 +88,40 @@ const FacturaListPage = () => {
     const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "facturas",
+      currency,
+      totalFacturas: rowCount,
+      filtros: {
+        searchText,
+        fechaDesde: fechaDesde?.format ? fechaDesde.format("YYYY-MM-DD") : null,
+        fechaHasta: fechaHasta?.format ? fechaHasta.format("YYYY-MM-DD") : null,
+      },
+      facturas: facturas.slice(0, 5),
+      facturaSeleccionada: selectedFactura
+        ? {
+            id: selectedFactura.id,
+            tipo: selectedFactura.tipoFactura,
+            numero: selectedFactura.numeroDocumento,
+            monto: selectedFactura.montoTotal,
+            fecha: selectedFactura.fechaEmision,
+          }
+        : null,
+    }),
+    [
+      currency,
+      rowCount,
+      searchText,
+      fechaDesde,
+      fechaHasta,
+      facturas,
+      selectedFactura,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   useEffect(() => {
     const handler = setTimeout(

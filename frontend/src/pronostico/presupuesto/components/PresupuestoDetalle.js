@@ -27,6 +27,7 @@ import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import { detectCurrencyFromName } from '../utils/currencyTag';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 // Helper seguro para números
 const safeNumber = (v) =>
@@ -388,6 +389,46 @@ export default function PresupuestoDetalle() {
   })();
 
   const salud = semaforoPorCumplimiento(pctCumplimientoGlobal);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuesto-detalle",
+      presupuesto: {
+        id: presupuesto.id,
+        nombre: presupuesto.nombre,
+        moneda: presupuestoCurrency,
+      },
+      resumen: {
+        totalIngresoReal,
+        totalEgresoReal,
+        resultadoReal,
+        totalIngresoEst,
+        totalEgresoEst,
+        resultadoEstimado,
+        cumplimiento: pctCumplimientoGlobal,
+        salud: salud?.label ?? null,
+      },
+      detalleMensual: Array.isArray(presupuesto.detalleMensual)
+        ? presupuesto.detalleMensual
+        : [],
+    }),
+    [
+      presupuesto.id,
+      presupuesto.nombre,
+      presupuestoCurrency,
+      totalIngresoReal,
+      totalEgresoReal,
+      resultadoReal,
+      totalIngresoEst,
+      totalEgresoEst,
+      resultadoEstimado,
+      pctCumplimientoGlobal,
+      salud,
+      presupuesto.detalleMensual,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   // Datos para gráficos separados (respetan filtros visuales por meses)
   const ingresosData = datosMensuales.map((fila) => {

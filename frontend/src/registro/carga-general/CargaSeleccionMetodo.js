@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Typography, Grid, ButtonBase } from "@mui/material";
 import { Edit, Description, CameraAlt, Mic } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function CargaSeleccionMetodo() {
   const navigate = useNavigate();
@@ -17,6 +18,17 @@ export default function CargaSeleccionMetodo() {
     { key: "foto", label: "Foto", icon: <CameraAlt fontSize="large" /> },
     { key: "audio", label: "Audio", icon: <Mic fontSize="large" /> },
   ];
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-seleccion-metodo",
+      tipo,
+      modos: modos.map((m) => ({ key: m.key, label: m.label })),
+    }),
+    [tipo, modos]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   return (
     <Box

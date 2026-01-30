@@ -9,6 +9,7 @@ import {
   Handshake,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function CargaSeleccionTipo() {
   const navigate = useNavigate();
@@ -20,6 +21,16 @@ export default function CargaSeleccionTipo() {
     { key: "Acreencia", label: "Acreencia", icon: <Wallet fontSize="large" /> },
     { key: "Factura", label: "Factura", icon: <Receipt fontSize="large" /> },
   ];
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-seleccion-tipo",
+      tipos: tipos.map((t) => ({ key: t.key, label: t.label })),
+    }),
+    [tipos]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   return (
     <Box

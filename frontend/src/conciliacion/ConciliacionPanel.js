@@ -32,6 +32,7 @@ import conciliacionApi from "./api/conciliacionApi";
 import CurrencyTabs, {
   usePreferredCurrency,
 } from "../shared-components/CurrencyTabs";
+import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
 
 export default function ConciliacionPanel() {
   const theme = useTheme();
@@ -58,6 +59,46 @@ export default function ConciliacionPanel() {
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
   const [paginaSugerencias, setPaginaSugerencias] = useState(1);
   const documentosPorPagina = 3;
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "conciliacion",
+      currency,
+      filtros: {
+        estado: filtroEstado,
+        tipo: filtroTipo,
+        busqueda: filtroBusqueda,
+      },
+      estadisticas,
+      movimientosTotal: totalElementos,
+      paginaActual,
+      movimientos: movimientos.slice(0, 5),
+      movimientoSeleccionado: movimientoSeleccionado
+        ? {
+            id: movimientoSeleccionado.id,
+            tipo: movimientoSeleccionado.tipo,
+            monto: movimientoSeleccionado.monto,
+            fecha: movimientoSeleccionado.fechaEmision,
+            conciliado: movimientoSeleccionado.conciliado,
+          }
+        : null,
+      sugerencias: sugerencias.slice(0, 5),
+    }),
+    [
+      currency,
+      filtroEstado,
+      filtroTipo,
+      filtroBusqueda,
+      estadisticas,
+      totalElementos,
+      paginaActual,
+      movimientos,
+      movimientoSeleccionado,
+      sugerencias,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   useEffect(() => {
     setPaginaActual(0);
