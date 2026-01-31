@@ -284,18 +284,8 @@ public class EventService {
 
     @Transactional
     public void handleReminderDeadline(ReminderDeadlineEvent evt) {
-        TenantContext baseCtx = resolveTenant(evt.userId());
-        Instant createdAt = evt.dueDate() != null ? evt.dueDate().minus(1, ChronoUnit.DAYS) : Instant.now();
-
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        NotificationType.REMINDER_DEADLINE,
-                        ResourceType.SYSTEM,
-                        "reminder_deadline_" + evt.title().hashCode(),
-                        "Recordatorio prÃ³ximo a vencer",
-                        String.format("%s - %s", defaultString(evt.title(), "Recordatorio"), defaultString(evt.message(), "")),
-                        Severity.INFO,
-                        createdAt));
+        // Deshabilitado: no enviamos recordatorios de "próximo a vencer"
+        return;
     }
 
     @Transactional
@@ -451,7 +441,7 @@ public class EventService {
         Instant createdAt = evt.scheduledFor() != null ? evt.scheduledFor() : Instant.now();
 
         NotificationType type = switch (evt.reminderType()) {
-            case "DEADLINE" -> NotificationType.REMINDER_DEADLINE;
+            case "DEADLINE" -> NotificationType.REMINDER_CUSTOM; // deshabilitado
             case "DATA_LOAD" -> NotificationType.REMINDER_DATA_LOAD;
             case "BILL_DUE" -> NotificationType.REMINDER_BILL_DUE;
             default -> NotificationType.REMINDER_CUSTOM;
@@ -562,3 +552,5 @@ public class EventService {
     private record TenantContext(Long organizacionId, String usuarioId) {
     }
 }
+
+

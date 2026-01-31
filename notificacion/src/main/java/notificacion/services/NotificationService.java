@@ -114,10 +114,13 @@ public class NotificationService {
 
         Notification saved = repo.save(notification);
 
-        try {
-            emailService.sendNotificationEmail(notification.getOrganizacionId(), notification.getUsuarioId(), saved);
-        } catch (Exception e) {
-            System.err.println("Error enviando email de notificacion: " + e.getMessage());
+        // Evitar doble envío en recordatorios: el mail específico lo envía CustomReminderService
+        if (notification.getType() != NotificationType.REMINDER_CUSTOM) {
+            try {
+                emailService.sendNotificationEmail(notification.getOrganizacionId(), notification.getUsuarioId(), saved);
+            } catch (Exception e) {
+                System.err.println("Error enviando email de notificacion: " + e.getMessage());
+            }
         }
 
         publishUnreadCount(notification.getOrganizacionId(), notification.getUsuarioId());

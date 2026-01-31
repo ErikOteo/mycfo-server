@@ -89,7 +89,14 @@ export default function NotificationSettings() {
     loadPreferences();
   }, []);
 
+  const reminderGroup = {
+    value: "REMINDERS_GROUP",
+    label: "Recordatorios",
+    members: ["REMINDER_CREATED", "REMINDER_CUSTOM"],
+  };
+
   const notificationTypes = [
+    reminderGroup,
     { value: "MOVEMENT_HIGH", label: "Movimientos Altos" },
     { value: "MOVEMENT_IMPORT", label: "Importación de Movimientos" },
     { value: "ACCOUNT_MP_LINKED", label: "Vinculación Mercado Pago" },
@@ -102,8 +109,6 @@ export default function NotificationSettings() {
     { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" },
     { value: "MONTHLY_SUMMARY", label: "Resumen Mensual Listo" },
     { value: "CASH_FLOW_ALERT", label: "Alerta de Cash Flow" },
-
-    { value: "REMINDER_DEADLINE", label: "Recordatorio Próximo a Vencer" },
   ];
 
   const daysOfWeek = [
@@ -119,15 +124,18 @@ export default function NotificationSettings() {
   const chatbotContext = React.useMemo(() => {
     const typeConfigs = notificationTypes
       .map((type) => {
-        const config = preferences.typeConfigs?.[type.value] || {};
+        const members = type.members || [type.value];
+        const configs = members.map(
+          (m) => preferences.typeConfigs?.[m] || {}
+        );
         return {
           type: type.value,
-          enabled: config.enabled ?? true,
-          emailEnabled: config.emailEnabled ?? true,
-          inAppEnabled: config.inAppEnabled ?? true,
+          enabled: configs.every((c) => c.enabled ?? true),
+          emailEnabled: configs.every((c) => c.emailEnabled ?? true),
+          inAppEnabled: configs.every((c) => c.inAppEnabled ?? true),
         };
       })
-      .slice(0, 20);
+      .slice(0, 25);
 
     return {
       screen: "configuracion-notificaciones",
@@ -178,6 +186,19 @@ export default function NotificationSettings() {
         },
       },
     }));
+  };
+
+  const handleTypeGroupChange = (types, field, value) => {
+    setPreferences((prev) => {
+      const nextTypeConfigs = { ...prev.typeConfigs };
+      types.forEach((t) => {
+        nextTypeConfigs[t] = {
+          ...(nextTypeConfigs[t] || {}),
+          [field]: value,
+        };
+      });
+      return { ...prev, typeConfigs: nextTypeConfigs };
+    });
   };
 
   const handleQuietDayToggle = (day) => {
@@ -449,99 +470,107 @@ export default function NotificationSettings() {
               columnGap: { xs: 2, sm: 2.5 },
             }}
           >
-            {notificationTypes.map((type) => (
-              <Box
-                key={type.value}
-                sx={{
-                  breakInside: "avoid",
-                  display: "inline-block",
-                  width: "100%",
-                  mb: 2,
-                }}
-              >
-                <Paper sx={{ p: 2, height: "100%" }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    {type.label}
-                  </Typography>
-                  <FormGroup>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={
-                            preferences.typeConfigs[type.value]?.enabled ??
-                            true
-                          }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "enabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                      disabled={!preferences.emailEnabled}
-                        />
-                      }
-                      label="Habilitado"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                        checked={
-                          (preferences.emailEnabled &&
-                            preferences.typeConfigs[type.value]
-                              ?.emailEnabled) ??
-                          true
+            {notificationTypes.map((type) => {
+              const members = type.members || [type.value];
+              const enabled =
+                preferences.typeConfigs[type.value]?.enabled ??
+                members.every(
+                  (m) => (preferences.typeConfigs[m]?.enabled ?? true) === true
+                );
+              const emailEnabled =
+                (preferences.emailEnabled &&
+                  (preferences.typeConfigs[type.value]?.emailEnabled ??
+                    members.every(
+                      (m) =>
+                        (preferences.typeConfigs[m]?.emailEnabled ?? true) ===
+                        true
+                    ))) ??
+                true;
+
+              const onToggleEnabled = (checked) =>
+                type.members
+                  ? handleTypeGroupChange(members, "enabled", checked)
+                  : handleTypeConfigChange(type.value, "enabled", checked);
+
+              const onToggleEmail = (checked) =>
+                type.members
+                  ? handleTypeGroupChange(members, "emailEnabled", checked)
+                  : handleTypeConfigChange(type.value, "emailEnabled", checked);
+
+              return (
+                <Box
+                  key={type.value}
+                  sx={{
+                    breakInside: "avoid",
+                    display: "inline-block",
+                    width: "100%",
+                    mb: 2,
+                  }}
+                >
+                  <Paper sx={{ p: 2, height: "100%" }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      {type.label}
+                    </Typography>
+                    <FormGroup>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={enabled}
+                            onChange={(e) => onToggleEnabled(e.target.checked)}
+                            size="small"
+                            disabled={!preferences.emailEnabled}
+                          />
                         }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "emailEnabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                          disabled={!preferences.emailEnabled}
-                        />
-                      }
-                      label="Email"
-                    />
-                    {type.value === "MOVEMENT_HIGH" && (
-                      <Box sx={{ mt: 1.5 }}>
-                        <FieldBox label="Umbral de movimiento alto (ARS)">
-                          <TextField
-                            type="number"
-                            fullWidth
-                            inputProps={{ min: 0, step: 1000 }}
-                            value={preferences.movementHighThreshold ?? 100000}
-                            onChange={(e) =>
-                              handlePreferenceChange(
-                                "movementHighThreshold",
-                                Number(e.target.value)
-                              )
-                            }
+                        label="Habilitado"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={emailEnabled}
+                            onChange={(e) => onToggleEmail(e.target.checked)}
+                            size="small"
+                            disabled={!preferences.emailEnabled}
                           />
-                        </FieldBox>
-                        <FieldBox label="Umbral de movimiento alto (USD)">
-                          <TextField
-                            type="number"
-                            fullWidth
-                            inputProps={{ min: 0, step: 50 }}
-                            value={preferences.movementHighThresholdUsd ?? 1000}
-                            onChange={(e) =>
-                              handlePreferenceChange(
-                                "movementHighThresholdUsd",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </FieldBox>
-                      </Box>
-                    )}
-                  </FormGroup>
-                </Paper>
-              </Box>
-            ))}
+                        }
+                        label="Email"
+                      />
+                      {type.value === "MOVEMENT_HIGH" && (
+                        <Box sx={{ mt: 1.5 }}>
+                          <FieldBox label="Umbral de movimiento alto (ARS)">
+                            <TextField
+                              type="number"
+                              fullWidth
+                              inputProps={{ min: 0, step: 1000 }}
+                              value={preferences.movementHighThreshold ?? 100000}
+                              onChange={(e) =>
+                                handlePreferenceChange(
+                                  "movementHighThreshold",
+                                  Number(e.target.value)
+                                )
+                              }
+                            />
+                          </FieldBox>
+                          <FieldBox label="Umbral de movimiento alto (USD)">
+                            <TextField
+                              type="number"
+                              fullWidth
+                              inputProps={{ min: 0, step: 50 }}
+                              value={preferences.movementHighThresholdUsd ?? 1000}
+                              onChange={(e) =>
+                                handlePreferenceChange(
+                                  "movementHighThresholdUsd",
+                                  Number(e.target.value)
+                                )
+                              }
+                            />
+                          </FieldBox>
+                        </Box>
+                      )}
+                    </FormGroup>
+                  </Paper>
+                </Box>
+              );
+            })}
           </Box>
         </CardContent>
       </Card>
