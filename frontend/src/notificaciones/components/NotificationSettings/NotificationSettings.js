@@ -93,13 +93,11 @@ export default function NotificationSettings() {
     { value: "MOVEMENT_HIGH", label: "Movimientos Altos" },
     { value: "MOVEMENT_IMPORT", label: "Importación de Movimientos" },
     { value: "ACCOUNT_MP_LINKED", label: "Vinculación Mercado Pago" },
-    { value: "MOVEMENT_DUPLICATE", label: "Movimientos Duplicados" },
 
     { value: "BUDGET_CREATED", label: "Presupuesto Creado" },
     { value: "BUDGET_DELETED", label: "Presupuesto Eliminado" },
     { value: "BUDGET_EXCEEDED", label: "Presupuesto Excedido" },
     { value: "BUDGET_WARNING", label: "Presupuesto en Alerta" },
-    { value: "BUDGET_MISSING_CATEGORY", label: "Categoría sin Presupuesto" },
 
     { value: "REPORT_READY", label: "Reporte Generado" },
     { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" },

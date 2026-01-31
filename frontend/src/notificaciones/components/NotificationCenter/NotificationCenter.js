@@ -39,6 +39,7 @@ import {
   formatNumber,
   formatMovementDate,
 } from "../../utils/formatters";
+import { deleteNotification } from "../../services/notificationsApi";
 import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 export default function NotificationCenter() {
