@@ -13,7 +13,7 @@ import ExcelPreviewDialog from "./components/ExcelPreviewDialog";
 import ExcelLibreMapper from "./components/ExcelLibreMapper";
 import DropzoneUploader from "./../../shared-components/DropzoneUploader";
 import CustomButton from "./../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
 
 export default function CargaMovimientos({ onCargaCompletada }) {
@@ -92,12 +92,11 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         formData.append("config", JSON.stringify(excelLibreConfig));
       }
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_CONFIG.REGISTRO}/api/preview-excel`,
         formData,
         {
           headers: {
-            "Content-Type": "multipart/form-data",
             "X-Usuario-Sub": usuarioSub,
           },
         },
@@ -134,7 +133,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         tipoOrigen: tipoOrigen,
       };
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_CONFIG.REGISTRO}/api/guardar-seleccionados`,
         requestData,
         {
@@ -172,9 +171,8 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       <Typography component="h2" variant="h6" sx={{ mb: 3 }}>
         Carga Excel
       </Typography>
-      <CamposRequeridos sx={{ mb: 4 }} /> {/* margen debajo del ejemplo */}
       {/* Desplegable para tipo de archivo */}
-      <FormControl fullWidth sx={{ mb: 4 }}>
+      <FormControl fullWidth sx={{ mb: 4 }} size="small">
         <InputLabel id="tipo-origen-label">Tipo de archivo</InputLabel>
         <Select
           labelId="tipo-origen-label"
@@ -193,6 +191,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           <MenuItem value="uala">Ualá (PDF)</MenuItem>
         </Select>
       </FormControl>
+      {tipoOrigen === "mycfo" && <CamposRequeridos sx={{ mb: 4 }} />}
       {tipoOrigen === "excel-libre" && (
         <Box sx={{ mb: 3 }}>
           <ExcelLibreMapper

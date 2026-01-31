@@ -52,11 +52,18 @@ services:
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
       - NOTIFICACION_URL=http://notificacion:8084
+      - NOTIFICACION_SERVICE_URL=http://notificacion:8084
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL}
+      - VERTEX_PROJECT_ID=mycfo-484102
+      - VERTEX_LOCATION=us-central1
+      - VERTEX_MODEL=gemini-2.5-flash
+      - VERTEX_CREDENTIALS_PATH=/secrets/mycfo-google.json
+    volumes:
+    - /home/azureuser/mycfo-secrets/mycfo-google.json:/secrets/mycfo-google.json:ro
 
   notificacion:
     container_name: notificacion
@@ -88,6 +95,7 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_SSL_TRUST=${MAIL_SSL_TRUST}
       - NOTIFICATIONS_EMAIL_FROM=${NOTIFICATIONS_EMAIL_FROM}
+      - FRONTEND_URL=${FRONTEND_URL}
 
   pronostico:
     container_name: pronostico
@@ -109,6 +117,7 @@ services:
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
       - NOTIFICACION_URL=http://notificacion:8084
+      - NOTIFICACION_SERVICE_URL=http://notificacion:8084
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
@@ -139,6 +148,7 @@ services:
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
       - NOTIFICACION_URL=http://notificacion:8084
+      - NOTIFICACION_SERVICE_URL=http://notificacion:8084
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087
@@ -157,6 +167,16 @@ services:
       - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
       - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
+      # Tamaño máximo de upload (imágenes / audio)
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=15MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=15MB
+      # Vertex AI (carga por imagen)
+      - VERTEX_PROJECT_ID=mycfo-484102
+      - VERTEX_LOCATION=us-central1
+      - VERTEX_MODEL=gemini-2.5-flash
+      - VERTEX_CREDENTIALS_PATH=/secrets/mycfo-google.json
+    volumes:
+      - /home/azureuser/mycfo-secrets/mycfo-google.json:/secrets/mycfo-google.json:ro
 
   reporte:
     container_name: reporte
@@ -178,6 +198,7 @@ services:
       - CONSOLIDACION_URL=http://consolidacion:8082
       - IA_URL=http://ia:8083
       - NOTIFICACION_URL=http://notificacion:8084
+      - NOTIFICACION_SERVICE_URL=http://notificacion:8084
       - PRONOSTICO_URL=http://pronostico:8085
       - REGISTRO_URL=http://registro:8086
       - REPORTE_URL=http://reporte:8087

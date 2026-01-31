@@ -111,6 +111,8 @@ export default function SignIn(props) {
   const [globalType, setGlobalType] = React.useState(null); // 'success' | 'error' | null
   const [open, setOpen] = React.useState(false);
 
+  const [showPassword, setShowPassword] = React.useState(false);
+
   const URL_ADMINISTRACION = API_CONFIG.ADMINISTRACION;
 
   const poolData = {
@@ -177,7 +179,7 @@ export default function SignIn(props) {
           sessionStorage.setItem("email", userData.email);
           sessionStorage.setItem("nombre", userData.nombre);
           sessionStorage.setItem("telefono", userData.telefono || "");
-          
+
           // Guardar datos de la empresa (sin IDs)
           if (userData.empresaId) {
             sessionStorage.setItem("empresaNombre", userData.empresaNombre || "");
@@ -262,7 +264,7 @@ export default function SignIn(props) {
               <TextField
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="******"
                 required
                 fullWidth
@@ -274,8 +276,14 @@ export default function SignIn(props) {
             </FormControl>
 
             <FormControlLabel
-              control={<Checkbox value="remember" color="primary" />}
-              label="Recordarme"
+              control={
+                <Checkbox
+                  checked={showPassword}
+                  onChange={() => setShowPassword(!showPassword)}
+                  color="primary"
+                />
+              }
+              label="Ver contraseña"
             />
 
             {globalMsg && (
@@ -284,13 +292,13 @@ export default function SignIn(props) {
                   mt: 1,
                   p: 1.5,
                   borderRadius: 1.5,
-                  bgcolor: "#FFF8E1",
-                  border: "1px solid #FFE082",
+                  bgcolor: "#FFDE70",
+                  border: "1px solid #F5C16C",
                 }}
               >
                 <Typography
                   variant="body2"
-                  sx={{ textAlign: "center", color: "text.primary" }}
+                  sx={{ textAlign: "center", color: "#000" }}
                 >
                   {globalMsg}
                 </Typography>

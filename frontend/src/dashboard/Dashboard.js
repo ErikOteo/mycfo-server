@@ -33,7 +33,11 @@ import InsightsWidget from "./components/InsightsWidget";
 // import BillingWidget from "./components/BillingWidget";
 import { fetchDashboardSummary } from "./services/dashboardSummaryService";
 import useResolvedColorTokens from "./useResolvedColorTokens";
-import { formatCurrencyAR } from "../utils/formatters";
+import { formatCurrencyByCode } from "../utils/formatters";
+import CurrencyTabs, {
+  usePreferredCurrency,
+} from "../shared-components/CurrencyTabs";
+import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
 
 const mockKpis = {
   totalIncomes: 820000,
@@ -429,6 +433,44 @@ const Dashboard = React.memo(() => {
   const [company, setCompany] = React.useState(companiesMock[0]);
   const periodOptions = React.useMemo(() => getRecentPeriods(6), []);
   const [period, setPeriod] = React.useState(periodOptions[0]?.value ?? "");
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
+  const dashboardCacheKey = React.useMemo(
+    () => `${DASHBOARD_CACHE_KEY}_${currency}`,
+    [currency]
+  );
+  const formatCurrency = React.useMemo(
+    () => (value) => formatCurrencyByCode(value, currency),
+    [currency]
+  );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "dashboard",
+      period,
+      currency,
+      kpis: state.kpis?.data ?? null,
+      cashflow: state.cashflow?.data ?? null,
+      reconciliation: state.reconciliation?.data ?? null,
+      recentMovements: Array.isArray(state.movements?.data)
+        ? state.movements.data.slice(0, 5)
+        : [],
+      recentInvoices: Array.isArray(state.invoices?.data)
+        ? state.invoices.data.slice(0, 5)
+        : [],
+      salesTrend: state.salesTrend?.data ?? null,
+      expensesTrend: state.expensesTrend?.data ?? null,
+      salesByCategory: Array.isArray(state.salesByCategory?.data)
+        ? state.salesByCategory.data.slice(0, 6)
+        : [],
+      expensesByCategory: Array.isArray(state.expensesByCategory?.data)
+        ? state.expensesByCategory.data.slice(0, 6)
+        : [],
+      budget: state.budget?.data ?? null,
+    }),
+    [currency, period, state]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const userDisplayName = React.useMemo(() => {
     if (typeof window === "undefined") {
@@ -810,7 +852,7 @@ const Dashboard = React.memo(() => {
       // 1) Mostrar primero lo que haya en cache (si existe)
       if (typeof window !== "undefined") {
         try {
-          const raw = window.sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+          const raw = window.sessionStorage.getItem(dashboardCacheKey);
           if (raw) {
             const cached = JSON.parse(raw);
             applyCompositeResponse(cached);
@@ -827,13 +869,14 @@ const Dashboard = React.memo(() => {
           months: 12,
           limitMovements: 6,
           limitInvoices: 6,
+          currency,
         });
 
         // guardar en cache la respuesta cruda del backend
         if (typeof window !== "undefined") {
           try {
             window.sessionStorage.setItem(
-              DASHBOARD_CACHE_KEY,
+              dashboardCacheKey,
               JSON.stringify(composite)
             );
           } catch (err) {
@@ -857,7 +900,7 @@ const Dashboard = React.memo(() => {
         }));
       }
     })();
-  }, [buildMockState, useMocks, period]);
+  }, [buildMockState, currency, dashboardCacheKey, useMocks, period]);
 
   React.useEffect(() => {
     loadDashboardData();
@@ -959,28 +1002,28 @@ const Dashboard = React.memo(() => {
         id: "totalIncomes",
         title: "Ingresos Totales Mensuales",
         value: data?.totalIncomes ?? null,
-        formatter: formatCurrencyAR,
+        formatter: formatCurrency,
         trend: [],
       },
       {
         id: "totalExpenses",
         title: "Egresos Totales Mensuales",
         value: data?.totalExpenses ?? null,
-        formatter: formatCurrencyAR,
+        formatter: formatCurrency,
         trend: [],
       },
       {
         id: "netResult",
         title: "Resultado Neto Mensuales",
         value: data?.netResult ?? null,
-        formatter: formatCurrencyAR,
+        formatter: formatCurrency,
         trend: [],
       },
       {
         id: "totalBalance",
         title: "Dinero Total",
         value: data?.totalBalance ?? null,
-        formatter: formatCurrencyAR,
+        formatter: formatCurrency,
         trend: [],
       },
       // {
@@ -1017,7 +1060,7 @@ const Dashboard = React.memo(() => {
       //   secondaryFormatter: formatCurrencyAR,
       // },
     ];
-  }, [state.kpis.data]);
+  }, [state.kpis.data, formatCurrency]);
 
   const quickActionsLoading = state.kpis.loading && !state.kpis.data;
 
@@ -1043,6 +1086,7 @@ const Dashboard = React.memo(() => {
       }}
     >
       <Stack spacing={3} sx={{ width: "100%" }}>
+        <CurrencyTabs value={currency} onChange={setCurrency} />
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
@@ -1144,6 +1188,7 @@ const Dashboard = React.memo(() => {
                 loading={state.salesTrend.loading && !state.salesTrend.data}
                 error={state.salesTrend.error}
                 onNavigate={() => handleNavigate("/reportes/ventas")}
+                currency={currency}
               />
             </Box>
           </Grid>
@@ -1155,6 +1200,7 @@ const Dashboard = React.memo(() => {
                   state.salesByCategory.loading && !state.salesByCategory.data
                 }
                 error={state.salesByCategory.error}
+                currency={currency}
               />
             </Box>
           </Grid>
@@ -1183,6 +1229,7 @@ const Dashboard = React.memo(() => {
                 }
                 error={state.expensesTrend.error}
                 emptyMessage="No hay egresos registrados en este periodo."
+                currency={currency}
               />
             </Box>
           </Grid>
@@ -1198,6 +1245,7 @@ const Dashboard = React.memo(() => {
                 emptyMessage="No hay egresos por categoria en este periodo."
                 title="Egresos por categorias"
                 subtitle="Distribucion anual por segmento"
+                currency={currency}
               />
             </Box>
           </Grid>
@@ -1217,11 +1265,12 @@ const Dashboard = React.memo(() => {
               loading={state.budget.loading && !state.budget.data}
               error={state.budget.error}
               onRetry={loadDashboardData}
+              currency={currency}
             />
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             {/* Sección comparativa Caja vs Devengado del último mes */}
-            <LiquidityGapWidget />
+            <LiquidityGapWidget currency={currency} />
           </Grid>
           <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
             <ReconciliationWidget
@@ -1231,6 +1280,7 @@ const Dashboard = React.memo(() => {
               }
               error={state.reconciliation.error}
               onRetry={loadDashboardData}
+              currency={currency}
               onNavigate={(account) =>
                 handleNavigate(
                   "/conciliacion",

@@ -24,6 +24,7 @@ import { sessionService } from "../../shared-services/sessionService";
 import { organizacionService } from "../../shared-services/organizacionService";
 import InvitarColaboradores from "../invitaciones/InvitarColaboradores";
 import API_CONFIG from "../../config/api-config";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function Organizacion() {
   const [empresa, setEmpresa] = useState(null);
@@ -35,6 +36,41 @@ export default function Organizacion() {
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [empresaEditada, setEmpresaEditada] = useState({});
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "organizacion",
+      empresa: empresa
+        ? {
+            nombre: empresa.nombre,
+            cuit: empresa.cuit,
+            condicionIVA: empresa.condicionIVA,
+            domicilio: empresa.domicilio,
+          }
+        : null,
+      empleadosTotal: empleados.length,
+      empleados: empleados.slice(0, 5).map((empleado) => ({
+        nombre: empleado.nombre,
+        email: empleado.email,
+        rol: empleado.rol,
+        activo: empleado.activo,
+      })),
+      usuarioRol,
+      editandoEmpresa,
+      editandoEmpleado: Boolean(editandoEmpleado),
+      loading,
+    }),
+    [
+      empresa,
+      empleados,
+      usuarioRol,
+      editandoEmpresa,
+      editandoEmpleado,
+      loading,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const sub = sessionStorage.getItem("sub");
   const organizacionId = sessionStorage.getItem("organizacionId");
@@ -100,20 +136,20 @@ export default function Organizacion() {
 
       setMensaje({ tipo: 'success', texto: 'Cambios del empleado guardados exitosamente' });
       handleCerrarEdicionEmpleado();
-      
+
       // Recargar lista de empleados
       cargarDatosEmpresaYEmpleados();
-      
+
       setTimeout(() => setMensaje({ tipo: '', texto: '' }), 3000);
     } catch (error) {
       console.error("Error guardando empleado:", error);
-      
+
       // Mostrar mensaje específico según el tipo de error
       let mensajeError = 'Error al guardar los cambios del empleado';
       if (error.response?.status === 403) {
         mensajeError = 'Solo los administradores pueden actualizar empleados.';
       }
-      
+
       setMensaje({ tipo: 'error', texto: mensajeError });
     }
   };
@@ -128,14 +164,14 @@ export default function Organizacion() {
       await organizacionService.eliminarEmpleado(empleadoSub);
 
       setMensaje({ tipo: 'success', texto: 'Empleado eliminado exitosamente' });
-      
+
       // Recargar lista de empleados
       cargarDatosEmpresaYEmpleados();
-      
+
       setTimeout(() => setMensaje({ tipo: '', texto: '' }), 3000);
     } catch (error) {
       console.error("Error eliminando empleado:", error);
-      
+
       // Mostrar mensaje específico según el tipo de error
       let mensajeError = 'Error al eliminar el empleado';
       if (error.response?.status === 403) {
@@ -145,7 +181,7 @@ export default function Organizacion() {
           mensajeError = 'Solo los administradores pueden eliminar empleados.';
         }
       }
-      
+
       setMensaje({ tipo: 'error', texto: mensajeError });
     }
   };
@@ -173,11 +209,11 @@ export default function Organizacion() {
   const handleGuardarEmpresa = async () => {
     try {
       await organizacionService.actualizarOrganizacion(empresaEditada);
-      
+
       setEmpresa(empresaEditada);
       setMensaje({ tipo: 'success', texto: 'Datos de la empresa actualizados exitosamente' });
       handleCerrarEdicionEmpresa();
-      
+
       setTimeout(() => setMensaje({ tipo: '', texto: '' }), 3000);
     } catch (error) {
       console.error("Error actualizando empresa:", error);
@@ -202,11 +238,11 @@ export default function Organizacion() {
           {mensaje.texto}
         </Alert>
       )}
-      
+
       <Typography variant="h4" gutterBottom>
         Gestión de Organización
       </Typography>
-      <Typography variant="subtitle1" sx={{ mb: 4, color: '#000' }}>
+      <Typography variant="subtitle1" sx={{ mb: 4, color: 'text.primary' }}>
         Visualiza la información de tu empresa y empleados
       </Typography>
 
@@ -233,7 +269,7 @@ export default function Organizacion() {
             {!editandoEmpresa ? (
               <Box>
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.primary">
                     Nombre de la Empresa
                   </Typography>
                   <Typography variant="h6">
@@ -243,7 +279,7 @@ export default function Organizacion() {
 
                 {empresa.cuit && (
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.primary">
                       CUIT
                     </Typography>
                     <Typography variant="body1">
@@ -254,7 +290,7 @@ export default function Organizacion() {
 
                 {empresa.condicionIVA && (
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.primary">
                       Condición IVA
                     </Typography>
                     <Typography variant="body1">
@@ -265,7 +301,7 @@ export default function Organizacion() {
 
                 {empresa.domicilio && (
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.primary">
                       Domicilio
                     </Typography>
                     <Typography variant="body1">
@@ -283,7 +319,7 @@ export default function Organizacion() {
             ) : (
               <Box>
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.primary">
                     Nombre de la Empresa
                   </Typography>
                   <TextField
@@ -295,7 +331,7 @@ export default function Organizacion() {
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.primary">
                     CUIT
                   </Typography>
                   <TextField
@@ -307,7 +343,7 @@ export default function Organizacion() {
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.primary">
                     Condición IVA
                   </Typography>
                   <TextField
@@ -319,7 +355,7 @@ export default function Organizacion() {
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.primary">
                     Domicilio
                   </Typography>
                   <TextField
@@ -362,7 +398,7 @@ export default function Organizacion() {
         <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
           Empleados de la Organización ({empleados.length})
         </Typography>
-        
+
         {empleados.length === 0 ? (
           <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
             No hay empleados registrados en la organización.
@@ -378,19 +414,19 @@ export default function Organizacion() {
                         {editandoEmpleado === empleado.sub ? empleadoEditado.nombre : empleado.nombre}
                       </Typography>
                       {(editandoEmpleado === empleado.sub ? empleadoEditado.rol : empleado.rol) === "ADMINISTRADOR" && (
-                        <Chip 
-                          icon={<AdminIcon />} 
-                          label="Admin" 
-                          size="small" 
-                          color="primary" 
+                        <Chip
+                          icon={<AdminIcon />}
+                          label="Admin"
+                          size="small"
+                          color="primary"
                           variant="outlined"
                         />
                       )}
                       {empleado.sub === sub && (
-                        <Chip 
-                          label="Tú" 
-                          size="small" 
-                          color="secondary" 
+                        <Chip
+                          label="Tú"
+                          size="small"
+                          color="secondary"
                           variant="outlined"
                         />
                       )}
@@ -419,7 +455,7 @@ export default function Organizacion() {
                           </Box>
                         ) : (
                           <Box>
-                            <IconButton 
+                            <IconButton
                               aria-label="editar"
                               onClick={() => handleAbrirEdicionEmpleado(empleado)}
                               sx={{ mr: 1 }}
@@ -429,7 +465,7 @@ export default function Organizacion() {
                             </IconButton>
                             {/* Solo mostrar botón eliminar si no es el propio usuario */}
                             {empleado.sub !== sub && (
-                              <IconButton 
+                              <IconButton
                                 aria-label="eliminar"
                                 onClick={() => handleEliminarEmpleado(empleado.sub)}
                                 color="error"
@@ -447,7 +483,7 @@ export default function Organizacion() {
                 {editandoEmpleado === empleado.sub ? (
                   <Box>
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Nombre
                       </Typography>
                       <TextField
@@ -459,7 +495,7 @@ export default function Organizacion() {
                     </Box>
 
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Email
                       </Typography>
                       <TextField
@@ -471,7 +507,7 @@ export default function Organizacion() {
                     </Box>
 
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Teléfono
                       </Typography>
                       <TextField
@@ -483,7 +519,7 @@ export default function Organizacion() {
                     </Box>
 
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Rol
                       </Typography>
                       <TextField
@@ -502,7 +538,7 @@ export default function Organizacion() {
                 ) : (
                   <Box>
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Email
                       </Typography>
                       <Typography variant="body1">
@@ -512,7 +548,7 @@ export default function Organizacion() {
 
                     {empleado.telefono && (
                       <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.primary">
                           Teléfono
                         </Typography>
                         <Typography variant="body1">
@@ -522,7 +558,7 @@ export default function Organizacion() {
                     )}
 
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Rol
                       </Typography>
                       <Typography variant="body1">
@@ -531,7 +567,7 @@ export default function Organizacion() {
                     </Box>
 
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary">
                         Estado
                       </Typography>
                       <Typography variant="body1">
@@ -555,9 +591,9 @@ export default function Organizacion() {
       </Paper>
 
       {/* Invitar Colaboradores */}
-      <InvitarColaboradores 
-        empresaNombre={empresa?.nombre} 
-        esAdministrador={esAdministrador} 
+      <InvitarColaboradores
+        empresaNombre={empresa?.nombre}
+        esAdministrador={esAdministrador}
       />
 
     </Box>

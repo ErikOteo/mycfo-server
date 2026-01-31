@@ -15,7 +15,7 @@ import { CameraAlt, Check, Close, Delete } from "@mui/icons-material";
 import Webcam from "react-webcam";
 import CustomButton from "../../../shared-components/CustomButton";
 import ImageIcon from "@mui/icons-material/Image";
-import axios from "axios";
+import http from "../../../api/http";
 
 const tipoMovimientoMap = {
   Movimiento: "Movimiento",
@@ -107,9 +107,9 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
         fd.append("tipoDoc", tipoDoc);
       }
       const usuarioSub = sessionStorage.getItem("sub");
-      const response = await axios.post(endpoint, fd, {
+      const response = await http.post(endpoint, fd, {
         headers: {
-          "Content-Type": "multipart/form-data",
+          // http.js meterá Authorization + X-Usuario-Sub si faltan
           "X-Usuario-Sub": usuarioSub,
         },
       });

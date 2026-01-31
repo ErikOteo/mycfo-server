@@ -2,10 +2,13 @@ import * as React from 'react';
 import {
   Box, Typography, Button, Paper, Table, TableHead, TableRow,
   TableCell, TableBody, Grid, TextField, MenuItem, IconButton,
-  Stepper, Step, StepLabel, Alert, AlertTitle, Divider, Tooltip, Chip, Stack, FormControlLabel, Switch, CircularProgress, Autocomplete
+  Stepper, Step, StepLabel, Alert, AlertTitle, Divider, Tooltip, Chip, Stack, FormControlLabel, Switch, CircularProgress, Autocomplete,
+  styled
 } from '@mui/material';
+import CheckIcon from '@mui/icons-material/Check';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import MonthRangeSelect from './MonthRangeSelect';
+import CustomSelect from '../../../shared-components/CustomSelect';
 import { useNavigate } from 'react-router-dom';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -15,7 +18,64 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import http from '../../../api/http';
 import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../utils/currency';
 import API_CONFIG from '../../../config/api-config';
+import { getStoredCurrencyPreference, persistCurrencyPreference } from '../../../shared-components/CurrencyTabs';
+import { CURRENCY_OPTIONS, stripCurrencyTag, withCurrencyTag } from '../utils/currencyTag';
 import { fetchCategorias } from '../../../shared-services/categoriasService';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
+
+const CustomStepIconRoot = styled('div')(({ theme, ownerState }) => {
+  const { active, completed } = ownerState;
+
+  const styles = {
+    backgroundColor: 'transparent',
+    zIndex: 1,
+    color: '#000',
+    width: 24,
+    height: 24,
+    display: 'flex',
+    borderRadius: '50%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    border: '3px solid black', // Círculo grueso negro
+    fontWeight: '900', // Negrita fuerte
+    fontSize: '0.9rem',
+  };
+
+  if (active) {
+    return {
+      ...styles,
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.primary.contrastText,
+      border: 'none',
+      width: 32, // un poco más destacado
+      height: 32,
+      fontWeight: 'bold',
+      boxShadow: '0 4px 10px 0 rgba(0,0,0,.25)',
+    };
+  }
+
+  if (completed) {
+    return {
+      ...styles,
+      backgroundColor: theme.palette.primary.main, // Igual que el activo
+      color: theme.palette.primary.contrastText,
+      border: 'none',
+      width: 34, // "un poquitito mas grande"
+      height: 34,
+    };
+  }
+
+  return styles;
+});
+
+function CustomStepIcon(props) {
+  const { active, completed, className, icon } = props;
+  return (
+    <CustomStepIconRoot ownerState={{ active, completed }} className={className}>
+      {completed ? <CheckIcon sx={{ fontSize: 20 }} /> : icon}
+    </CustomStepIconRoot>
+  );
+}
 
 const tableRowStyle = {
   backgroundColor: 'rgba(255, 255, 255, 0.02)',
@@ -123,7 +183,8 @@ export default function PresupuestoNuevo() {
   const [creating, setCreating] = React.useState(false);
 
   // Paso 1
-  const [nombre, setNombre] = React.useState('Presupuesto Demo');
+  const [currency, setCurrency] = React.useState(() => getStoredCurrencyPreference('ARS'));
+  const [nombreBase, setNombreBase] = React.useState(() => stripCurrencyTag('Presupuesto Demo'));
   const [fechaDesde, setFechaDesde] = React.useState('2025-01');
   const [fechaHasta, setFechaHasta] = React.useState('2025-06');
 
@@ -196,7 +257,7 @@ export default function PresupuestoNuevo() {
 
   // Validaciones básicas
   const validarPaso1 = () => {
-    if (!nombre) return 'Ingresá un nombre para el presupuesto.';
+    if (!nombreBase || !nombreBase.trim()) return 'Ingresá un nombre para el presupuesto.';
     if (!fechaDesde || !fechaHasta) return 'Completá los meses.';
     if (fechaDesde > fechaHasta) return 'El mes "Desde" no puede ser posterior a "Hasta".';
     return null;
@@ -205,7 +266,7 @@ export default function PresupuestoNuevo() {
     if (categorias.length === 0) return 'Agregá al menos una categoría.';
     if (categorias.some(c => !c.categoria?.trim())) return 'Todas las categorías deben tener nombre.';
     if (categorias.some(c => !c.tipo?.trim())) return 'Todas las categorías deben tener tipo.';
-    
+
     // Helper numérico
     const isBlankNum = (v) => v === '' || v == null || Number.isNaN(Number(v));
     const isPositiveInt = (v) => Number.isInteger(Number(v)) && Number(v) >= 1;
@@ -501,6 +562,72 @@ export default function PresupuestoNuevo() {
 
 
   // Guardar (CAMBIO MÍNIMO: enviar payload nuevo con `plantilla`)
+  const monthSummary = React.useMemo(
+    () =>
+      meses.slice(0, 6).map((mes) => ({
+        mes,
+        ingresos: monthTotals[mes]?.ingresos ?? 0,
+        egresos: monthTotals[mes]?.egresos ?? 0,
+        resultado: monthTotals[mes]?.resultado ?? 0,
+      })),
+    [meses, monthTotals]
+  );
+
+  const categoriasSummary = React.useMemo(
+    () =>
+      categorias.slice(0, 10).map((categoria) => ({
+        nombre: categoria.categoria,
+        tipo: categoria.tipo,
+        regla: categoria.regla?.modo,
+      })),
+    [categorias]
+  );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuesto-nuevo",
+      isDraft: true,
+      step,
+      currency,
+      nombreBase,
+      fechaDesde,
+      fechaHasta,
+      mesesCount: meses.length,
+      categoriasCount: categorias.length,
+      categorias: categoriasSummary,
+      totals: {
+        ingresos: totalIngresos,
+        egresos: totalEgresos,
+        resultado: resultadoTotal,
+      },
+      hasLosses,
+      negativeMonths: negativeMonths.slice(0, 6),
+      monthSummary,
+      lockNegative,
+      errors,
+    }),
+    [
+      step,
+      currency,
+      nombreBase,
+      fechaDesde,
+      fechaHasta,
+      meses,
+      categorias,
+      categoriasSummary,
+      totalIngresos,
+      totalEgresos,
+      resultadoTotal,
+      hasLosses,
+      negativeMonths,
+      monthSummary,
+      lockNegative,
+      errors,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   const handleGuardar = async () => {
     if (creating) {
       return;
@@ -511,6 +638,7 @@ export default function PresupuestoNuevo() {
 
     setCreating(true);
     try {
+      const nombreFinal = withCurrencyTag(nombreBase, currency || 'ARS');
       // Normalizo meses a YYYY-MM (ya vienen así desde el input type="month")
       const dDesde = fechaDesde;
       const dHasta = fechaHasta;
@@ -554,7 +682,7 @@ export default function PresupuestoNuevo() {
       });
 
       const payload = {
-        nombre,
+        nombre: nombreFinal,
         desde: dDesde,
         hasta: dHasta,
         autogenerarCeros: false,
@@ -566,7 +694,7 @@ export default function PresupuestoNuevo() {
         payload
       );
 
-      const nombreFuente = res?.data?.nombre || nombre;
+      const nombreFuente = res?.data?.nombre || nombreFinal;
       const slug = encodeURIComponent(
         nombreFuente.trim().toLowerCase().replace(/\s+/g, '-')
       );
@@ -589,9 +717,9 @@ export default function PresupuestoNuevo() {
       <Typography variant="subtitle1" gutterBottom>Planificá tus ingresos y egresos esperados</Typography>
 
       <Stepper activeStep={step} alternativeLabel sx={{ mb: 3 }}>
-        <Step><StepLabel>Datos básicos</StepLabel></Step>
-        <Step><StepLabel>Categorías & Reglas</StepLabel></Step>
-        <Step><StepLabel>Vista previa & Guardar</StepLabel></Step>
+        <Step><StepLabel StepIconComponent={CustomStepIcon}>Datos básicos</StepLabel></Step>
+        <Step><StepLabel StepIconComponent={CustomStepIcon}>Categorías & Reglas</StepLabel></Step>
+        <Step><StepLabel StepIconComponent={CustomStepIcon}>Vista previa & Guardar</StepLabel></Step>
       </Stepper>
 
       {errors && <Alert severity="warning" sx={{ mb: 2 }}>{errors}</Alert>}
@@ -600,14 +728,33 @@ export default function PresupuestoNuevo() {
       {step === 0 && (
         <>
           <Box sx={{ display: 'flex', gap: 2, mb: 3, flexDirection: 'column' }}>
-            <TextField 
-              label="Nombre del presupuesto" 
-              value={nombre} 
-              onChange={e => setNombre(e.target.value)} 
-              fullWidth 
-              variant="outlined" 
+            <TextField
+              label="Nombre del presupuesto"
+              value={nombreBase}
+              onChange={e => setNombreBase(stripCurrencyTag(e.target.value))}
+              fullWidth
+              variant="outlined"
+              sx={{ minWidth: 260 }}
             />
+
+            <Box sx={{ minWidth: 220, maxWidth: 300 }}>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Moneda</Typography>
+              <CustomSelect
+                value={currency}
+                size="small"
+                fullWidth
+                options={CURRENCY_OPTIONS}
+                width="100%"
+                onChange={(val) => {
+                  const next = val || 'ARS';
+                  setCurrency(next);
+                  persistCurrencyPreference(next);
+                }}
+              />
+            </Box>
+
             <Box sx={{ maxWidth: 300 }}>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Período</Typography>
               <MonthRangeSelect
                 value={{
                   from: fechaDesde,

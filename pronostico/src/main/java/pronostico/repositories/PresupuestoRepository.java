@@ -60,6 +60,14 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
                  OR (:status = 'active' AND p.deleted = false)
                  OR (:status = 'deleted' AND p.deleted = true)
                )
+               AND (
+                    :moneda IS NULL
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'ARS' AND (
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
+                    ))
+               )
         """,
         countQuery = """
             SELECT COUNT(p) FROM Presupuesto p
@@ -71,6 +79,14 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
                  OR (:status = 'active' AND p.deleted = false)
                  OR (:status = 'deleted' AND p.deleted = true)
                )
+               AND (
+                    :moneda IS NULL
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'ARS' AND (
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
+                    ))
+               )
         """
     )
     Page<Presupuesto> searchByOrganizacion(
@@ -78,6 +94,50 @@ public interface PresupuestoRepository extends JpaRepository<Presupuesto, Long> 
         @Param("from") LocalDate from,
         @Param("to") LocalDate to,
         @Param("status") String status,
+        @Param("moneda") String moneda,
+        Pageable pageable
+    );
+
+    @Query(
+        value = """
+            SELECT p FROM Presupuesto p
+             WHERE p.organizacionId = :organizacionId
+               AND (
+                    :status = 'all'
+                 OR (:status = 'active' AND p.deleted = false)
+                 OR (:status = 'deleted' AND p.deleted = true)
+               )
+               AND (
+                    :moneda IS NULL
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'ARS' AND (
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
+                    ))
+               )
+        """,
+        countQuery = """
+            SELECT COUNT(p) FROM Presupuesto p
+             WHERE p.organizacionId = :organizacionId
+               AND (
+                    :status = 'all'
+                 OR (:status = 'active' AND p.deleted = false)
+                 OR (:status = 'deleted' AND p.deleted = true)
+               )
+               AND (
+                    :moneda IS NULL
+                 OR (UPPER(:moneda) = 'USD' AND LOWER(TRIM(p.nombre)) LIKE '[usd]%')
+                 OR (UPPER(:moneda) = 'ARS' AND (
+                        LOWER(TRIM(p.nombre)) LIKE '[ars]%'
+                        OR (LOWER(TRIM(p.nombre)) NOT LIKE '[usd]%' AND LOWER(TRIM(p.nombre)) NOT LIKE '[ars]%')
+                    ))
+               )
+        """
+    )
+    Page<Presupuesto> listByOrganizacionStatusAndMoneda(
+        @Param("organizacionId") Long organizacionId,
+        @Param("status") String status,
+        @Param("moneda") String moneda,
         Pageable pageable
     );
 

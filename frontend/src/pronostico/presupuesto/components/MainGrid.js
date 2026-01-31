@@ -1,4 +1,4 @@
-import * as React from "react";
+import * as React from 'react';
 import {
   Box,
   Typography,
@@ -28,17 +28,23 @@ import {
   Pagination,
   CircularProgress,
   Divider,
+  useMediaQuery,
+  InputAdornment,
 } from "@mui/material";
+import { DataGrid } from '@mui/x-data-grid';
 import { alpha, useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import http from "../../../api/http";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import API_CONFIG from "../../../config/api-config";
 import LoadingSpinner from "../../../shared-components/LoadingSpinner";
-
-
+import CurrencyTabs, { usePreferredCurrency } from "../../../shared-components/CurrencyTabs";
+import { matchesCurrencyFilter } from "../utils/currencyTag";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
+import CustomNoRowsOverlay from "../../../shared-components/CustomNoRowsOverlay";
 
 const tableRowStyle = {
   backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -91,6 +97,7 @@ const formatDeletedAt = (value) => {
   return date.toLocaleString("es-AR", { hour12: false });
 };
 const PAGE_SIZE = 3;
+const LARGE_PAGE_SIZE = 1000;
 const DEFAULT_SORT = "createdAt,desc";
 const createEmptyPage = () => ({
   content: [],
@@ -100,31 +107,96 @@ const createEmptyPage = () => ({
   size: PAGE_SIZE,
 });
 const HeaderLabelAligned = ({ label, ghost }) => (
-  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+  <Box sx={{ position: "relative", display: "inline-flex" }}>
     <Box
       aria-hidden
       sx={{
-        visibility: 'hidden',
-        pointerEvents: 'none',
-        display: 'inline-flex',
-        whiteSpace: 'nowrap',
+        visibility: "hidden",
+        pointerEvents: "none",
+        display: "inline-flex",
+        whiteSpace: "nowrap",
       }}
     >
       {ghost}
     </Box>
-    <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', whiteSpace: 'nowrap' }}>
+    <Box
+      sx={{
+        position: "absolute",
+        inset: 0,
+        display: "grid",
+        placeItems: "center",
+        whiteSpace: "nowrap",
+      }}
+    >
       {label}
     </Box>
   </Box>
+
+);
+
+
+
+// Estilos estáticos fuera del componente para evitar re-renders
+// Se mantienen los bordes originales requeridos por el usuario
+const dataGridStyles = {
+  backgroundColor: "background.paper",
+  borderRadius: 2,
+  border: (theme) => `1px solid ${theme.palette.divider}`,
+  "& .MuiDataGrid-cell": {
+    borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+    display: "flex",
+    alignItems: "center",
+    fontSize: "0.875rem",
+  },
+  "& .MuiDataGrid-columnHeaders": {
+    backgroundColor: (theme) =>
+      theme.palette.mode === "dark"
+        ? "rgba(255, 255, 255, 0.05)"
+        : "#f5f5f5",
+    color: "text.primary",
+    borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+  },
+  "& .MuiDataGrid-columnHeader": {
+    "&:focus": { outline: "none" },
+  },
+  "& .MuiDataGrid-sortIcon": {
+    display: "none",
+  },
+  "& .MuiDataGrid-menuIcon": {
+    display: "none",
+  },
+  "& .MuiDataGrid-iconButtonContainer": {
+    display: "none",
+  },
+  "& .MuiDataGrid-row:hover": {
+    backgroundColor: (theme) => theme.palette.action.hover,
+  },
+  "& .MuiDataGrid-footerContainer": {
+    borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+  },
+  // Hide default footer since we use custom pagination below
+  "& .MuiDataGrid-footerContainer": {
+    display: "none"
+  }
+};
+
+const CustomNoRowsPresupuestos = () => (
+  <CustomNoRowsOverlay message="No se encontraron presupuestos registrados" />
+);
+
+const CustomNoSearchResults = () => (
+  <CustomNoRowsOverlay message="No se encontraron coincidencias para tu búsqueda" />
 );
 
 export default function MainGrid() {
   const theme = useTheme();
+  // Sidebar disappears on lg, so we consider "mobile" (no sidebar) as down('lg')
+  const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
   const isLightMode = theme.palette.mode === "light";
   const paletteVars = theme.vars?.palette ?? theme.palette;
   const tabsLabelColor = isLightMode
-    ? paletteVars.text?.primary ?? "#000"
-    : paletteVars.common?.white ?? "#fff";
+    ? (paletteVars.text?.primary ?? "#000")
+    : (paletteVars.common?.white ?? "#fff");
   const darkActionButtonSx = isLightMode ? undefined : { color: "#42897f" };
   const navigate = useNavigate();
   const baseURL = API_CONFIG.PRONOSTICO;
@@ -155,6 +227,7 @@ export default function MainGrid() {
     message: "",
     action: null,
   });
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
   const [deletingId, setDeletingId] = React.useState(null);
   const [menuState, setMenuState] = React.useState({
     anchorEl: null,
@@ -176,11 +249,62 @@ export default function MainGrid() {
       : ym;
   }, []);
 
+  const activePage = React.useMemo(() => {
+    if (hasActiveSearch && searchPage) {
+      return searchPage;
+    }
+    return presupuestosPage;
+  }, [hasActiveSearch, searchPage, presupuestosPage]);
+
+  const activeRows = React.useMemo(() => {
+    const rows = Array.isArray(activePage?.content) ? activePage.content : [];
+    return rows;
+  }, [activePage]);
+
+  const samplePresupuestos = React.useMemo(
+    () =>
+      activeRows.slice(0, 5).map((p) => ({
+        id: p?.id ?? null,
+        nombre: p?.nombre ?? null,
+        desde: p?.desde ?? null,
+        hasta: p?.hasta ?? null,
+        estado: p?.estado ?? p?.status ?? null,
+        eliminado: Boolean(p?.eliminado ?? p?.deleted),
+        moneda: p?.moneda ?? null,
+      })),
+    [activeRows]
+  );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuestos",
+      statusFilter,
+      pageIndex,
+      query,
+      filters,
+      currency,
+      totalPresupuestos: Number(activePage?.totalElements ?? 0),
+      totalPaginas: Number(activePage?.totalPages ?? 0),
+      muestra: samplePresupuestos,
+    }),
+    [
+      statusFilter,
+      pageIndex,
+      query,
+      filters,
+      currency,
+      activePage,
+      samplePresupuestos,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   const cargarRolUsuario = React.useCallback(() => {
-    const sub = sessionStorage.getItem('sub');
+    const sub = sessionStorage.getItem("sub");
     if (!sub) return;
     fetch(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
-      headers: { 'X-Usuario-Sub': sub },
+      headers: { "X-Usuario-Sub": sub },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -188,7 +312,7 @@ export default function MainGrid() {
           setUsuarioRol(data.rol);
         }
       })
-      .catch((err) => console.error('Error cargando rol de usuario:', err));
+      .catch((err) => console.error("Error cargando rol de usuario:", err));
   }, []);
   const mergeYearOptions = React.useCallback((items) => {
     if (!Array.isArray(items) || items.length === 0) {
@@ -232,25 +356,30 @@ export default function MainGrid() {
       size: Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : PAGE_SIZE,
     };
   }, []);
+  const applyCurrencyFilter = React.useCallback((pageData) => {
+    if (!pageData || !Array.isArray(pageData.content)) return pageData;
+    const filtered = pageData.content.filter((p) => matchesCurrencyFilter(p?.nombre, currency));
+    const totalElements = filtered.length;
+    const totalPages = pageData.size ? Math.ceil(totalElements / pageData.size) : 0;
+    return { ...pageData, content: filtered, totalElements, totalPages };
+  }, [currency]);
   const fetchPresupuestos = React.useCallback(
     async (statusValue, pageValue) => {
       setLoadingAll(true);
       try {
-        const trimmedQuery = query.trim();
-        const shouldExpand = trimmedQuery.length >= 2;
-        const effectivePage = shouldExpand ? 0 : Math.max(pageValue, 0);
-        const effectiveSize = shouldExpand ? 1000 : PAGE_SIZE;
+        const effectivePage = Math.max(pageValue, 0);
+        const effectiveSize = LARGE_PAGE_SIZE;
         const params = new URLSearchParams();
         params.set("status", statusValue);
         params.set("page", String(effectivePage));
         params.set("size", String(effectiveSize));
         params.set("sort", DEFAULT_SORT);
+        if (currency) params.set("moneda", currency);
         const res = await http.get(
           `${baseURL}/api/presupuestos?${params.toString()}`,
         );
-        const pageData = normalizePage(res.data);
+        const pageData = applyCurrencyFilter(normalizePage(res.data));
         if (
-          !shouldExpand &&
           pageValue > 0 &&
           pageData.totalPages > 0 &&
           pageValue >= pageData.totalPages
@@ -261,9 +390,6 @@ export default function MainGrid() {
         setPresupuestosPage(pageData);
         mergeYearOptions(pageData.content);
         setListError("");
-        if (shouldExpand && pageValue !== 0) {
-          setPageIndex(0);
-        }
       } catch (e) {
         console.error("Error cargando presupuestos desde el backend:", e);
         setPresupuestosPage(createEmptyPage());
@@ -274,7 +400,7 @@ export default function MainGrid() {
         setLoadingAll(false);
       }
     },
-    [baseURL, mergeYearOptions, normalizePage, query],
+    [baseURL, mergeYearOptions, normalizePage, currency, applyCurrencyFilter],
   );
   const fetchSearchPresupuestos = React.useCallback(
     async (searchParamsString, statusValue, pageValue) => {
@@ -283,12 +409,48 @@ export default function MainGrid() {
         const params = new URLSearchParams(searchParamsString || "");
         params.set("status", statusValue);
         params.set("page", String(Math.max(pageValue, 0)));
-        params.set("size", String(PAGE_SIZE));
+        params.set("size", String(LARGE_PAGE_SIZE));
         params.set("sort", DEFAULT_SORT);
+        if (currency) params.set("moneda", currency);
         const res = await http.get(
           `${baseURL}/api/presupuestos?${params.toString()}`,
         );
-        const pageData = normalizePage(res.data);
+        let data = res.data;
+
+        // Fallback: Filtrado local si el backend devuelve todo
+        // Verificamos si hay un filtro de "nombre" en los parametros
+        const nameFilter = params.get("nombre");
+        if (nameFilter && Array.isArray(data.content)) {
+          const lowerTerm = nameFilter.toLowerCase();
+          const filteredContent = data.content.filter((item) => {
+            const nombre = (item.nombre || "").toLowerCase();
+            const desde = (item.desde || "").toLowerCase();
+            const hasta = (item.hasta || "").toLowerCase();
+            const desdeMes = monthName(item.desde || "").toLowerCase();
+            const hastaMes = monthName(item.hasta || "").toLowerCase();
+            return (
+              nombre.includes(lowerTerm) ||
+              desde.includes(lowerTerm) ||
+              hasta.includes(lowerTerm) ||
+              desdeMes.includes(lowerTerm) ||
+              hastaMes.includes(lowerTerm)
+            );
+          });
+
+          // Recalculamos totales si filtramos localmente
+          // Nota: Esto es una aproximación, idealmente el backend debe filtrar.
+          // Pero si el backend ignora el filtro, corregimos aquí.
+          if (filteredContent.length !== data.content.length) {
+            data = {
+              ...data,
+              content: filteredContent,
+              totalElements: filteredContent.length,
+              totalPages: data.size > 0 ? Math.ceil(filteredContent.length / data.size) : 1
+            };
+          }
+        }
+
+        const pageData = applyCurrencyFilter(normalizePage(data));
         if (
           pageValue > 0 &&
           pageData.totalPages > 0 &&
@@ -310,12 +472,22 @@ export default function MainGrid() {
         setLoadingSearch(false);
       }
     },
-    [baseURL, mergeYearOptions, normalizePage],
+    [baseURL, mergeYearOptions, normalizePage, currency, applyCurrencyFilter],
   );
   React.useEffect(() => {
     fetchPresupuestos(statusFilter, pageIndex);
     cargarRolUsuario();
   }, [fetchPresupuestos, statusFilter, pageIndex, cargarRolUsuario]);
+  const handleCurrencyChange = (next) => {
+    if (!next) return;
+    setCurrency(next);
+    setPageIndex(0);
+    setHasActiveSearch(false);
+    setSearchPage(null);
+    setSearchPageIndex(0);
+    setSearchError("");
+    searchParamsRef.current = "";
+  };
   const handleStatusChange = (event, newValue) => {
     if (newValue === statusFilter) return;
     setStatusFilter(newValue);
@@ -472,27 +644,7 @@ export default function MainGrid() {
   const searchTotalPages = searchPage ? Number(searchPage.totalPages) || 0 : 0;
   const searchCurrentPage =
     searchTotalPages > 0 && searchPage ? searchPage.number + 1 : 1;
-  const visiblePresupuestos = React.useMemo(() => {
-    const term = query.trim().toLowerCase();
-    const data = Array.isArray(presupuestosPage.content)
-      ? presupuestosPage.content
-      : [];
-    if (!term) return data;
-    return data.filter((p) => {
-      const nombre = (p?.nombre || "").toLowerCase();
-      const desde = (p?.desde || "").toLowerCase();
-      const hasta = (p?.hasta || "").toLowerCase();
-      const desdeMes = monthName(p?.desde || "").toLowerCase();
-      const hastaMes = monthName(p?.hasta || "").toLowerCase();
-      return (
-        nombre.includes(term) ||
-        desde.includes(term) ||
-        hasta.includes(term) ||
-        desdeMes.includes(term) ||
-        hastaMes.includes(term)
-      );
-    });
-  }, [presupuestosPage.content, query, monthName]);
+  /* Memos eliminados: visiblePresupuestos y visibleSearchResults para evitar filtrado local */
   const handleFilterChange = (field) => (event) => {
     const value = event.target.value;
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -500,6 +652,15 @@ export default function MainGrid() {
   const handleSearch = () => {
     setSearchError("");
     const params = new URLSearchParams();
+
+    // Filtro por término de búsqueda (nombre)
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      params.set("nombre", trimmedQuery);
+    }
+
+
+
     const hasYear = Boolean(filters.year);
     const hasFrom = Boolean(filters.fromMonth);
     const hasTo = Boolean(filters.toMonth);
@@ -513,18 +674,11 @@ export default function MainGrid() {
         : new Date().getFullYear();
       const fromMonth = Number(filters.fromMonth);
       const toMonth = Number(filters.toMonth);
-      if (fromMonth > toMonth) {
-        setSearchError("El mes Desde no puede ser posterior al mes Hasta.");
-        return;
-      }
-      const fromDate = `${baseYear}-${pad2(fromMonth)}-01`;
-      const toDateValue = `${baseYear}-${pad2(toMonth)}-${pad2(lastDayOfMonth(baseYear, toMonth))}`;
-      params.set("from", fromDate);
-      params.set("to", toDateValue);
+      params.set("desde", `${baseYear}-${pad2(fromMonth)}-01`);
+      params.set("hasta", `${baseYear}-${pad2(toMonth)}-${pad2(lastDayOfMonth(baseYear, toMonth))}`);
     } else if (hasYear) {
-      const fromDate = `${filters.year}-01-01`;
-      const toDateValue = `${filters.year}-12-31`;
-      params.set("year", filters.year);
+      params.set("desde", `${filters.year}-01-01`);
+      params.set("hasta", `${filters.year}-12-31`);
     }
     const queryString = params.toString();
     if (!queryString) {
@@ -578,25 +732,48 @@ export default function MainGrid() {
         menuState.presupuesto.id === p.id;
       const menuId = isMenuOpenForRow ? "presupuesto-actions-menu" : undefined;
       const buttonId = `acciones-presupuesto-${p.id}`;
-      const esAdmin = (usuarioRol || '').toUpperCase().includes('ADMIN');
+      const esAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
       return (
         <TableRow key={p.id} sx={tableRowStyle}>
-          <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).nombre })}>
+          <TableCell
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).nombre,
+            })}
+          >
             {p.nombre}
           </TableCell>
-          <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).desde })}>
+          <TableCell
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).desde,
+            })}
+          >
             {monthName(p.desde)}
           </TableCell>
-          <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).hasta })}>
+          <TableCell
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).hasta,
+            })}
+          >
             {monthName(p.hasta)}
           </TableCell>
           {isDeleted && (
-            <TableCell sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).eliminado })}>
+            <TableCell
+              sx={(theme) => ({
+                ...tableCellStyle(theme),
+                ...getColumnWidth(statusFilter).eliminado,
+              })}
+            >
               {formatDeletedAt(p.deletedAt)}
             </TableCell>
           )}
           <TableCell
-            sx={(theme) => ({ ...tableCellStyle(theme), ...getColumnWidth(statusFilter).acciones })}
+            sx={(theme) => ({
+              ...tableCellStyle(theme),
+              ...getColumnWidth(statusFilter).acciones,
+            })}
             align="right"
           >
             {isDeleted ? (
@@ -641,31 +818,152 @@ export default function MainGrid() {
     });
 
   const firstMain = React.useMemo(
-    () => (Array.isArray(presupuestosPage?.content) && presupuestosPage.content.length ? presupuestosPage.content[0] : null),
-    [presupuestosPage?.content]
+    () =>
+      Array.isArray(presupuestosPage?.content) &&
+        presupuestosPage.content.length
+        ? presupuestosPage.content[0]
+        : null,
+    [presupuestosPage?.content],
   );
 
   const firstSearchRow = React.useMemo(
-    () => (searchPage && Array.isArray(searchPage.content) && searchPage.content.length ? searchPage.content[0] : null),
-    [searchPage]
+    () =>
+      searchPage &&
+        Array.isArray(searchPage.content) &&
+        searchPage.content.length
+        ? searchPage.content[0]
+        : null,
+    [searchPage],
   );
 
   const headerGhostMain = {
-    nombre: firstMain?.nombre || 'Nombre de ejemplo',
-    desde: monthName(firstMain?.desde || '2025-01'),
-    hasta: monthName(firstMain?.hasta || '2025-12'),
-    eliminado: formatDeletedAt(firstMain?.deletedAt || '2025-10-14T20:21:43Z'),
+    nombre: firstMain?.nombre || "Nombre de ejemplo",
+    desde: monthName(firstMain?.desde || "2025-01"),
+    hasta: monthName(firstMain?.hasta || "2025-12"),
+    eliminado: formatDeletedAt(firstMain?.deletedAt || "2025-10-14T20:21:43Z"),
   };
 
   const headerGhostSearch = {
-    nombre: firstSearchRow?.nombre || 'Nombre de ejemplo',
-    desde: monthName(firstSearchRow?.desde || '2025-01'),
-    hasta: monthName(firstSearchRow?.hasta || '2025-12'),
-    eliminado: formatDeletedAt(firstSearchRow?.deletedAt || '2025-10-14T20:21:43Z'),
+    nombre: firstSearchRow?.nombre || "Nombre de ejemplo",
+    desde: monthName(firstSearchRow?.desde || "2025-01"),
+    hasta: monthName(firstSearchRow?.hasta || "2025-12"),
+    eliminado: formatDeletedAt(
+      firstSearchRow?.deletedAt || "2025-10-14T20:21:43Z",
+    ),
   };
+
+
+
+  const columns = React.useMemo(() => {
+    const cols = [
+      {
+        field: 'nombre',
+        headerName: 'Nombre',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        renderCell: (params) => (
+          <Typography
+            variant="body2"
+            sx={{
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              lineHeight: 1.2,
+              py: 1
+            }}
+          >
+            {params.value}
+          </Typography>
+        )
+      },
+      {
+        field: 'desde',
+        headerName: 'Desde',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        valueFormatter: (value) => monthName(value)
+      },
+      {
+        field: 'hasta',
+        headerName: 'Hasta',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        valueFormatter: (value) => monthName(value)
+      }
+    ];
+
+    if (statusFilter === 'deleted') {
+      cols.push({
+        field: 'deletedAt',
+        headerName: 'Eliminados',
+        flex: 1,
+        align: 'center',
+        headerAlign: 'center',
+        valueFormatter: (value) => formatDeletedAt(value)
+      });
+    }
+
+    cols.push({
+      field: 'acciones',
+      headerName: 'Acciones',
+      flex: 1,
+      align: 'center',
+      headerAlign: 'center',
+      sortable: false,
+      renderCell: (params) => {
+        const p = params.row;
+        const isDeleted = statusFilter === "deleted";
+        const slug = encodeURIComponent(
+          (p.nombre || "").trim().toLowerCase().replace(/\s+/g, "-"),
+        );
+        const esAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
+
+        if (isDeleted) {
+          return (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RestoreFromTrashIcon />}
+              onClick={() => handleRestore(p)}
+            >
+              Restaurar
+            </Button>
+          );
+        }
+
+        return (
+          <Box sx={{ display: "flex", justifyContent: "center", gap: 1, width: '100%' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => navigate(`/presupuestos/${slug}`)}
+              sx={isLightMode ? { lineHeight: 1.2 } : { color: "#42897f", lineHeight: 1.2 }}
+            >
+              Ver detalle
+            </Button>
+            {esAdmin && (
+              <Tooltip title="Más acciones">
+                <IconButton
+                  size="small"
+                  onClick={(event) => openActionsMenu(event, p)}
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        );
+      }
+    });
+
+    return cols;
+  }, [statusFilter, usuarioRol, monthName, handleRestore, navigate, isLightMode, openActionsMenu]);
 
   return (
     <Box sx={{ width: "100%", p: 3 }}>
+      <CurrencyTabs value={currency} onChange={handleCurrencyChange} sx={{ justifyContent: 'center', mb: 1.5 }} />
       <Typography variant="h4" gutterBottom>
         Presupuestos
       </Typography>
@@ -694,7 +992,7 @@ export default function MainGrid() {
       </Tabs>
       <Typography
         variant="caption"
-        sx={{ display: "block", mb: 2, color: 'text.primary' }}
+        sx={{ display: "block", mb: 2, color: "text.primary" }}
       >
         {`Los presupuestos se purgan de forma definitiva a los ${retentionDays} días.`}
       </Typography>
@@ -774,15 +1072,38 @@ export default function MainGrid() {
         </Button>
       </Box>
       <TextField
-        label="Buscar por nombre, mes o año"
+        label="Buscar"
         variant="outlined"
         size="small"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          const newVal = e.target.value;
+          setQuery(newVal);
+          // Si el usuario borra todo el texto, limpiamos la búsqueda activa
+          if (newVal.trim() === "") {
+            setHasActiveSearch(false);
+            setSearchPage(null);
+            setSearchPageIndex(0);
+            setSearchError("");
+            searchParamsRef.current = "";
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSearch();
+        }}
+        InputProps={{
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton onClick={handleSearch} size="small" edge="end">
+                <SearchRoundedIcon />
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}
         sx={{
           mt: 1,
           mb: 2,
-          width: { xs: '100%', sm: 250 },
+          width: { xs: "100%", sm: 350 },
         }}
       />
       {searchError && (
@@ -790,6 +1111,8 @@ export default function MainGrid() {
           {searchError}
         </Alert>
       )}
+
+      {/* --- Search Results Table --- */}
       {hasActiveSearch && (
         <>
           <Box sx={{ mt: 4, mb: 2 }}>
@@ -798,101 +1121,31 @@ export default function MainGrid() {
             </Typography>
             <Divider />
           </Box>
-          <Paper
-            sx={(theme) => ({
-              width: "100%",
-              mb: 3,
-              overflowX: "auto",
-              p: 0,
-              bgcolor: alpha(
-                theme.palette.primary.main,
-                theme.palette.mode === "dark" ? 0.12 : 0.06,
-              ),
-              border: `1px solid ${(theme.vars || theme).palette.divider}`,
-            })}
-          >
+          <Paper sx={{ width: "100%", mb: 3 }}>
             {loadingSearch ? (
               <LoadingSpinner message="Cargando presupuestos..." />
-            ) : searchPage &&
-              Array.isArray(searchPage.content) &&
-              searchPage.content.length > 0 ? (
+            ) : searchPage ? (
               <>
-                <Table>
-                  <TableHead>
-                    <TableRow sx={tableRowStyle}>
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).nombre,
-                        })}
-                        align="left"
-                      >
-                        <HeaderLabelAligned label="Nombre" ghost={headerGhostSearch.nombre} />
-                      </TableCell>
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).desde,
-                        })}
-                        align="left"
-                      >
-                        <HeaderLabelAligned label="Desde" ghost={headerGhostSearch.desde} />
-                      </TableCell>
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).hasta,
-                        })}
-                        align="left"
-                      >
-                        <HeaderLabelAligned label="Hasta" ghost={headerGhostSearch.hasta} />
-                      </TableCell>
-                      {statusFilter === "deleted" && (
-                        <TableCell
-                          sx={(theme) => ({
-                            ...headerCellStyle(theme),
-                            ...getColumnWidth(statusFilter).eliminado,
-                          })}
-                          align="left"
-                        >
-                          <HeaderLabelAligned label="Eliminados" ghost={headerGhostSearch.eliminado} />
-                        </TableCell>
-                      )}
-                      <TableCell
-                        sx={(theme) => ({
-                          ...headerCellStyle(theme),
-                          ...getColumnWidth(statusFilter).acciones,
-                        })}
-                        align="right"
-                      >
-                        {/* Wrapper que replica el ancho del bloque de acciones */}
-                        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                          {/* Contenido “fantasma” para medir ancho del bloque real */}
-                          <Box
-                            aria-hidden
-                            sx={{
-                              visibility: 'hidden',
-                              pointerEvents: 'none',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 1,
-                            }}
-                          >
-                            <Button variant="outlined" size="small" sx={darkActionButtonSx}>Ver detalle</Button>
-                            <IconButton size="small"><MoreVertIcon fontSize="small" /></IconButton>
-                          </Box>
-                          {/* Texto centrado exactamente sobre ese ancho */}
-                          <Box sx={{ position:'absolute', inset:0, display:'grid', placeItems:'center', whiteSpace:'nowrap', fontWeight: 600 }}>
-                            Acciones
-                          </Box>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>{renderRows(searchPage.content)}</TableBody>
-                </Table>
+                <DataGrid
+                  rows={searchPage.content || []}
+                  columns={columns}
+                  getRowHeight={() => 'auto'}
+                  autoHeight
+                  density="standard"
+                  hideFooter
+                  disableColumnMenu
+                  disableRowSelectionOnClick
+                  columnVisibilityModel={{
+                    desde: !isMobile,
+                    hasta: !isMobile,
+                  }}
+                  sx={dataGridStyles}
+                  slots={{
+                    noRowsOverlay: CustomNoSearchResults,
+                  }}
+                />
                 {searchTotalPages > 1 && (
-                  <Box mt={2} display="flex" justifyContent="center">
+                  <Box mt={2} mb={2} display="flex" justifyContent="center">
                     <Pagination
                       color="primary"
                       size="small"
@@ -901,33 +1154,16 @@ export default function MainGrid() {
                       onChange={handleSearchPageChange}
                       siblingCount={0}
                       boundaryCount={1}
-                      aria-label="Paginacion de resultados de presupuestos"
-                      getItemAriaLabel={(type, page) => {
-                        switch (type) {
-                          case "page":
-                            return `Ir a la pagina ${page} de resultados`;
-                          case "previous":
-                            return "Pagina anterior de resultados";
-                          case "next":
-                            return "Pagina siguiente de resultados";
-                          default:
-                            return `Ir a la pagina ${page} de resultados`;
-                        }
-                      }}
                     />
                   </Box>
                 )}
               </>
-            ) : (
-              !searchError && (
-                <Alert severity="info">
-                  No encontramos presupuestos para el rango seleccionado.
-                </Alert>
-              )
-            )}
+            ) : null}
           </Paper>
         </>
       )}
+
+      {/* --- Main List Table --- */}
       <Box sx={{ mt: 4, mb: 2 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
           Listado completo
@@ -939,116 +1175,34 @@ export default function MainGrid() {
           {listError}
         </Alert>
       )}
-      <Paper sx={{ width: "100%", overflowX: "auto" }}>
+      <Paper sx={{ width: "100%" }}>
         {loadingAll ? (
           <LoadingSpinner message="Cargando presupuestos..." />
         ) : (
-          <Table>
-            <TableHead>
-              <TableRow sx={tableRowStyle}>
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).nombre,
-                  })}
-                  align="left"
-                >
-                  <HeaderLabelAligned label="Nombre" ghost={headerGhostMain.nombre} />
-                </TableCell>
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).desde,
-                  })}
-                  align="left"
-                >
-                  <HeaderLabelAligned label="Desde" ghost={headerGhostMain.desde} />
-                </TableCell>
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).hasta,
-                  })}
-                  align="left"
-                >
-                  <HeaderLabelAligned label="Hasta" ghost={headerGhostMain.hasta} />
-                </TableCell>
-                {statusFilter === "deleted" && (
-                  <TableCell
-                    sx={(theme) => ({
-                      ...headerCellStyle(theme),
-                      ...getColumnWidth(statusFilter).eliminado,
-                    })}
-                    align="left"
-                  >
-                    <HeaderLabelAligned label="Eliminados" ghost={headerGhostMain.eliminado} />
-                  </TableCell>
-                )}
-                <TableCell
-                  sx={(theme) => ({
-                    ...headerCellStyle(theme),
-                    ...getColumnWidth(statusFilter).acciones,
-                  })}
-                  align="right"
-                >
-                  {/* Wrapper que replica el ancho del bloque de acciones */}
-                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                    {/* Contenido “fantasma” para medir ancho del bloque real */}
-                    <Box
-                      aria-hidden
-                      sx={{
-                        visibility: 'hidden',
-                        pointerEvents: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 1,
-                      }}
-                    >
-                      <Button variant="outlined" size="small" sx={darkActionButtonSx}>Ver detalle</Button>
-                      <IconButton size="small"><MoreVertIcon fontSize="small" /></IconButton>
-                    </Box>
-                    {/* Texto centrado exactamente sobre ese ancho */}
-                    <Box sx={{ position:'absolute', inset:0, display:'grid', placeItems:'center', whiteSpace:'nowrap', fontWeight: 600 }}>
-                      Acciones
-                    </Box>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {visiblePresupuestos.length > 0 && renderRows(visiblePresupuestos)}
-              {visiblePresupuestos.length === 0 && !listError && (
-                <TableRow>
-                  <TableCell
-                    colSpan={columnsCount}
-                    sx={(theme) => ({
-                      ...tableCellStyle(theme),
-                      textAlign: "center",
-                      py: 3,
-                    })}
-                  >
-                    No hay presupuestos para mostrar.
-                  </TableCell>
-                </TableRow>
-              )}
-              {listError && (
-                <TableRow>
-                  <TableCell
-                    colSpan={columnsCount}
-                    sx={(theme) => ({
-                      ...tableCellStyle(theme),
-                      textAlign: "center",
-                      py: 3,
-                    })}
-                  >
-                    <Alert severity="error">{listError}</Alert>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <>
+            <DataGrid
+              rows={presupuestosPage.content || []}
+              columns={columns}
+              getRowHeight={() => 'auto'}
+              autoHeight
+              density="standard"
+              hideFooter
+              disableColumnMenu
+              disableRowSelectionOnClick
+              columnVisibilityModel={{
+                desde: !isMobile,
+                hasta: !isMobile,
+              }}
+              sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: CustomNoRowsPresupuestos,
+              }}
+            />
+          </>
         )}
       </Paper>
+
+      {/* --- Pagination --- */}
       {mainTotalPages > 1 && (
         <Box mt={2} display="flex" justifyContent="center">
           <Pagination
@@ -1060,21 +1214,10 @@ export default function MainGrid() {
             siblingCount={0}
             boundaryCount={1}
             aria-label="Paginacion de presupuestos"
-            getItemAriaLabel={(type, page) => {
-              switch (type) {
-                case "page":
-                  return `Ir a la pagina ${page} de presupuestos`;
-                case "previous":
-                  return "Pagina anterior de presupuestos";
-                case "next":
-                  return "Pagina siguiente de presupuestos";
-                default:
-                  return `Ir a la pagina ${page} de presupuestos`;
-              }
-            }}
           />
         </Box>
       )}
+
       <Box mt={3}>
         <Button
           variant="contained"
@@ -1083,6 +1226,8 @@ export default function MainGrid() {
           Crear nuevo presupuesto
         </Button>
       </Box>
+
+      {/* --- Dialogs & Menus (Same as before) --- */}
       <Menu
         id="presupuesto-actions-menu"
         anchorEl={menuState.anchorEl}
@@ -1091,11 +1236,6 @@ export default function MainGrid() {
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         keepMounted
-        MenuListProps={{
-          "aria-labelledby": menuState.presupuesto
-            ? `acciones-presupuesto-${menuState.presupuesto.id}`
-            : undefined,
-        }}
       >
         <MenuItem
           onClick={handleSelectDelete}

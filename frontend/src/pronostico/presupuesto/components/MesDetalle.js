@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useParams, useNavigate } from 'react-router-dom';
-import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { buildTipoSelectSx } from '../../../shared-components/tipoSelectStyles';
 import http from '../../../api/http';
 import { formatCurrency, formatCurrencyInput, parseCurrency } from '../../../utils/currency';
@@ -14,9 +13,12 @@ import { fetchCategorias } from '../../../shared-services/categoriasService';
 import dayjs from 'dayjs';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { getMovimientosPorRango } from '../../../reportes/reportes.service';
+import { detectCurrencyFromName } from '../utils/currencyTag';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, Legend
 } from 'recharts';
+import { exportToExcel } from '../../../utils/exportExcelUtils';
+import { exportPdfReport } from '../../../utils/exportPdfUtils';
 import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -33,6 +35,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { TODAS_LAS_CATEGORIAS } from '../../../shared-components/categorias';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 // ===== Helpers =====
 const safeNumber = (v) =>
@@ -43,18 +46,18 @@ const baseURL = API_CONFIG.PRONOSTICO;
 const GUARD_MESSAGES = {
   categoria: {
     title: 'Habilitar edicion manual',
-    body: 'La categoria, tipo y monto estimado ayudan a ordenar tus analisis. Cambiarlos manualmente puede afectar reportes y automatizaciones. Queres habilitar la edicion manual?',
-    confirmLabel: 'Habilitar edicion'
+    body: 'La categoría, tipo y monto estimado ayudan a ordenar tus análisis. Cambiarlos manualmente puede afectar reportes y automatizaciones. ¿Querés habilitar la edición manual?',
+    confirmLabel: 'Habilitar edición'
   },
   real: {
     title: 'Editar monto real',
     body: 'El monto real refleja los registros consolidados. Para ajustarlo, edita los movimientos registrados del periodo. Te llevamos a Ver movimientos.',
-    confirmLabel: 'Habilitar edicion en movimientos'
+    confirmLabel: 'Habilitar edición en movimientos'
   }
 };
 
 const GUARD_FIELD_LABELS = {
-  categoria: 'la categoria, tipo y estimado',
+  categoria: 'la categoría, tipo y estimado',
   tipo: 'el tipo',
   montoEstimado: 'el estimado',
   real: 'el monto real'
@@ -91,12 +94,12 @@ const mesANumero = {
 const formatearMes = (ym) => {
   if (!ym) return 'Mes desconocido';
   const [anio, mes] = ym.split('-');
-  const nombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const nombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const i = parseInt(mes, 10);
-  return isNaN(i) ? ym : `${nombres[i-1]} ${anio}`;
+  return isNaN(i) ? ym : `${nombres[i - 1]} ${anio}`;
 };
 
-// YYYY-MM → YYYY-MM-01
+// YYYY-MM ? YYYY-MM-01
 const ymToYmd = (ym) => `${ym}-01`;
 
 // Devuelve array de YYYY-MM entre from y to (inclusive)
@@ -180,11 +183,13 @@ export default function MesDetalle() {
   const [guardPrompt, setGuardPrompt] = React.useState({ open: false, id: null, field: null, title: '', message: '', confirmLabel: '', movementIds: [] });
   const [nombreMes, setNombreMes] = React.useState('Mes desconocido');
   const [presupuestoNombre, setPresupuestoNombre] = React.useState('');
+  const [presupuestoCurrency, setPresupuestoCurrency] = React.useState('ARS');
   const [presupuestoId, setPresupuestoId] = React.useState(null);
   const [ym, setYm] = React.useState(null); // YYYY-MM
   const [mesesDisponibles, setMesesDisponibles] = React.useState([]);
   const [tab, setTab] = React.useState(0);
   const [totalRealMes, setTotalRealMes] = React.useState(0);
+  const [logoDataUrl, setLogoDataUrl] = React.useState(null);
   const goToDatosBrutos = React.useCallback(() => setTab(1), [setTab]);
 
   // UI
@@ -290,6 +295,21 @@ export default function MesDetalle() {
     cargarRolUsuario();
   }, []);
 
+  React.useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch('/logo512.png');
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
+
   const esAdmin = React.useMemo(
     () => (usuarioRol || '').toUpperCase().includes('ADMIN'),
     [usuarioRol]
@@ -310,8 +330,8 @@ export default function MesDetalle() {
         const d = res?.data;
         let arr =
           Array.isArray(d) ? d :
-          Array.isArray(d?.lineas) ? d.lineas :
-          Array.isArray(d?.categorias) ? d.categorias : [];
+            Array.isArray(d?.lineas) ? d.lineas :
+              Array.isArray(d?.categorias) ? d.categorias : [];
         const norm = arr.map(normalizeLine);
         return norm;
       } catch {
@@ -326,9 +346,10 @@ export default function MesDetalle() {
     return finalLineas;
   }, []);
 
-  const cargarLineasConReales = React.useCallback(async (pid, ymStr) => {
+  const cargarLineasConReales = React.useCallback(async (pid, ymStr, currencyHint) => {
     const lineasBase = (await fetchMes(pid, ymStr, { skipStateUpdate: true })) || [];
     const ymKey = typeof ymStr === 'string' ? ymStr.slice(0, 7) : '';
+    const presupuestoCurrency = currencyHint || detectCurrencyFromName(presupuestoNombre);
     const referencia = dayjs(`${ymKey}-01`);
     if (!referencia.isValid()) {
       const sinReales = lineasBase.map((linea) => ({ ...linea, real: 0 }));
@@ -348,11 +369,13 @@ export default function MesDetalle() {
           fechaDesde,
           fechaHasta,
           tipos: 'Egreso',
+          moneda: presupuestoCurrency,
         }),
         getMovimientosPorRango({
           fechaDesde,
           fechaHasta,
           tipos: 'Ingreso',
+          moneda: presupuestoCurrency,
         }),
       ]);
       const movimientosEgreso = Array.isArray(respEgreso?.content) ? respEgreso.content : (Array.isArray(respEgreso) ? respEgreso : []);
@@ -360,7 +383,7 @@ export default function MesDetalle() {
 
       const agruparPorCategoria = (lista) => lista.reduce((acc, movimiento) => {
         const nombreOriginal =
-          movimiento?.categoriaNombre || movimiento?.categoria || movimiento?.categoria_id_nombre || 'Sin categoría';
+          movimiento?.categoriaNombre || movimiento?.categoria || movimiento?.categoria_id_nombre || 'Sin Categoría';
         const key = normCat(nombreOriginal);
         if (!key) return acc;
         const monto = Math.abs(
@@ -368,7 +391,7 @@ export default function MesDetalle() {
         ) || 0;
         if (!Number.isFinite(monto)) return acc;
         if (!acc[key]) {
-          acc[key] = { total: 0, label: nombreOriginal || 'Sin categoría', movementIds: [] };
+          acc[key] = { total: 0, label: nombreOriginal || 'Sin Categoría', movementIds: [] };
         }
         acc[key].total += monto;
         const rawMovimientoId =
@@ -430,7 +453,7 @@ export default function MesDetalle() {
           if (!set.has(key)) {
             adicionales.push({
               id: `real-only-${tipoKey}-${key}`,
-              categoria: data.label || 'Sin categoría',
+              categoria: data.label || 'Sin Categoría',
               tipo: normalizeTipo(tipoKey),
               montoEstimado: 0,
               real: data.total,
@@ -460,7 +483,7 @@ export default function MesDetalle() {
       setSnack({ open: true, message: 'No se pudieron cargar los datos reales del mes.', severity: 'error' });
       return fallback;
     }
-  }, [fetchMes, setSnack]);
+  }, [fetchMes, presupuestoNombre, setSnack]);
 
   React.useEffect(() => {
     const cargar = async () => {
@@ -481,31 +504,33 @@ export default function MesDetalle() {
         if (!p?.id) throw new Error('Presupuesto no encontrado');
 
         setPresupuestoNombre(p.nombre);
+        const currency = detectCurrencyFromName(p.nombre);
+        setPresupuestoCurrency(currency);
         setPresupuestoId(p.id);
 
-      // 2) resolver YYYY-MM desde mesNombreUrl usando /totales
-      const mesNumStr = mesANumero[(mesNombreUrl || '').toLowerCase().trim()];
-      if (!mesNumStr) throw new Error('Mes no válido');
+        // 2) resolver YYYY-MM desde mesNombreUrl usando /totales
+        const mesNumStr = mesANumero[(mesNombreUrl || '').toLowerCase().trim()];
+        if (!mesNumStr) throw new Error('Mes no válido');
 
-      const resTot = await http.get(`${baseURL}/api/presupuestos/${p.id}/totales`);
-      const totales = Array.isArray(resTot.data) ? resTot.data : [];
-      const mesesLista = Array.from(
-        new Set(
-          totales
-            .map((t) => (t?.mes ? String(t.mes) : ''))
-            .filter(Boolean)
-        )
-      ).sort((a, b) => a.localeCompare(b));
-      setMesesDisponibles(mesesLista);
-      const item = totales.find(t => String(t?.mes || '').endsWith(`-${mesNumStr}`));
-      if (!item?.mes) throw new Error('Mes no encontrado en totales');
+        const resTot = await http.get(`${baseURL}/api/presupuestos/${p.id}/totales`);
+        const totales = Array.isArray(resTot.data) ? resTot.data : [];
+        const mesesLista = Array.from(
+          new Set(
+            totales
+              .map((t) => (t?.mes ? String(t.mes) : ''))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        setMesesDisponibles(mesesLista);
+        const item = totales.find(t => String(t?.mes || '').endsWith(`-${mesNumStr}`));
+        if (!item?.mes) throw new Error('Mes no encontrado en totales');
 
-      setYm(item.mes);
-      setNombreMes(formatearMes(item.mes));
+        setYm(item.mes);
+        setNombreMes(formatearMes(item.mes));
 
-      // 3) cargar lineas reales
-      await cargarLineasConReales(p.id, item.mes);
-  
+        // 3) cargar lineas reales
+        await cargarLineasConReales(p.id, item.mes, currency);
+
       } catch (err) {
         console.error(err);
         setLineas([]);
@@ -525,7 +550,7 @@ export default function MesDetalle() {
     if (!targetYm || !presupuestoId) return;
     try {
       setLoading(true);
-      await cargarLineasConReales(presupuestoId, targetYm);
+      await cargarLineasConReales(presupuestoId, targetYm, presupuestoCurrency);
       setYm(targetYm);
       setNombreMes(formatearMes(targetYm));
     } catch (err) {
@@ -534,7 +559,7 @@ export default function MesDetalle() {
     } finally {
       setLoading(false);
     }
-  }, [presupuestoId, cargarLineasConReales, setSnack]);
+  }, [presupuestoId, presupuestoCurrency, cargarLineasConReales, setSnack]);
 
   // Sincronizo `edits` cuando cambian las lineas
   const lineasCompleto = React.useMemo(
@@ -724,6 +749,42 @@ export default function MesDetalle() {
     (c) => safeNumber(c.montoEstimado) !== 0 && safeNumber(c.real) === 0
   ).length;
 
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuesto-mes-detalle",
+      presupuesto: {
+        id: presupuestoId,
+        nombre: presupuestoNombre,
+        moneda: presupuestoCurrency,
+      },
+      mes: ym,
+      resumen: {
+        totalIngresos,
+        totalEgresos,
+        resultado,
+        estimadoTotal,
+        cumplimiento,
+        vencidosEstimados,
+      },
+      lineas: lineasCompleto.slice(0, 20),
+    }),
+    [
+      presupuestoId,
+      presupuestoNombre,
+      presupuestoCurrency,
+      ym,
+      totalIngresos,
+      totalEgresos,
+      resultado,
+      estimadoTotal,
+      cumplimiento,
+      vencidosEstimados,
+      lineasCompleto,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   const pieDataIngresos = ingresos.map((i) => ({ name: i.categoria, value: safeNumber(i.real) }));
   const barDataIngresos = ingresos.map((i) => ({
     name: i.categoria,
@@ -737,43 +798,106 @@ export default function MesDetalle() {
     real: safeNumber(e.real),
   }));
 
+  const ingresosPieRef = React.useRef(null);
+  const ingresosBarsRef = React.useRef(null);
+  const egresosPieRef = React.useRef(null);
+  const egresosBarsRef = React.useRef(null);
+
   // ===== Export =====
   const handleExportExcel = () => {
-    const data = [
-      ['Categoría', 'Tipo', 'Monto Estimado', 'Monto Registrado', 'Desvío'],
-      ...lineasCompleto.map((item) => [
-        item.categoria,
-        item.tipo,
-        safeNumber(item.montoEstimado),
-        safeNumber(item.real),
-        (item.tipo === 'Egreso'
-            ? safeNumber(item.montoEstimado) - safeNumber(item.real)
-            : safeNumber(item.real) - safeNumber(item.montoEstimado)),
-      ]),
+    const excelData = [
+      ["Categoria", "Tipo", "Monto Estimado", "Monto Registrado", "Desvío"],
+      ...lineasCompleto.map((item) => {
+        const estimado = Number(item.montoEstimado) || 0;
+        const real = Number(item.real) || 0;
+        const desvio = item.tipo === "Egreso" ? estimado - real : real - estimado;
+        return [item.categoria, item.tipo, estimado, real, desvio];
+      }),
+      ["", "", "", "", ""],
+      ["Resultado", "", "", "", resultado],
+      ["Cumplimiento", "", "", "", `${(cumplimiento * 100).toFixed(0)}%`],
     ];
-    data.push(['', '', '', '', '']);
-    data.push(['Resultado:', '', '', '', resultado]);
 
-    import('xlsx').then(({ utils, writeFile }) => {
-      const ws = utils.aoa_to_sheet(data, { cellStyles: true });
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, 'Detalle Mes');
-      writeFile(wb, `Mes_${nombreMes}_${Date.now()}.xlsx`, { cellStyles: true });
-    });
+    const colsConfig = [
+      { wch: 28 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+    ];
+    const mergesConfig = [];
+    const currencyColumns = ["C", "D", "E"];
+
+    exportToExcel(
+      excelData,
+      `Mes_${nombreMes}_${presupuestoNombre || ''}`,
+      "Detalle Mes",
+      colsConfig,
+      mergesConfig,
+      currencyColumns,
+      {
+        headerRows: [0],
+        totalRows: [excelData.length - 2],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      }
+    );
   };
 
-  const handleExportPdf = () => {
-    import('html2pdf.js').then((html2pdf) => {
-      const element = document.getElementById('mes-detalle-content');
-      const opt = {
-        margin: 1,
-        filename: `Mes_${nombreMes}_${Date.now()}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-      };
-      html2pdf.default().from(element).set(opt).save();
-    });
+  const handleExportPdf = async () => {
+    try {
+      const tableHead = [["Categoría", "Tipo", "Estimado", "Real", "Desvío"]];
+      const tableBody = lineasCompleto.map((item) => {
+        const estimado = Number(item.montoEstimado) || 0;
+        const real = Number(item.real) || 0;
+        const desvio = item.tipo === "Egreso" ? estimado - real : real - estimado;
+        return [
+          item.categoria,
+          item.tipo,
+          formatCurrency(estimado),
+          formatCurrency(real),
+          formatCurrency(desvio),
+        ];
+      });
+      tableBody.append(["", "", "", "", ""]);
+      tableBody.append(["Resultado", "", "", "", formatCurrency(resultado)]);
+
+      const charts = [];
+      if (pieDataIngresos.length && ingresosPieRef.current) charts.push({ element: ingresosPieRef.current });
+      if (barDataIngresos.length && ingresosBarsRef.current) charts.push({ element: ingresosBarsRef.current });
+      if (pieDataEgresos.length && egresosPieRef.current) charts.push({ element: egresosPieRef.current });
+      if (barDataEgresos.length && egresosBarsRef.current) charts.push({ element: egresosBarsRef.current });
+
+      await exportPdfReport({
+        title: `Detalle de ${nombreMes}`,
+        subtitle: presupuestoNombre,
+        charts,
+        table: { head: tableHead, body: tableBody },
+        fileName: `Mes_${nombreMes}_${presupuestoNombre || ''}`,
+        footerOnFirstPage: false,
+        cover: {
+          show: true,
+          subtitle: nombreMes,
+          logo: logoDataUrl,
+          meta: [
+            { label: "Presupuesto", value: presupuestoNombre || '-' },
+            { label: "Generado", value: new Date().toLocaleDateString('es-AR') },
+          ],
+          kpis: [
+            { label: "Ingresos", value: formatCurrency(totalIngresos) },
+            { label: "Egresos", value: formatCurrency(totalEgresos) },
+            { label: "Resultado", value: formatCurrency(resultado) },
+          ],
+          summary: [
+            `Cumplimiento: ${(cumplimiento * 100).toFixed(0)}%`,
+            `Estimados sin registrar: ${vencidosEstimados}`,
+          ],
+        },
+      });
+    } catch (e) {
+      console.error('Error al exportar PDF de mes:', e);
+      alert('No se pudo generar el PDF. Intente nuevamente.');
+    }
   };
 
   // ===== CRUD =====
@@ -801,7 +925,7 @@ export default function MesDetalle() {
       if (!esAdmin) {
         setSnack({
           open: true,
-          message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
+          message: 'No tienes permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
           severity: 'warning',
         });
         return;
@@ -1115,9 +1239,6 @@ export default function MesDetalle() {
               sx={vencidosEstimados === 0 ? undefined : SIN_PRONOSTICO_CHIP_SX}
             />
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
-          </Stack>
         </Stack>
       </Paper>
 
@@ -1146,7 +1267,7 @@ export default function MesDetalle() {
       {tab === 0 && (
         <>
           <Grid container spacing={3} mb={2}>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.ingresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'success.main', mx: 'auto', mb: 1 }}>+</Avatar>
                 <Typography variant="h6">Ingresos</Typography>
@@ -1157,7 +1278,7 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.egresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'error.main', mx: 'auto', mb: 1 }}>-</Avatar>
                 <Typography variant="h6">Egresos</Typography>
@@ -1168,10 +1289,10 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: resultado >= 0 ? kpiColors.resultadoPos : kpiColors.resultadoNeg, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: resultado >= 0 ? 'info.main' : 'warning.main', mx: 'auto', mb: 1 }}>
-                  {resultado >= 0 ? '✓' : '⚠'}
+                  {resultado >= 0 ? '?' : '?'}
                 </Avatar>
                 <Typography variant="h6">Resultado</Typography>
                 <Typography variant="h4" fontWeight="bold">{formatCurrency(resultado)}</Typography>
@@ -1182,14 +1303,14 @@ export default function MesDetalle() {
             </Grid>
           </Grid>
 
-          {/* GrÃ¡ficos */}
+          {/* Gráficos */}
           {pieDataIngresos.length > 0 ? (
-            <Paper sx={{ p: 3, mb: 2 }}>
+            <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
               <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
                 <PieChart>
                   <Pie data={pieDataIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                     {pieDataIngresos.map((_, i) => <Cell key={`ing-${i}`} fill={INGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
                   </Pie>
                   <RTooltip formatter={(value) => formatCurrency(value)} />
@@ -1204,7 +1325,7 @@ export default function MesDetalle() {
           )}
 
           {barDataIngresos.length > 0 && (
-            <Paper sx={{ p: 3, mb: 2 }}>
+            <Paper sx={{ p: 3, mb: 2 }} ref={ingresosBarsRef}>
               <Typography variant="h6" gutterBottom fontWeight="600">Ingresos: Estimado vs Real por Categoría</Typography>
               <Box sx={{ mt: 2 }}>
                 {barDataIngresos.map((item, index) => {
@@ -1235,13 +1356,13 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.estimado }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={INGRESO_EST_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={INGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1249,13 +1370,13 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={INGRESO_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={INGRESO_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1269,12 +1390,12 @@ export default function MesDetalle() {
           )}
 
           {pieDataEgresos.length > 0 ? (
-            <Paper sx={{ p: 3, mb: 2 }}>
+            <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
               <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
                 <PieChart>
                   <Pie data={pieDataEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                     {pieDataEgresos.map((_, i) => <Cell key={`egr-${i}`} fill={EGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
                   </Pie>
                   <RTooltip formatter={(value) => formatCurrency(value)} />
@@ -1289,7 +1410,7 @@ export default function MesDetalle() {
           )}
 
           {barDataEgresos.length > 0 && (
-            <Paper sx={{ p: 3 }}>
+            <Paper sx={{ p: 3 }} ref={egresosBarsRef}>
               <Typography variant="h6" gutterBottom fontWeight="600">Egresos: Estimado vs Real por Categoría</Typography>
               <Box sx={{ mt: 2 }}>
                 {barDataEgresos.map((item, index) => {
@@ -1320,13 +1441,13 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.estimado }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={EGRESO_EST_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={EGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1334,13 +1455,13 @@ export default function MesDetalle() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.name, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
-                                <Bar dataKey="valor" fill={EGRESO_COLOR} radius={[4,4,4,4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                <Bar dataKey="valor" fill={EGRESO_COLOR} radius={[4, 4, 4, 4]}
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -1355,108 +1476,108 @@ export default function MesDetalle() {
         </>
       )}
 
-      {/* === PestaÃ±a 1: Tabla editable === */}
+      {/* === Pestaña 1: Tabla editable === */}
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
-          {/* Agregar nueva lÃ­nea */}
+          {/* Agregar nueva línea */}
           {esAdmin && (
-          <Box sx={{ mb: 2 }}>
-            {!agregando ? (
-              <Button startIcon={<AddCircleOutlineIcon />} variant="contained" onClick={() => setAgregando(true)}>
-                Agregar categoría
-              </Button>
-            ) : (
-              <Grid container spacing={1} alignItems="center">
-                <Grid item xs={12} md={4} sx={{ minWidth: 240 }}>
-                  <Autocomplete
-                    size="small"
-                    fullWidth
-                    value={nueva.categoria || null}
-                    onChange={(_, newValue) => {
-                      setNueva((s) => ({ ...s, categoria: newValue || '' }));
-                    }}
-                    options={opcionesNuevaLinea}
-                    freeSolo={false}
-                    disableClearable
-                    forcePopupIcon
-                    popupIcon={<KeyboardArrowDownIcon />}
-                    componentsProps={{
-                      popupIndicator: {
-                        disableRipple: true,
-                        disableFocusRipple: true,
-                        sx: {
-                          p: 0,
-                          m: 0,
-                          bgcolor: 'transparent',
-                          border: 'none',
-                          boxShadow: 'none',
-                          '&:hover': { bgcolor: 'transparent' },
-                          '& .MuiTouchRipple-root': { display: 'none' },
-                          '& .MuiSvgIcon-root': { fontSize: 24 },
-                        },
-                      },
-                      clearIndicator: { sx: { display: 'none' } },
-                    }}
-                    sx={{
-                      '& .MuiAutocomplete-endAdornment': {
-                        right: 0,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                      },
-                      '& .MuiAutocomplete-popupIndicator': { p: 0 },
-                      '& .MuiAutocomplete-popupIndicatorOpen .MuiSvgIcon-root': {
-                        transform: 'none',
-                      },
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Categoría"
-                        size="small"
-                        fullWidth
-                        InputLabelProps={params.InputLabelProps}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={2}>
-                  <FormControl fullWidth size="small" sx={buildTipoSelectSx(nueva.tipo)}>
-                    <InputLabel>Tipo</InputLabel>
-                    <Select
-                      label="Tipo"
-                      value={nueva.tipo}
-                      onChange={(e) => setNueva((s) => ({ ...s, tipo: e.target.value }))}
+            <Box sx={{ mb: 2 }}>
+              {!agregando ? (
+                <Button startIcon={<AddCircleOutlineIcon />} variant="contained" onClick={() => setAgregando(true)}>
+                  Agregar Categoría
+                </Button>
+              ) : (
+                <Grid container spacing={1} alignItems="center">
+                  <Grid size={{ xs: 12, md: 4 }} sx={{ minWidth: 240 }}>
+                    <Autocomplete
                       size="small"
-                    >
-                      <MenuItem value="Ingreso">INGRESO</MenuItem>
-                      <MenuItem value="Egreso">EGRESO</MenuItem>
-                    </Select>
-                  </FormControl>
+                      fullWidth
+                      value={nueva.categoria || null}
+                      onChange={(_, newValue) => {
+                        setNueva((s) => ({ ...s, categoria: newValue || '' }));
+                      }}
+                      options={opcionesNuevaLinea}
+                      freeSolo={false}
+                      disableClearable
+                      forcePopupIcon
+                      popupIcon={<KeyboardArrowDownIcon />}
+                      componentsProps={{
+                        popupIndicator: {
+                          disableRipple: true,
+                          disableFocusRipple: true,
+                          sx: {
+                            p: 0,
+                            m: 0,
+                            bgcolor: 'transparent',
+                            border: 'none',
+                            boxShadow: 'none',
+                            '&:hover': { bgcolor: 'transparent' },
+                            '& .MuiTouchRipple-root': { display: 'none' },
+                            '& .MuiSvgIcon-root': { fontSize: 24 },
+                          },
+                        },
+                        clearIndicator: { sx: { display: 'none' } },
+                      }}
+                      sx={{
+                        '& .MuiAutocomplete-endAdornment': {
+                          right: 0,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                        },
+                        '& .MuiAutocomplete-popupIndicator': { p: 0 },
+                        '& .MuiAutocomplete-popupIndicatorOpen .MuiSvgIcon-root': {
+                          transform: 'none',
+                        },
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Categoría"
+                          size="small"
+                          fullWidth
+                          InputLabelProps={params.InputLabelProps}
+                        />
+                      )}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 2 }}>
+                    <FormControl fullWidth size="small" sx={buildTipoSelectSx(nueva.tipo)}>
+                      <InputLabel>Tipo</InputLabel>
+                      <Select
+                        label="Tipo"
+                        value={nueva.tipo}
+                        onChange={(e) => setNueva((s) => ({ ...s, tipo: e.target.value }))}
+                        size="small"
+                      >
+                        <MenuItem value="Ingreso">INGRESO</MenuItem>
+                        <MenuItem value="Egreso">EGRESO</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      label="Estimado"
+                      type="text"
+                      fullWidth
+                      size="small"
+                      InputLabelProps={{ sx: CENTERED_INPUT_LABEL_SX }}
+                      value={formatCurrencyInput(nueva.montoEstimado)}
+                      onChange={(e) => {
+                        const parsed = parseCurrency(e.target.value, { returnEmpty: true });
+                        setNueva((s) => ({ ...s, montoEstimado: parsed === '' ? '' : parsed }));
+                      }}
+                      inputProps={{ inputMode: 'numeric' }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 3 }} display="flex" gap={1} justifyContent="flex-end">
+                    <Button variant="outlined" onClick={() => { setAgregando(false); setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' }); }}>
+                      Cancelar
+                    </Button>
+                    <Button variant="contained" onClick={addLinea}>Guardar</Button>
+                  </Grid>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Estimado"
-                    type="text"
-                    fullWidth
-                    size="small"
-                    InputLabelProps={{ sx: CENTERED_INPUT_LABEL_SX }}
-                    value={formatCurrencyInput(nueva.montoEstimado)}
-                    onChange={(e) => {
-                      const parsed = parseCurrency(e.target.value, { returnEmpty: true });
-                      setNueva((s) => ({ ...s, montoEstimado: parsed === '' ? '' : parsed }));
-                    }}
-                    inputProps={{ inputMode: 'numeric' }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={3} display="flex" gap={1} justifyContent="flex-end">
-                  <Button variant="outlined" onClick={() => { setAgregando(false); setNueva({ categoria: '', tipo: 'Egreso', montoEstimado: '' }); }}>
-                    Cancelar
-                  </Button>
-                  <Button variant="contained" onClick={addLinea}>Guardar</Button>
-                </Grid>
-              </Grid>
-            )}
-          </Box>
+              )}
+            </Box>
           )}
 
           <Divider sx={{ my: 2 }} />
@@ -1635,7 +1756,7 @@ export default function MesDetalle() {
                                   </IconButton>
                                 </Tooltip>
                               ) : (
-                                <Tooltip title="Editar (categoría, tipo y estimado)">
+                                <Tooltip title="Editar (Categoría, tipo y estimado)">
                                   <IconButton size="small" onClick={() => requestManualUnlock(item.id, 'categoria')}>
                                     <EditOutlinedIcon fontSize="small" />
                                   </IconButton>
@@ -1661,55 +1782,55 @@ export default function MesDetalle() {
                             </Tooltip>
                           </Box>
                         </td>
-                        <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', color: desvio >= 0 ? '#66bb6a' : '#ef5350' , minWidth: 100 }}>
+                        <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', color: desvio >= 0 ? '#66bb6a' : '#ef5350', minWidth: 100 }}>
                           {desvio >= 0 ? '+' : '-'}{formatCurrency(Math.abs(desvio))}
                         </td>
                         {esAdmin && (
-                        <td style={{ padding: 12, whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
-                            <Tooltip title={esSoloReal ? 'Crear linea de presupuesto con este movimiento' : 'Guardar cambios'}>
-                              <span>
-                                <IconButton size="small" onClick={handleGuardar}>
-                                  <SaveOutlinedIcon />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                            {sinPronostico && (
-                              <Tooltip title="Movimiento sin pronosticar: no tiene monto estimado.">
-                                <Chip
-                                  size="small"
-                                  icon={<WarningAmberOutlinedIcon fontSize="small" />}
-                                  label="Sin pronosticar"
-                                  variant="filled"
-                                  sx={SIN_PRONOSTICO_CHIP_SX}
-                                />
+                          <td style={{ padding: 12, whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
+                              <Tooltip title={esSoloReal ? 'Crear linea de presupuesto con este movimiento' : 'Guardar cambios'}>
+                                <span>
+                                  <IconButton size="small" onClick={handleGuardar}>
+                                    <SaveOutlinedIcon />
+                                  </IconButton>
+                                </span>
                               </Tooltip>
-                            )}
-                            {!esSoloReal && (
-                              <>
-                                <Tooltip title="Eliminar esta linea">
-                                  <span>
-                                    <IconButton size="small" onClick={() => openDeletePrompt(item)}>
-                                      <DeleteOutlineIcon />
-                                    </IconButton>
-                                  </span>
+                              {sinPronostico && (
+                                <Tooltip title="Movimiento sin pronosticar: no tiene monto estimado.">
+                                  <Chip
+                                    size="small"
+                                    icon={<WarningAmberOutlinedIcon fontSize="small" />}
+                                    label="Sin pronosticar"
+                                    variant="filled"
+                                    sx={SIN_PRONOSTICO_CHIP_SX}
+                                  />
                                 </Tooltip>
-                                <Tooltip title="Aplicar esta linea a varios meses">
-                                  <span>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        if (baseIdx >= 0) abrirDlgVariosConFila(baseIdx);
-                                      }}
-                                    >
-                                      <ContentCopyIcon />
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                              </>
-                            )}
-                          </Box>
-                        </td>
+                              )}
+                              {!esSoloReal && (
+                                <>
+                                  <Tooltip title="Eliminar esta linea">
+                                    <span>
+                                      <IconButton size="small" onClick={() => openDeletePrompt(item)}>
+                                        <DeleteOutlineIcon />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                  <Tooltip title="Aplicar esta linea a varios meses">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          if (baseIdx >= 0) abrirDlgVariosConFila(baseIdx);
+                                        }}
+                                      >
+                                        <ContentCopyIcon />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </Box>
+                          </td>
                         )}
                       </tr>
                     );
@@ -1752,7 +1873,7 @@ export default function MesDetalle() {
         <DialogTitle>Eliminar movimiento</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            Se eliminará la categoría <strong>{deletePrompt.categoria || 'sin nombre'}</strong> ({deletePrompt.tipo ? deletePrompt.tipo.toLowerCase() : 'movimiento'}) de este mes.
+            Se eliminará la Categoría <strong>{deletePrompt.categoria || 'sin nombre'}</strong> ({deletePrompt.tipo ? deletePrompt.tipo.toLowerCase() : 'movimiento'}) de este mes.
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             Esta acción no se puede deshacer.
@@ -1829,7 +1950,7 @@ export default function MesDetalle() {
           <Stack spacing={2}>
             <TextField select label="Acción" value={bulkCfg.accion} onChange={(e) => setBulkCfg((s) => ({ ...s, accion: e.target.value }))}>
               <MenuItem value="replicar">Replicar esta línea en un rango</MenuItem>
-              <MenuItem value="eliminar">Eliminar esta categoría (mismo tipo) en un rango</MenuItem>
+              <MenuItem value="eliminar">Eliminar esta Categoría (mismo tipo) en un rango</MenuItem>
             </TextField>
             <Stack direction="row" spacing={2}>
               <TextField label="Desde (YYYY-MM)" value={bulkCfg.desde} onChange={(e) => setBulkCfg((s) => ({ ...s, desde: e.target.value }))} placeholder="2025-07" />
@@ -1837,7 +1958,7 @@ export default function MesDetalle() {
             </Stack>
             <Typography variant="body2" color="text.secondary">
               • Replicar: crea una línea por cada mes con los mismos valores (no deduplica).<br />
-              • Eliminar: busca por <b>categoría + tipo</b> en cada mes y borra coincidencias.
+              • Eliminar: busca por <b>Categoría + tipo</b> en cada mes y borra coincidencias.
             </Typography>
           </Stack>
         </DialogContent>
@@ -1859,3 +1980,4 @@ export default function MesDetalle() {
     </Box>
   );
 }
+

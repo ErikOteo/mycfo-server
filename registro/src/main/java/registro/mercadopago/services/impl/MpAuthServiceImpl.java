@@ -15,10 +15,14 @@ import org.springframework.web.client.RestTemplate;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import registro.movimientosexcel.services.NotificationsEventPublisher;
 
 @Service
 public class MpAuthServiceImpl implements MpAuthService {
@@ -26,22 +30,28 @@ public class MpAuthServiceImpl implements MpAuthService {
     private final MpAccountLinkRepository repo;
     private final MpPaymentRepository paymentRepo;
     private final MpWalletMovementRepository movementRepo;
+    private final NotificationsEventPublisher notificationsEventPublisher;
     private final RestTemplate rest = new RestTemplate();
+
+    @Value("${notificacion.service.url:http://localhost:8084}")
+    private String notificacionServiceUrl;
 
     public MpAuthServiceImpl(
             MpProperties props,
             MpAccountLinkRepository repo,
             MpPaymentRepository paymentRepo,
-            MpWalletMovementRepository movementRepo
+            MpWalletMovementRepository movementRepo,
+            NotificationsEventPublisher notificationsEventPublisher
     ) {
         this.props = props;
         this.repo = repo;
         this.paymentRepo = paymentRepo;
         this.movementRepo = movementRepo;
+        this.notificationsEventPublisher = notificationsEventPublisher;
     }
 
     @Override
-    public String buildAuthorizationUrl(String ignored, Long userIdApp) {
+    public String buildAuthorizationUrl(String ignored, String userIdApp) {
         // Siempre forzar nuevo login - limpiar cualquier sesión existente
         System.out.println(">>> Forzando nuevo login OAuth para usuario: " + userIdApp);
         
@@ -84,7 +94,7 @@ public class MpAuthServiceImpl implements MpAuthService {
     }
 
     @Override
-    public OauthStatusDTO getStatus(Long userIdApp) {
+    public OauthStatusDTO getStatus(String userIdApp) {
         Optional<MpAccountLink> link = repo.findByUserIdApp(userIdApp);
         if (link.isEmpty()) {
             System.out.println(">>> No hay cuenta vinculada para usuario: " + userIdApp);
@@ -113,12 +123,12 @@ public class MpAuthServiceImpl implements MpAuthService {
     }
 
     @Override
-    public MpAccountLink getAccountLink(Long userIdApp) {
+    public MpAccountLink getAccountLink(String userIdApp) {
         return repo.findByUserIdApp(userIdApp).orElse(null);
     }
 
     @Override
-    public void handleCallback(String code, String state, Long userIdApp) {
+    public void handleCallback(String code, String state, String userIdApp) {
         if (!verifySignedState(state, userIdApp, 5 * 60_000L)) {
             throw new IllegalArgumentException("invalid state");
         }
@@ -127,35 +137,47 @@ public class MpAuthServiceImpl implements MpAuthService {
         
         TokenResponse token = exchangeCodeForToken(code);
 
-        // Buscar link existente o crear uno nuevo
+        // Buscar link existente por usuario
         MpAccountLink link = repo.findByUserIdApp(userIdApp).orElse(new MpAccountLink());
-        
-        // Si ya existe un link, limpiar datos anteriores
+
+        // Limpiar tokens anteriores si el link ya existía
         if (link.getId() != null) {
             System.out.println(">>> Limpiando datos de sesión anterior para usuario: " + userIdApp);
-            // Limpiar tokens anteriores
             link.setAccessToken(null);
             link.setRefreshToken(null);
             link.setExpiresAt(null);
         }
-        
-        // Configurar nuevos datos
-        link.setUserIdApp(userIdApp);
-        link.setAccessToken(token.getAccessToken());
-        link.setRefreshToken(token.getRefreshToken());
-        link.setScope(props.getScope());
-        link.setLiveMode(Boolean.TRUE.equals(token.getLiveMode()));
 
-        long sec = token.getExpiresIn() != null ? token.getExpiresIn() : 3600L;
-        link.setExpiresAt(Instant.now().plusSeconds(Math.max(0, sec - 60)));
+        // Configurar datos de tokens y expiración
+        applyTokenData(link, userIdApp, token);
 
+        // Enriquecer identidad para obtener mp_user_id / email / nickname
+        enrichAccountIdentity(link);
+
+        // Si existe otro link con el mismo mp_user_id, reutilizarlo para evitar UNIQUE constraint
+        if (link.getMpUserId() != null) {
+            Optional<MpAccountLink> byMpId = repo.findByMpUserId(link.getMpUserId());
+            if (byMpId.isPresent() && (link.getId() == null || !byMpId.get().getId().equals(link.getId()))) {
+                System.out.println(">>> Reutilizando link existente para mp_user_id=" + link.getMpUserId());
+                link = byMpId.get();
+            }
+        }
+
+        // Reaplicar datos finales sobre el link elegido
+        applyTokenData(link, userIdApp, token);
         if (link.getCreatedAt() == null) link.setCreatedAt(Instant.now());
         link.setUpdatedAt(Instant.now());
 
-        enrichAccountIdentity(link);
         repo.save(link);
         
         System.out.println(">>> Cuenta MP vinculada exitosamente para usuario: " + userIdApp);
+
+        // Notificar vinculación exitosa
+        try {
+            notificationsEventPublisher.publishMpLinked(userIdApp, link.getId(), link.getEmail());
+        } catch (Exception e) {
+            System.out.println(">>> No se pudo notificar vinculación MP: " + e.getMessage());
+        }
     }
 
     /* =========================
@@ -163,7 +185,7 @@ public class MpAuthServiceImpl implements MpAuthService {
        ========================= */
     @Override
     @Transactional
-    public void unlink(Long userIdApp) {
+    public void unlink(String userIdApp) {
         // Buscamos el link del usuario
         MpAccountLink link = repo.findByUserIdApp(userIdApp)
                 .orElse(null);
@@ -323,7 +345,7 @@ public class MpAuthServiceImpl implements MpAuthService {
                 .encodeToString(s.getBytes(StandardCharsets.UTF_8));
     }
 
-    private String buildSignedState(Long userId) {
+    private String buildSignedState(String userId) {
         long ts = System.currentTimeMillis();
         String payload = userId + ":" + ts;
         String sig = sign(payload, props.getClientSecret());
@@ -331,16 +353,26 @@ public class MpAuthServiceImpl implements MpAuthService {
     }
 
     // (quedó para compatibilidad; ahora hace purge antes de borrar)
-    public void unlinkLegacyDelete(Long userIdApp) {
+    public void unlinkLegacyDelete(String userIdApp) {
         repo.findByUserIdApp(userIdApp).ifPresent(repo::delete);
     }
 
-    private boolean verifySignedState(String stateB64, Long expectedUserId, long maxAgeMs) {
+    private void applyTokenData(MpAccountLink link, String userIdApp, TokenResponse token) {
+        link.setUserIdApp(userIdApp);
+        link.setAccessToken(token.getAccessToken());
+        link.setRefreshToken(token.getRefreshToken());
+        link.setScope(props.getScope());
+        link.setLiveMode(Boolean.TRUE.equals(token.getLiveMode()));
+        long sec = token.getExpiresIn() != null ? token.getExpiresIn() : 3600L;
+        link.setExpiresAt(Instant.now().plusSeconds(Math.max(0, sec - 60)));
+    }
+
+    private boolean verifySignedState(String stateB64, String expectedUserId, long maxAgeMs) {
         try {
             String decoded = new String(java.util.Base64.getUrlDecoder().decode(stateB64), StandardCharsets.UTF_8);
             String[] parts = decoded.split(":");
             if (parts.length != 3) return false;
-            Long userId = Long.parseLong(parts[0]);
+            String userId = parts[0];
             long ts = Long.parseLong(parts[1]);
             String sig = parts[2];
 

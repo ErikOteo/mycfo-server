@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import registro.services.AdministracionService;
 import registro.conciliacion.dtos.ConciliacionRequestDTO;
 import registro.conciliacion.dtos.DocumentoSugeridoDTO;
 import registro.conciliacion.dtos.MovimientoDTO;
@@ -23,21 +24,67 @@ import java.util.Map;
 public class ConciliacionController {
 
     private final ConciliacionService conciliacionService;
+    private final AdministracionService administracionService;
 
     /**
      * Obtiene movimientos sin conciliar con paginación
      */
     @GetMapping("/movimientos/sin-conciliar")
     public ResponseEntity<Page<MovimientoDTO>> obtenerMovimientosSinConciliar(
+            @RequestHeader("X-Usuario-Sub") String usuarioSub,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
-        
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String moneda) {
+
         Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
-        
-        Page<MovimientoDTO> movimientos = conciliacionService.obtenerMovimientosSinConciliar(pageable);
+
+        registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+        if (moneda != null) {
+            try {
+                monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+        Page<MovimientoDTO> movimientos = conciliacionService.obtenerMovimientosSinConciliar(pageable, empresaId,
+                monedaEnum);
+        return ResponseEntity.ok(movimientos);
+    }
+
+    /**
+     * Obtiene movimientos conciliados con paginación
+     */
+    @GetMapping("/movimientos/conciliados")
+    public ResponseEntity<Page<MovimientoDTO>> obtenerMovimientosConciliados(
+            @RequestHeader("X-Usuario-Sub") String usuarioSub,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "fechaEmision") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String moneda) {
+
+        Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+
+        registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+        if (moneda != null) {
+            try {
+                monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+        Page<MovimientoDTO> movimientos = conciliacionService.obtenerMovimientosConciliados(pageable, empresaId,
+                monedaEnum);
         return ResponseEntity.ok(movimientos);
     }
 
@@ -46,15 +93,29 @@ public class ConciliacionController {
      */
     @GetMapping("/movimientos")
     public ResponseEntity<Page<MovimientoDTO>> obtenerTodosLosMovimientos(
+            @RequestHeader("X-Usuario-Sub") String usuarioSub,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
-        
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String moneda) {
+
         Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
-        
-        Page<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientos(pageable);
+
+        registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+        if (moneda != null) {
+            try {
+                monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+        Page<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientos(pageable, empresaId,
+                monedaEnum);
         return ResponseEntity.ok(movimientos);
     }
 
@@ -62,11 +123,26 @@ public class ConciliacionController {
      * Sugiere documentos para un movimiento específico
      */
     @GetMapping("/movimientos/{movimientoId}/sugerencias")
-    public ResponseEntity<SugerenciasResponseDTO> obtenerSugerencias(@PathVariable Long movimientoId) {
-        List<DocumentoSugeridoDTO> sugerencias = conciliacionService.sugerirDocumentos(movimientoId);
-        
+    public ResponseEntity<SugerenciasResponseDTO> obtenerSugerencias(@RequestHeader("X-Usuario-Sub") String usuarioSub,
+            @PathVariable Long movimientoId,
+            @RequestParam(required = false) String moneda) {
+        registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+        if (moneda != null) {
+            try {
+                monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+        List<DocumentoSugeridoDTO> sugerencias = conciliacionService.sugerirDocumentos(movimientoId, empresaId,
+                monedaEnum);
+
         // Obtener el movimiento para incluirlo en la respuesta
-        List<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientos();
+        List<MovimientoDTO> movimientos = conciliacionService.obtenerTodosLosMovimientosPorMoneda(empresaId,
+                monedaEnum);
         MovimientoDTO movimiento = movimientos.stream()
                 .filter(m -> m.getId().equals(movimientoId))
                 .findFirst()
@@ -84,12 +160,15 @@ public class ConciliacionController {
      * Vincula un movimiento con un documento
      */
     @PostMapping("/vincular")
-    public ResponseEntity<MovimientoDTO> vincularMovimiento(@RequestBody ConciliacionRequestDTO request) {
+    public ResponseEntity<MovimientoDTO> vincularMovimiento(@RequestHeader("X-Usuario-Sub") String usuarioSub,
+            @RequestBody ConciliacionRequestDTO request) {
         try {
+            Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
             MovimientoDTO movimiento = conciliacionService.vincularMovimientoConDocumento(
-                    request.getMovimientoId(), 
-                    request.getDocumentoId()
-            );
+                    request.getMovimientoId(),
+                    request.getDocumentoId(),
+                    empresaId);
             return ResponseEntity.ok(movimiento);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -100,9 +179,12 @@ public class ConciliacionController {
      * Desvincula un movimiento de su documento
      */
     @PostMapping("/desvincular/{movimientoId}")
-    public ResponseEntity<MovimientoDTO> desvincularMovimiento(@PathVariable Long movimientoId) {
+    public ResponseEntity<MovimientoDTO> desvincularMovimiento(@RequestHeader("X-Usuario-Sub") String usuarioSub,
+            @PathVariable Long movimientoId) {
         try {
-            MovimientoDTO movimiento = conciliacionService.desvincularMovimiento(movimientoId);
+            Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+
+            MovimientoDTO movimiento = conciliacionService.desvincularMovimiento(movimientoId, empresaId);
             return ResponseEntity.ok(movimiento);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -113,19 +195,19 @@ public class ConciliacionController {
      * Obtiene estadísticas de conciliación
      */
     @GetMapping("/estadisticas")
-    public ResponseEntity<Map<String, Object>> obtenerEstadisticas() {
-        List<MovimientoDTO> todos = conciliacionService.obtenerTodosLosMovimientos();
-        
-        long sinConciliar = todos.stream().filter(m -> !m.getConciliado()).count();
-        long conciliados = todos.stream().filter(MovimientoDTO::getConciliado).count();
-        
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("total", todos.size());
-        stats.put("sinConciliar", sinConciliar);
-        stats.put("conciliados", conciliados);
-        stats.put("porcentajeConciliado", todos.isEmpty() ? 0 : (conciliados * 100.0 / todos.size()));
+    public ResponseEntity<Map<String, Object>> obtenerEstadisticas(@RequestHeader("X-Usuario-Sub") String usuarioSub,
+            @RequestParam(required = false) String moneda) {
+        registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+        if (moneda != null) {
+            try {
+                monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
 
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+        Map<String, Object> stats = conciliacionService.obtenerResumenEstadisticas(empresaId, monedaEnum);
         return ResponseEntity.ok(stats);
     }
 }
-

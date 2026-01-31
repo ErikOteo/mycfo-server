@@ -6,6 +6,8 @@ import CustomDateTimePicker from "../../../../shared-components/CustomDateTimePi
 import CustomSelect from "../../../../shared-components/CustomSelect";
 import dayjs from "dayjs";
 
+const CURRENCY_OPTIONS = ["ARS", "USD"];
+
 export default function FormIngreso({
   formData,
   setFormData,
@@ -42,11 +44,13 @@ export default function FormIngreso({
         </Box>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Moneda</FormLabel>
-          <OutlinedInput
+          <CustomSelect
             value={formData.moneda || "ARS"}
-            size="small"
-            fullWidth
-            disabled
+            onChange={(valor) =>
+              setFormData((p) => ({ ...p, moneda: valor || "ARS" }))
+            }
+            options={CURRENCY_OPTIONS}
+            width="100%"
           />
         </Box>
         <Box sx={{ flex: 1 }}>

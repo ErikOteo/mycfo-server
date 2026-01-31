@@ -6,12 +6,13 @@ import TablaDetalle from './TablaDetalle';
 import Filtros from './Filtros';
 import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { jsPDF } from "jspdf";
-import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas';
-import { exportToExcel } from '../../../utils/exportExcelUtils'; // Importando la utilidad de Excel
+import { exportToExcel } from '../../../utils/exportExcelUtils';
+import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#19C9FF'];
 
@@ -23,9 +24,74 @@ export default function MainGrid() {
     const chartRefIngresos = React.useRef(null);
     const chartRefEgresos = React.useRef(null);
     const [loading, setLoading] = React.useState(false);
+    const [exportingPdf, setExportingPdf] = React.useState(false);
+    const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
-    // Formateo de moneda para tooltips de tortas
-    const currency = (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(v) || 0);
+    const [currency, setCurrency] = usePreferredCurrency("ARS");
+
+    const topIngresos = React.useMemo(() => {
+        const items = Array.isArray(data.detalleIngresos) ? data.detalleIngresos : [];
+        return [...items]
+            .sort((a, b) => Number(b?.total ?? 0) - Number(a?.total ?? 0))
+            .slice(0, 5);
+    }, [data.detalleIngresos]);
+
+    const topEgresos = React.useMemo(() => {
+        const items = Array.isArray(data.detalleEgresos) ? data.detalleEgresos : [];
+        return [...items]
+            .sort((a, b) => Math.abs(Number(b?.total ?? 0)) - Math.abs(Number(a?.total ?? 0)))
+            .slice(0, 5);
+    }, [data.detalleEgresos]);
+
+    const totalIngresos = React.useMemo(
+        () => (Array.isArray(data.detalleIngresos)
+            ? data.detalleIngresos.reduce((sum, item) => sum + (Number(item?.total) || 0), 0)
+            : 0),
+        [data.detalleIngresos]
+    );
+
+    const totalEgresos = React.useMemo(
+        () => (Array.isArray(data.detalleEgresos)
+            ? data.detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item?.total) || 0), 0)
+            : 0),
+        [data.detalleEgresos]
+    );
+
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "reporte-mensual",
+            year: selectedYear,
+            month: selectedMonth + 1,
+            currency,
+            categoriasSeleccionadas: selectedCategoria,
+            ingresos: {
+                total: totalIngresos,
+                topCategorias: topIngresos,
+            },
+            egresos: {
+                total: totalEgresos,
+                topCategorias: topEgresos,
+            },
+        }),
+        [
+            selectedYear,
+            selectedMonth,
+            currency,
+            selectedCategoria,
+            totalIngresos,
+            totalEgresos,
+            topIngresos,
+            topEgresos,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
+
+    // Formateo de moneda dependiente de la preferencia seleccionada
+    const formatCurrency = React.useCallback(
+        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        [currency]
+    );
 
     React.useEffect(() => {
         const baseUrl = API_CONFIG.REPORTE;
@@ -34,6 +100,7 @@ export default function MainGrid() {
         const params = new URLSearchParams();
         params.set('anio', Number(selectedYear));
         params.set('mes', Number(selectedMonth) + 1);
+        if (currency) params.set('moneda', currency);
 
         if (Array.isArray(selectedCategoria) && selectedCategoria.length > 0) {
             selectedCategoria.forEach((c) => params.append('categoria', c));
@@ -59,115 +126,168 @@ export default function MainGrid() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [selectedYear, selectedMonth, selectedCategoria]);
+    }, [currency, selectedYear, selectedMonth, selectedCategoria]);
+
+    // Cargar logo para la carátula del PDF
+    React.useEffect(() => {
+        const loadLogo = async () => {
+            try {
+                const res = await fetch('/logo512.png');
+                const blob = await res.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => setLogoDataUrl(reader.result);
+                reader.readAsDataURL(blob);
+            } catch {
+                setLogoDataUrl(null);
+            }
+        };
+        loadLogo();
+    }, []);
 
     const getNombreMes = (mesIndex) => {
-        if (mesIndex === '' || mesIndex === null) return '';
+        if (mesIndex === '' || mesIndex === null || mesIndex === undefined) return '';
         const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         return meses[mesIndex];
     };
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const { detalleIngresos, detalleEgresos } = data;
         const mesNombre = getNombreMes(selectedMonth);
 
         const excelData = [
             ["Resumen Mensual", `${mesNombre} ${selectedYear}`],
-            [], // Fila vacía
+            [],
         ];
 
+        let ingresosHeaderRow = null;
+        let egresosHeaderRow = null;
+
         if (detalleIngresos.length > 0) {
+            ingresosHeaderRow = excelData.length;
             const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-            excelData.push(["Ingresos", "", {v: totalIngresos, t: 'n'}]);
+            excelData.push(["Ingresos", "", { v: totalIngresos, t: 'n' }]);
             detalleIngresos.forEach(item => {
-                excelData.push(["", (item.categoria ?? 'Sin categoría'), {v: (Number(item.total) || 0), t: 'n'}]);
+                excelData.push(["", (item.categoria ?? 'Sin categoria'), { v: (Number(item.total) || 0), t: 'n' }]);
             });
         }
 
         if (detalleEgresos.length > 0) {
-            excelData.push([]); // Fila vacía
+            excelData.push([]);
+            egresosHeaderRow = excelData.length;
             const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
-            excelData.push(["Egresos", "", {v: totalEgresos, t: 'n'}]);
+            excelData.push(["Egresos", "", { v: totalEgresos, t: 'n' }]);
             detalleEgresos.forEach(item => {
-                excelData.push(["", (item.categoria ?? 'Sin categoría'), {v: Math.abs(Number(item.total) || 0), t: 'n'}]);
+                excelData.push(["", (item.categoria ?? 'Sin categoria'), { v: Math.abs(Number(item.total) || 0), t: 'n' }]);
             });
         }
 
-        const colsConfig = [{ wch: 25 }, { wch: 25 }, { wch: 15 }]; // Ancho para las columnas A, B, C
+        const colsConfig = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
         const mergesConfig = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, // Título principal
-            { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } }, // Encabezado Ingresos
-            { s: { r: 2 + detalleIngresos.length + 1, c: 0 }, e: { r: 2 + detalleIngresos.length + 1, c: 1 } }, // Encabezado Egresos
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
         ];
-        const currencyColumns = ['C']; // Columna C para formato de moneda
+        if (ingresosHeaderRow !== null) {
+            mergesConfig.push({ s: { r: ingresosHeaderRow, c: 0 }, e: { r: ingresosHeaderRow, c: 1 } });
+        }
+        if (egresosHeaderRow !== null) {
+            mergesConfig.push({ s: { r: egresosHeaderRow, c: 0 }, e: { r: egresosHeaderRow, c: 1 } });
+        }
+        const currencyColumns = ['C'];
 
-        exportToExcel(excelData, `reporte-mensual-${mesNombre}-${selectedYear}`, "Resumen Mensual", colsConfig, mergesConfig, currencyColumns);
+        const totalRows = [];
+        if (ingresosHeaderRow !== null) totalRows.push(ingresosHeaderRow);
+        if (egresosHeaderRow !== null) totalRows.push(egresosHeaderRow);
+
+        exportToExcel(
+            excelData,
+            `reporte-mensual-${mesNombre}-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
+            "Resumen Mensual",
+            colsConfig,
+            mergesConfig,
+            currencyColumns,
+            {
+                headerRows: [0].concat(ingresosHeaderRow !== null ? [ingresosHeaderRow] : []).concat(egresosHeaderRow !== null ? [egresosHeaderRow] : []),
+                totalRows,
+                zebra: true,
+                freezePane: { rowSplit: 2, colSplit: 1 },
+            }
+        );
+
+        await sendReportGenerated({
+            reportType: "MONTHLY_REPORT",
+            reportName: "Reporte mensual (Excel)",
+            period: `${mesNombre} ${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
-        const doc = new jsPDF();
-        const mesNombre = getNombreMes(selectedMonth);
-        doc.text(`Resumen Mensual - ${mesNombre} ${selectedYear}`, 14, 22);
+        const charts = [chartRefIngresos.current, chartRefEgresos.current].filter(Boolean);
+        if (!charts.length) {
+            alert("No se encontraron graficos para exportar.");
+            return;
+        }
 
-        // Forzar fondo blanco y texto negro en las capturas para que la guía sea visible en el PDF
-        const nodes = [chartRefIngresos.current, chartRefEgresos.current].filter(Boolean);
-        const prev = nodes.map(n => ({
-            node: n,
-            bg: n.style.backgroundColor,
-            color: n.style.color,
-        }));
-        nodes.forEach(n => {
-            n.style.backgroundColor = '#ffffff';
-            n.style.color = '#000000';
-        });
-
+        setExportingPdf(true);
         try {
-            const canvasIngresos = await html2canvas(chartRefIngresos.current, { backgroundColor: '#ffffff', scale: 2 });
-            const canvasEgresos = await html2canvas(chartRefEgresos.current, { backgroundColor: '#ffffff', scale: 2 });
-            const imgDataIngresos = canvasIngresos.toDataURL('image/png');
-            const imgDataEgresos = canvasEgresos.toDataURL('image/png');
-
-            const pdfWidth = doc.internal.pageSize.getWidth();
-            const chartWidth = (pdfWidth / 2) - 20;
-
-            doc.addImage(imgDataIngresos, 'PNG', 14, 30, chartWidth, chartWidth * 0.75);
-            doc.addImage(imgDataEgresos, 'PNG', pdfWidth / 2, 30, chartWidth, chartWidth * 0.75);
-
             const { detalleIngresos, detalleEgresos } = data;
-            const head = [["Tipo", "Categoría", "Total"]];
+            const head = [["Tipo", "Categoria", "Total"]];
             const body = [];
 
+            const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+            const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
+
             if (detalleIngresos.length > 0) {
-                const totalIngresos = detalleIngresos.reduce((sum, item) => sum + item.total, 0);
-                body.push(["Ingresos", "", totalIngresos.toFixed(2)]);
+                body.push(["Ingresos", "", formatCurrency(totalIngresos)]);
                 detalleIngresos.forEach(item => {
-                    body.push(["", item.categoria, item.total.toFixed(2)]);
+                    body.push(["", item.categoria ?? 'Sin categoria', formatCurrency(Number(item.total) || 0)]);
                 });
             }
             if (detalleEgresos.length > 0) {
-                const totalEgresos = detalleEgresos.reduce((sum, item) => sum + item.total, 0);
-                body.push(["Egresos", "", totalEgresos.toFixed(2)]);
+                body.push(["Egresos", "", formatCurrency(totalEgresos)]);
                 detalleEgresos.forEach(item => {
-                    body.push(["", item.categoria, item.total.toFixed(2)]);
+                    body.push(["", item.categoria ?? 'Sin categoria', formatCurrency(Math.abs(Number(item.total) || 0))]);
                 });
             }
 
-            autoTable(doc, { head, body, startY: 30 + chartWidth * 0.75 + 10 });
-            doc.save(`reporte-mensual-${mesNombre}-${selectedYear}.pdf`);
+            await exportPdfReport({
+                title: `Resumen Mensual`,
+                subtitle: `${getNombreMes(selectedMonth)} ${selectedYear}`,
+                charts: charts.map((element, idx) => ({
+                    element,
+                    forcePageBreakBefore: false, // mantener el primer grafico en la pagina del titulo
+                    forcePageBreakAfter: true, // cada grafica en su propia pagina
+                })),
+                table: { head, body },
+                fileName: `reporte-mensual-${getNombreMes(selectedMonth)}-${selectedYear}-${(currency || 'ARS').toLowerCase()}`,
+                cover: {
+                    show: true,
+                    subtitle: `${getNombreMes(selectedMonth)} ${selectedYear}`,
+                    logo: logoDataUrl,
+                    meta: [{ label: "Generado", value: new Date().toLocaleDateString('es-AR') }],
+                    kpis: [
+                        { label: "Ingresos", value: formatCurrency(totalIngresos) },
+                        { label: "Egresos", value: formatCurrency(totalEgresos) },
+                        { label: "Neto", value: formatCurrency(totalIngresos - totalEgresos) },
+                    ],
+                },
+            });
 
-        } catch (error) {
-            console.error("Error al generar el PDF:", error);
+            await sendReportGenerated({
+                reportType: "MONTHLY_REPORT",
+                reportName: "Reporte mensual (PDF)",
+                period: `${getNombreMes(selectedMonth)} ${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
+            });
+        } catch (e) {
+            console.error("Error al generar el PDF:", e);
             alert("No se pudo generar el PDF. Intente nuevamente.");
         } finally {
-            // Restaurar estilos originales
-            prev.forEach(p => {
-                if (!p.node) return;
-                p.node.style.backgroundColor = p.bg;
-                p.node.style.color = p.color;
-            });
+            setExportingPdf(false);
         }
     };
-    
+
     const handleMonthChange = (e) => setSelectedMonth(e.target.value);
     const handleYearChange = (e) => setSelectedYear(e.target.value);
     const handleCategoriaChange = (e) => {
@@ -178,13 +298,12 @@ export default function MainGrid() {
 
     const normalizeCategoria = (c) => {
         const s = (c ?? '').toString().trim();
-        return s.length ? s : 'Sin categoría';
+        return s.length ? s : 'Sin categoria';
     };
 
     const dataIngresosPie = data.detalleIngresos.map(item => ({ name: normalizeCategoria(item.categoria), value: item.total }));
     const dataEgresosPie = data.detalleEgresos.map(item => ({ name: normalizeCategoria(item.categoria), value: Math.abs(item.total) }));
 
-    // Cálculo para placeholder y guía
     const totalIngresosPie = dataIngresosPie.reduce((sum, d) => sum + (d.value || 0), 0);
     const totalEgresosPie = dataEgresosPie.reduce((sum, d) => sum + (d.value || 0), 0);
     const ingresosDisplayData = totalIngresosPie > 0 ? dataIngresosPie : [{ name: 'Sin datos', value: 1 }];
@@ -199,12 +318,17 @@ export default function MainGrid() {
     }
 
     return (
-        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, p: 3 }}>
+        <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' }, px: { xs: 2, md: 3 }, pt: { xs: 1.5, md: 2 }, pb: 3 }}>
+            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography component="h2" variant="h4">
                     Resumen mensual
                 </Typography>
-                <ExportadorSimple onExportExcel={handleExportExcel} onExportPdf={handleExportPdf} />
+                <ExportadorSimple
+                    onExportExcel={handleExportExcel}
+                    onExportPdf={handleExportPdf}
+                    exportingPdf={exportingPdf}
+                />
             </Box>
 
             <Filtros
@@ -232,74 +356,73 @@ export default function MainGrid() {
                     <div ref={chartRefIngresos}>
                         <Paper variant="outlined" sx={{ p: 2 }}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'text.primary' }}>Desglose de Ingresos</Typography>
-                            <Box sx={{ width: 280, height: 280, mx: 'auto', display: 'flex', alignItems: 'center' }} ref={chartRefIngresos}>
-                                {/* Guía de categorías (izquierda) */}
+                            <Box sx={{ width: 280, height: 280, mx: 'auto', display: 'flex', alignItems: 'center' }}>
                                 <Box sx={{ width: 100, height: 240, overflow: 'auto', pr: 1 }}>
                                     {ingresosDisplayData.map((item, i) => (
                                         <Box key={`ing-cat-${i}`} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                                             <Box sx={{ width: 10, height: 10, borderRadius: '2px', mr: 1, bgcolor: totalIngresosPie > 0 ? COLORS[i % COLORS.length] : 'rgba(160,160,160,0.35)' }} />
-                                            <Typography variant="caption" sx={{ lineHeight: 1.2 }} title={item.name}>{item.name}</Typography>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>{item.name}</Typography>
                                         </Box>
                                     ))}
                                 </Box>
-                                {/* Torta (derecha) */}
-                                <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                                    <PieChart width={180} height={180} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
                                         <Pie
                                             data={ingresosDisplayData}
-                                            dataKey="value"
-                                            nameKey="name"
                                             cx="50%"
                                             cy="50%"
-                                            outerRadius={80}
                                             labelLine={false}
-                                            label={false}
+                                            outerRadius={80}
+                                            fill="#8884d8"
+                                            dataKey="value"
                                         >
-                                            {ingresosDisplayData.map((entry, index) => (
-                                                <Cell key={`cell-ing-${index}`} fill={totalIngresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
+                                            {ingresosDisplayData.map((_, index) => (
+                                                <Cell key={`cell-${index}`} fill={totalIngresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v, n) => [currency(v), n]} />
+                                        <Tooltip formatter={(v, n) => [formatCurrency(v), n]} />
+                                        <Legend />
                                     </PieChart>
-                                </Box>
+                                </ResponsiveContainer>
                             </Box>
                         </Paper>
                     </div>
                 </Grid>
+
                 <Grid item xs={12} md={6}>
                     <div ref={chartRefEgresos}>
                         <Paper variant="outlined" sx={{ p: 2 }}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'text.primary' }}>Desglose de Egresos</Typography>
-                            <Box sx={{ width: 280, height: 280, mx: 'auto', display: 'flex', alignItems: 'center' }} ref={chartRefEgresos}>
-                                {/* Guía de categorías (izquierda) */}
+                            <Box sx={{ width: 280, height: 280, mx: 'auto', display: 'flex', alignItems: 'center' }}>
                                 <Box sx={{ width: 100, height: 240, overflow: 'auto', pr: 1 }}>
                                     {egresosDisplayData.map((item, i) => (
                                         <Box key={`egr-cat-${i}`} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                                             <Box sx={{ width: 10, height: 10, borderRadius: '2px', mr: 1, bgcolor: totalEgresosPie > 0 ? COLORS[i % COLORS.length] : 'rgba(160,160,160,0.35)' }} />
-                                            <Typography variant="caption" sx={{ lineHeight: 1.2 }} title={item.name}>{item.name}</Typography>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>{item.name}</Typography>
                                         </Box>
                                     ))}
                                 </Box>
-                                {/* Torta (derecha) */}
-                                <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                                    <PieChart width={180} height={180} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
                                         <Pie
                                             data={egresosDisplayData}
-                                            dataKey="value"
-                                            nameKey="name"
                                             cx="50%"
                                             cy="50%"
-                                            outerRadius={80}
                                             labelLine={false}
-                                            label={false}
+                                            outerRadius={80}
+                                            fill="#8884d8"
+                                            dataKey="value"
                                         >
-                                            {egresosDisplayData.map((entry, index) => (
+                                            {egresosDisplayData.map((_, index) => (
                                                 <Cell key={`cell-egr-${index}`} fill={totalEgresosPie > 0 ? COLORS[index % COLORS.length] : 'rgba(160,160,160,0.35)'} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v, n) => [currency(v), n]} />
+                                        <Tooltip formatter={(v, n) => [formatCurrency(v), n]} />
+                                        <Legend />
                                     </PieChart>
-                                </Box>
+                                </ResponsiveContainer>
                             </Box>
                         </Paper>
                     </div>

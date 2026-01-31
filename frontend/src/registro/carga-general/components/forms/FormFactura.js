@@ -11,6 +11,8 @@ import CustomDateTimePicker from "../../../../shared-components/CustomDateTimePi
 import CategoriaAutoComplete from "../../../../shared-components/CategoriaAutoComplete";
 import { sessionService } from "../../../../shared-services/sessionService";
 
+const CURRENCY_OPTIONS = ["ARS", "USD"];
+
 export default function FormFactura({ formData, setFormData, errors = {}, modoEdicion = true }) {
   const [datosEmpresa, setDatosEmpresa] = useState(null);
 
@@ -183,11 +185,15 @@ export default function FormFactura({ formData, setFormData, errors = {}, modoEd
         </Box>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Moneda</FormLabel>
-          <OutlinedInput
+          <CustomSelect
             value={formData.moneda || "ARS"}
-            size="small"
-            fullWidth
-            disabled
+            onChange={(valor) => {
+              if (!modoEdicion) return;
+              setFormData((p) => ({ ...p, moneda: valor || "ARS" }));
+            }}
+            options={CURRENCY_OPTIONS}
+            width="100%"
+            disabled={!modoEdicion}
           />
         </Box>
       </Box>

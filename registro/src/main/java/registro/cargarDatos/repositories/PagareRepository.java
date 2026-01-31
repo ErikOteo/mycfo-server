@@ -3,8 +3,15 @@ package registro.cargarDatos.repositories;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import registro.cargarDatos.models.Pagare;
+import registro.cargarDatos.models.TipoMoneda;
+
+import java.util.List;
 
 @Repository
 public interface PagareRepository extends JpaRepository<Pagare, Long> {
 
+    List<Pagare> findByMoneda(TipoMoneda moneda);
+
+    List<Pagare> findByOrganizacionId(Long organizacionId);
+    List<Pagare> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda);
 }

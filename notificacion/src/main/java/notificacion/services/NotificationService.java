@@ -19,11 +19,14 @@ public class NotificationService {
 
     private final NotificationRepository repo;
     private final EmailNotificationService emailService;
+    private final NotificationPreferencesService preferencesService;
 
     public NotificationService(NotificationRepository repo,
-                               EmailNotificationService emailService) {
+                               EmailNotificationService emailService,
+                               NotificationPreferencesService preferencesService) {
         this.repo = repo;
         this.emailService = emailService;
+        this.preferencesService = preferencesService;
     }
 
     @Transactional(readOnly = true)
@@ -99,12 +102,25 @@ public class NotificationService {
             throw new IllegalArgumentException("La notificacion debe incluir organizacion y usuario.");
         }
 
+        // Respeta preferencia "Habilitado" (in-app) por tipo
+        var prefsOpt = preferencesService.getPreferences(notification.getOrganizacionId(), notification.getUsuarioId());
+        if (prefsOpt.isPresent()) {
+            if (!preferencesService.isNotificationEnabled(notification.getOrganizacionId(),
+                    notification.getUsuarioId(),
+                    notification.getType())) {
+                return null; // no crear ni enviar si está deshabilitado
+            }
+        }
+
         Notification saved = repo.save(notification);
 
-        try {
-            emailService.sendNotificationEmail(notification.getOrganizacionId(), notification.getUsuarioId(), saved);
-        } catch (Exception e) {
-            System.err.println("Error enviando email de notificacion: " + e.getMessage());
+        // Evitar doble envío en recordatorios: el mail específico lo envía CustomReminderService
+        if (notification.getType() != NotificationType.REMINDER_CUSTOM) {
+            try {
+                emailService.sendNotificationEmail(notification.getOrganizacionId(), notification.getUsuarioId(), saved);
+            } catch (Exception e) {
+                System.err.println("Error enviando email de notificacion: " + e.getMessage());
+            }
         }
 
         publishUnreadCount(notification.getOrganizacionId(), notification.getUsuarioId());

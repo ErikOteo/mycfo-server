@@ -24,6 +24,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
+import { exportToExcel } from '../../../utils/exportExcelUtils';
+import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { detectCurrencyFromName } from '../utils/currencyTag';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 // Helper seguro para números
 const safeNumber = (v) =>
@@ -96,7 +100,7 @@ const toDateSafe = (value) => {
   return isValidDate(date) ? date : null;
 };
 
-async function getRealPorMes(meses, tipo) {
+async function getRealPorMes(meses, tipo, moneda) {
   const out = {};
 
   for (const d of meses) {
@@ -104,7 +108,7 @@ async function getRealPorMes(meses, tipo) {
     const hasta = formatDate(endOfMonth(d), 'yyyy-MM-dd');
     const mesKey = formatDate(d, 'yyyy-MM');
     try {
-      const resp = await getMovimientosPorRango({ fechaDesde: desde, fechaHasta: hasta, tipos: tipo });
+      const resp = await getMovimientosPorRango({ fechaDesde: desde, fechaHasta: hasta, tipos: tipo, moneda });
       const movimientos = Array.isArray(resp?.content) ? resp.content : (Array.isArray(resp) ? resp : []);
       const totalMes = movimientos.reduce((acc, movimiento) => {
         const monto = Math.abs(Number(movimiento?.monto ?? movimiento?.montoTotal ?? 0));
@@ -144,10 +148,12 @@ export default function PresupuestoDetalle() {
     nombre: '',
     detalleMensual: [],
   });
+  const [presupuestoCurrency, setPresupuestoCurrency] = React.useState('ARS');
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
 
   const [tab, setTab] = React.useState(0); // 0: resumen, 1: tabla
+  const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
   // Filtros UI
   const [verSoloDeficit, setVerSoloDeficit] = React.useState(false);
@@ -158,6 +164,21 @@ export default function PresupuestoDetalle() {
   // Panel lateral (KPIs clicables)
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [drawerTipo, setDrawerTipo] = React.useState('Ingresos'); // 'ingresos' | 'egresos' | 'resultado'
+
+  React.useEffect(() => {
+    const loadLogo = async () => {
+      try {
+        const res = await fetch('/logo512.png');
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setLogoDataUrl(reader.result);
+        reader.readAsDataURL(blob);
+      } catch {
+        setLogoDataUrl(null);
+      }
+    };
+    loadLogo();
+  }, []);
 
   React.useEffect(() => {
     const cargar = async () => {
@@ -196,6 +217,8 @@ export default function PresupuestoDetalle() {
           const resHeader = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${encontrado.id}`);
           if (resHeader?.data?.nombre) nombreOficial = resHeader.data.nombre;
         } catch { /* no crítico */ }
+        const currencyDetected = detectCurrencyFromName(nombreOficial || encontrado.nombre);
+        setPresupuestoCurrency(currencyDetected);
 
         // 3) Traer TOTALES mensuales del backend nuevo
         const resTot = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${encontrado.id}/totales`);
@@ -238,10 +261,11 @@ export default function PresupuestoDetalle() {
             console.log('🚀 Usando endpoint optimizado para obtener movimientos del presupuesto');
             const fechaDesde = formatDate(rangoInicioDate, 'yyyy-MM-dd');
             const fechaHasta = formatDate(rangoFinDate, 'yyyy-MM-dd');
-            
-            const movimientosData = await getMovimientosParaPresupuesto({ 
-              fechaDesde, 
-              fechaHasta 
+
+            const movimientosData = await getMovimientosParaPresupuesto({
+              fechaDesde,
+              fechaHasta,
+              moneda: currencyDetected
             });
 
             // Convertir la respuesta optimizada al formato esperado
@@ -257,10 +281,33 @@ export default function PresupuestoDetalle() {
                 totalEgresos: movimientosData.resumenTotal?.totalEgresos
               });
             }
+            // Si no vino nada en datosMensuales, intentar fallback explícito
+            if (!movimientosData?.datosMensuales || movimientosData.datosMensuales.length === 0) {
+              throw new Error('Respuesta sin datosMensuales');
+            }
           }
         } catch (movError) {
           console.error('❌ Error al obtener datos reales del presupuesto:', movError);
           setError((prev) => prev ?? 'No se pudieron cargar los datos reales del presupuesto.');
+          // Fallback: calcular reales mes a mes usando el endpoint de movimientos con moneda
+          try {
+            const mesesDate = detalleMensual
+              .map((detalle) => {
+                const mesKey = (detalle?.mes || '').slice(0, 7);
+                return mesKey ? toDateSafe(`${mesKey}-01`) : null;
+              })
+              .filter(Boolean);
+            if (mesesDate.length > 0) {
+              const [ingresosFallback, egresosFallback] = await Promise.all([
+                getRealPorMes(mesesDate, 'Ingreso', currencyDetected),
+                getRealPorMes(mesesDate, 'Egreso', currencyDetected),
+              ]);
+              realesIngresoPorMes = ingresosFallback;
+              realesEgresoPorMes = egresosFallback;
+            }
+          } catch (fallbackErr) {
+            console.error('❌ Error en fallback de datos reales:', fallbackErr);
+          }
         }
 
         const detalleMensualCompleto = detalleMensual.map((detalle) => {
@@ -343,6 +390,46 @@ export default function PresupuestoDetalle() {
 
   const salud = semaforoPorCumplimiento(pctCumplimientoGlobal);
 
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuesto-detalle",
+      presupuesto: {
+        id: presupuesto.id,
+        nombre: presupuesto.nombre,
+        moneda: presupuestoCurrency,
+      },
+      resumen: {
+        totalIngresoReal,
+        totalEgresoReal,
+        resultadoReal,
+        totalIngresoEst,
+        totalEgresoEst,
+        resultadoEstimado,
+        cumplimiento: pctCumplimientoGlobal,
+        salud: salud?.label ?? null,
+      },
+      detalleMensual: Array.isArray(presupuesto.detalleMensual)
+        ? presupuesto.detalleMensual
+        : [],
+    }),
+    [
+      presupuesto.id,
+      presupuesto.nombre,
+      presupuestoCurrency,
+      totalIngresoReal,
+      totalEgresoReal,
+      resultadoReal,
+      totalIngresoEst,
+      totalEgresoEst,
+      resultadoEstimado,
+      pctCumplimientoGlobal,
+      salud,
+      presupuesto.detalleMensual,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   // Datos para gráficos separados (respetan filtros visuales por meses)
   const ingresosData = datosMensuales.map((fila) => {
     const mm = (fila?.mes || '0000-01').split('-')[1];
@@ -372,6 +459,7 @@ export default function PresupuestoDetalle() {
       fill: superavit >= 0 ? SUPERAVIT_COLOR : DEFICIT_COLOR,
     };
   });
+  const desvioChartRef = React.useRef(null);
 
   // Navegación al detalle del mes
   const goToMes = (fila) => {
@@ -388,59 +476,137 @@ export default function PresupuestoDetalle() {
     navigate(`/presupuestos/${nombreNormalizado}/detalle/${mesNombre}`);
   };
 
-  // EXPORTS (igual)
+  // EXPORTS
   const handleExportExcel = () => {
-    const data = [
-      ['Mes', 'Ingreso Estimado', 'Ingreso Real', 'Desvío Ingresos', 'Egreso Estimado', 'Egreso Real', 'Desvío Egresos', 'Total Estimado', 'Total Real', 'Total Desvío'],
-      ...datosMensualesRaw.map((fila) => [
-        fila.mes ?? '—',
-        safeNumber(fila.ingresoEst),
-        safeNumber(fila.ingresoReal),
-        safeNumber(fila.ingresoReal) - safeNumber(fila.ingresoEst),
-        safeNumber(fila.egresoEst),
-        safeNumber(fila.egresoReal),
-        safeNumber(fila.egresoReal) - safeNumber(fila.egresoEst),
-        safeNumber(fila.totalEst),
-        safeNumber(fila.totalReal),
-        safeNumber(fila.totalReal) - safeNumber(fila.totalEst),
-      ]),
+    const excelData = [
+      ['Mes', 'Ingreso Estimado', 'Ingreso Real', 'Desvio Ingresos', 'Egreso Estimado', 'Egreso Real', 'Desvio Egresos', 'Total Estimado', 'Total Real', 'Total Desvio'],
+      ...datosMensualesRaw.map((fila) => {
+        const ingresoEst = safeNumber(fila.ingresoEst);
+        const ingresoReal = safeNumber(fila.ingresoReal);
+        const egresoEst = safeNumber(fila.egresoEst);
+        const egresoReal = safeNumber(fila.egresoReal);
+        const totalEst = safeNumber(fila.totalEst ?? (ingresoEst - egresoEst));
+        const totalReal = safeNumber(fila.totalReal ?? (ingresoReal - egresoReal));
+        return [
+          fila.mes ?? '-',
+          ingresoEst,
+          ingresoReal,
+          ingresoReal - ingresoEst,
+          egresoEst,
+          egresoReal,
+          egresoReal - egresoEst,
+          totalEst,
+          totalReal,
+          totalReal - totalEst,
+        ];
+      }),
+      [],
+      [
+        'Totales',
+        totalIngresoEst,
+        totalIngresoReal,
+        totalIngresoReal - totalIngresoEst,
+        totalEgresoEst,
+        totalEgresoReal,
+        totalEgresoReal - totalEgresoEst,
+        resultadoEstimado,
+        resultadoReal,
+        resultadoReal - resultadoEstimado,
+      ],
     ];
 
-    data.push(['', '', '', '', '', '', '', '', '', '']);
-    data.push(['Totales:', '', '', '', '', '', '', '', '', '']);
-    data.push([
-      '',
-      totalIngresoEst,
-      totalIngresoReal,
-      totalIngresoReal - totalIngresoEst,
-      totalEgresoEst,
-      totalEgresoReal,
-      totalEgresoReal - totalEgresoEst,
-      resultadoEstimado,
-      resultadoReal,
-      resultadoReal - resultadoEstimado,
-    ]);
+    const colsConfig = [
+      { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+    ];
+    const currencyColumns = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
-    import('xlsx').then(({ utils, writeFile }) => {
-      const ws = utils.aoa_to_sheet(data, { cellStyles: true });
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, 'Detalle Presupuesto');
-      writeFile(wb, `Presupuesto_${presupuesto.nombre || ''}_${presupuesto.id || ''}.xlsx`, { cellStyles: true });
-    });
+    exportToExcel(
+      excelData,
+      `Presupuesto_${presupuesto.nombre || ''}`,
+      'Detalle Presupuesto',
+      colsConfig,
+      [],
+      currencyColumns,
+      {
+        headerRows: [0],
+        totalRows: [excelData.length - 1],
+        zebra: true,
+        freezePane: { rowSplit: 1, colSplit: 1 },
+      }
+    );
   };
 
-  const handleExportPdf = () => {
-    import('html2pdf.js').then((html2pdf) => {
-      const element = document.getElementById('presupuesto-detalle-content');
-      const opt = {
-        margin: 0.5,
-        filename: `Presupuesto_${presupuesto.nombre || ''}_${presupuesto.id || ''}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' },
-      };
-      html2pdf.default().from(element).set(opt).save();
-    });
+  const handleExportPdf = async () => {
+    try {
+      const tableHead = [['Mes', 'Ingreso Estimado', 'Ingreso Real', 'Desvio Ingresos', 'Egreso Estimado', 'Egreso Real', 'Desvio Egresos', 'Total Estimado', 'Total Real', 'Total Desvio']];
+      const tableBody = datosMensualesRaw.map((fila) => {
+        const ingresoEst = safeNumber(fila.ingresoEst);
+        const ingresoReal = safeNumber(fila.ingresoReal);
+        const egresoEst = safeNumber(fila.egresoEst);
+        const egresoReal = safeNumber(fila.egresoReal);
+        const totalEst = safeNumber(fila.totalEst ?? (ingresoEst - egresoEst));
+        const totalReal = safeNumber(fila.totalReal ?? (ingresoReal - egresoReal));
+        return [
+          fila.mes ?? '-',
+          formatCurrency(ingresoEst),
+          formatCurrency(ingresoReal),
+          formatCurrency(ingresoReal - ingresoEst),
+          formatCurrency(egresoEst),
+          formatCurrency(egresoReal),
+          formatCurrency(egresoReal - egresoEst),
+          formatCurrency(totalEst),
+          formatCurrency(totalReal),
+          formatCurrency(totalReal - totalEst),
+        ];
+      });
+      tableBody.push(['', '', '', '', '', '', '', '', '', '']);
+      tableBody.push([
+        'Totales',
+        formatCurrency(totalIngresoEst),
+        formatCurrency(totalIngresoReal),
+        formatCurrency(totalIngresoReal - totalIngresoEst),
+        formatCurrency(totalEgresoEst),
+        formatCurrency(totalEgresoReal),
+        formatCurrency(totalEgresoReal - totalEgresoEst),
+        formatCurrency(resultadoEstimado),
+        formatCurrency(resultadoReal),
+        formatCurrency(resultadoReal - resultadoEstimado),
+      ]);
+
+      const charts = [];
+      if (desvioChartRef.current) charts.push({ element: desvioChartRef.current });
+
+      await exportPdfReport({
+        title: 'Detalle de Presupuesto',
+        subtitle: presupuesto.nombre,
+        charts,
+        table: { head: tableHead, body: tableBody },
+        fileName: `Presupuesto_${presupuesto.nombre || ''}`,
+        footerOnFirstPage: false,
+        cover: {
+          show: true,
+          subtitle: 'Resumen anual',
+          logo: logoDataUrl,
+          meta: [
+            { label: 'Presupuesto', value: presupuesto.nombre || '-' },
+            { label: 'Generado', value: new Date().toLocaleDateString('es-AR') },
+          ],
+          kpis: [
+            { label: 'Ingresos', value: formatCurrency(totalIngresoReal) },
+            { label: 'Egresos', value: formatCurrency(totalEgresoReal) },
+            { label: 'Resultado', value: formatCurrency(resultadoReal) },
+          ],
+          summary: [
+            `Estimado: ${formatCurrency(resultadoEstimado)}`,
+            `Cumplimiento: ${(pctCumplimientoGlobal * 100).toFixed(0)}%`,
+          ],
+        },
+      });
+    } catch (e) {
+      console.error('Error al exportar PDF de presupuesto:', e);
+      alert('No se pudo generar el PDF.');
+    }
   };
 
   // Drawer contenido: lista de meses ordenados por mayor desvío (absoluto)
@@ -532,7 +698,7 @@ export default function PresupuestoDetalle() {
         <>
           {/* KPIs con acciones rápidas */}
           <Grid container spacing={2} mb={2}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.ingresos, color: 'white', position: 'relative', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'success.main', mx: 'auto', mb: 1 }}>+</Avatar>
                 <Typography variant="h6">Ingresos</Typography>
@@ -557,7 +723,7 @@ export default function PresupuestoDetalle() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.egresos, color: 'white', position: 'relative', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'error.main', mx: 'auto', mb: 1 }}>-</Avatar>
                 <Typography variant="h6">Egresos</Typography>
@@ -582,7 +748,7 @@ export default function PresupuestoDetalle() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper
                 sx={{
                   p: 3,
@@ -624,7 +790,7 @@ export default function PresupuestoDetalle() {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="overline">Marcador de salud</Typography>
                 <Stack alignItems="center" spacing={1}>
@@ -657,16 +823,16 @@ export default function PresupuestoDetalle() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       {/* Estimado */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                           onClick={() => fila && goToMes(fila)}>
+                        onClick={() => fila && goToMes(fila)}>
                         <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                         <Box sx={{ flex: 1, height: 30 }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                          <ResponsiveContainer width="100%" height={30} minWidth={0}>
                             <BarChart data={[{ name: item.mes, valor: item.estimado }]} layout="vertical">
                               <XAxis type="number" domain={[0, max]} hide />
                               <YAxis type="category" dataKey="name" hide />
                               <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                               <Bar dataKey="valor" fill={INGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
-                                   label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                             </BarChart>
                           </ResponsiveContainer>
                         </Box>
@@ -675,16 +841,16 @@ export default function PresupuestoDetalle() {
                       {/* Real */}
                       {!verSoloEstimados && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                             onClick={() => fila && goToMes(fila)}>
+                          onClick={() => fila && goToMes(fila)}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.mes, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                                 <Bar dataKey="valor" fill={INGRESO_REAL_COLOR} radius={[4, 4, 4, 4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -714,16 +880,16 @@ export default function PresupuestoDetalle() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       {/* Estimado */}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                           onClick={() => fila && goToMes(fila)}>
+                        onClick={() => fila && goToMes(fila)}>
                         <Typography variant="body2" sx={{ minWidth: 80 }}>Estimado:</Typography>
                         <Box sx={{ flex: 1, height: 30 }}>
-                          <ResponsiveContainer width="100%" height={30}>
+                          <ResponsiveContainer width="100%" height={30} minWidth={0}>
                             <BarChart data={[{ name: item.mes, valor: item.estimado }]} layout="vertical">
                               <XAxis type="number" domain={[0, max]} hide />
                               <YAxis type="category" dataKey="name" hide />
                               <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                               <Bar dataKey="valor" fill={EGRESO_EST_COLOR} radius={[4, 4, 4, 4]}
-                                   label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                             </BarChart>
                           </ResponsiveContainer>
                         </Box>
@@ -732,16 +898,16 @@ export default function PresupuestoDetalle() {
                       {/* Real */}
                       {!verSoloEstimados && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}
-                             onClick={() => fila && goToMes(fila)}>
+                          onClick={() => fila && goToMes(fila)}>
                           <Typography variant="body2" sx={{ minWidth: 80 }}>Real:</Typography>
                           <Box sx={{ flex: 1, height: 30 }}>
-                            <ResponsiveContainer width="100%" height={30}>
+                            <ResponsiveContainer width="100%" height={30} minWidth={0}>
                               <BarChart data={[{ name: item.mes, valor: item.real }]} layout="vertical">
                                 <XAxis type="number" domain={[0, max]} hide />
                                 <YAxis type="category" dataKey="name" hide />
                                 <RTooltip formatter={(value) => [formatCurrency(value), '']} />
                                 <Bar dataKey="valor" fill={EGRESO_REAL_COLOR} radius={[4, 4, 4, 4]}
-                                     label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
+                                  label={{ position: 'right', formatter: (v) => formatCurrency(v) }} />
                               </BarChart>
                             </ResponsiveContainer>
                           </Box>
@@ -759,58 +925,60 @@ export default function PresupuestoDetalle() {
             <Typography variant="h6" gutterBottom fontWeight="600">
               Tendencia del Resultado Mensual
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={desvioData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="50%" stopColor="#4caf50" stopOpacity={0.1} />
-                    <stop offset="50%" stopColor="#f44336" stopOpacity={0.1} />
-                  </linearGradient>
-                </defs>
-                <Area dataKey="superavit" fill="url(#splitColor)" stroke="none" yAxisId="left" />
-                <Line
-                  type="monotone"
-                  dataKey="superavit"
-                  stroke="#2196f3"
-                  strokeWidth={2}
-                  dot={{ r: 6, cursor: 'pointer' }}
-                  activeDot={{ r: 8 }}
-                  yAxisId="left"
-                  onClick={(_, index) => {
-                    const fila = datosMensuales[index];
-                    if (fila) goToMes(fila);
-                  }}
-                />
-                <ReferenceLine
-                  y={0}
-                  stroke="#666"
-                  strokeDasharray="3 3"
-                  label={{ value: 'Punto de equilibrio', position: 'right', fill: '#666', fontSize: 12 }}
-                />
-                <XAxis dataKey="mes" />
-                <YAxis
-                  yAxisId="left"
-                  domain={[dataMin => Math.min(dataMin, 0), dataMax => Math.max(dataMax, 0)]}
-                  tickFormatter={(value) => formatCurrency(value)}
-                  width={70}
-                />
-                <RTooltip
-                  formatter={(value) => [
-                    Number(value) >= 0
-                      ? `Superávit: ${formatCurrency(value)}`
-                      : `Déficit: ${formatCurrency(value)}`,
-                    'Resultado'
-                  ]}
-                  contentStyle={{ color: 'black' }}
-                />
-                <Legend
-                  payload={[
-                    { value: 'Resultado mensual', type: 'line', color: '#2196f3' },
-                    { value: 'Punto de equilibrio', type: 'dashedLine', color: '#666' },
-                  ]}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <Box ref={desvioChartRef}>
+              <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                <LineChart data={desvioData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="50%" stopColor="#4caf50" stopOpacity={0.1} />
+                      <stop offset="50%" stopColor="#f44336" stopOpacity={0.1} />
+                    </linearGradient>
+                  </defs>
+                  <Area dataKey="superavit" fill="url(#splitColor)" stroke="none" yAxisId="left" />
+                  <Line
+                    type="monotone"
+                    dataKey="superavit"
+                    stroke="#2196f3"
+                    strokeWidth={2}
+                    dot={{ r: 6, cursor: 'pointer' }}
+                    activeDot={{ r: 8 }}
+                    yAxisId="left"
+                    onClick={(_, index) => {
+                      const fila = datosMensuales[index];
+                      if (fila) goToMes(fila);
+                    }}
+                  />
+                  <ReferenceLine
+                    y={0}
+                    stroke="#666"
+                    strokeDasharray="3 3"
+                    label={{ value: 'Punto de equilibrio', position: 'right', fill: '#666', fontSize: 12 }}
+                  />
+                  <XAxis dataKey="mes" />
+                  <YAxis
+                    yAxisId="left"
+                    domain={[dataMin => Math.min(dataMin, 0), dataMax => Math.max(dataMax, 0)]}
+                    tickFormatter={(value) => formatCurrency(value)}
+                    width={70}
+                  />
+                  <RTooltip
+                    formatter={(value) => [
+                      Number(value) >= 0
+                        ? `Superavit: ${formatCurrency(value)}`
+                        : `Deficit: ${formatCurrency(value)}`,
+                      'Resultado'
+                    ]}
+                    contentStyle={{ color: 'black' }}
+                  />
+                  <Legend
+                    payload={[
+                      { value: 'Resultado mensual', type: 'line', color: '#2196f3' },
+                      { value: 'Punto de equilibrio', type: 'dashedLine', color: '#666' },
+                    ]}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
           </Paper>
         </>
       )}

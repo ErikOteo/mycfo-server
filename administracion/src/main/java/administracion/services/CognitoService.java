@@ -13,8 +13,8 @@ import java.util.Map;
 public class CognitoService {
 
     private final CognitoIdentityProviderClient cognitoClient;
-    private static final String USER_POOL_ID = System.getenv("COGNITO_USER_POOL_ID") != null 
-            ? System.getenv("COGNITO_USER_POOL_ID") 
+    private static final String USER_POOL_ID = System.getenv("COGNITO_USER_POOL_ID") != null
+            ? System.getenv("COGNITO_USER_POOL_ID")
             : "sa-east-1_lTMNrWW7R";
     private static final String CLIENT_ID = System.getenv("COGNITO_CLIENT_ID") != null
             ? System.getenv("COGNITO_CLIENT_ID")
@@ -23,7 +23,8 @@ public class CognitoService {
     /**
      * Registra un nuevo usuario en Cognito con todos sus atributos
      */
-    public String registrarUsuario(String email, String password, String nombre, String apellido, String nombreEmpresa) {
+    public String registrarUsuario(String email, String password, String nombre, String apellido,
+            String nombreEmpresa) {
         try {
             SignUpRequest signUpRequest = SignUpRequest.builder()
                     .clientId(CLIENT_ID)
@@ -33,8 +34,7 @@ public class CognitoService {
                             AttributeType.builder().name("email").value(email).build(),
                             AttributeType.builder().name("name").value(nombre).build(),
                             AttributeType.builder().name("family_name").value(apellido).build(),
-                            AttributeType.builder().name("custom:organizacion").value(nombreEmpresa).build()
-                    )
+                            AttributeType.builder().name("custom:organizacion").value(nombreEmpresa).build())
                     .build();
 
             SignUpResponse response = cognitoClient.signUp(signUpRequest);
@@ -109,7 +109,7 @@ public class CognitoService {
                     .build();
 
             AdminGetUserResponse response = cognitoClient.adminGetUser(request);
-            
+
             // El sub está en los atributos del usuario
             return response.userAttributes().stream()
                     .filter(attr -> attr.name().equals("sub"))
@@ -141,7 +141,7 @@ public class CognitoService {
             Map<String, String> attributes = new HashMap<>();
             attributes.put("name", nombre);
             attributes.put("email", email);
-            
+
             // Solo agregar teléfono si tiene formato válido
             if (telefono != null && !telefono.isEmpty()) {
                 if (esFormatoTelefonoValido(telefono)) {
@@ -161,8 +161,7 @@ public class CognitoService {
                                             .name(entry.getKey())
                                             .value(entry.getValue())
                                             .build())
-                                    .toList()
-                    )
+                                    .toList())
                     .build();
 
             cognitoClient.adminUpdateUserAttributes(request);
@@ -216,6 +215,27 @@ public class CognitoService {
             cognitoClient.adminEnableUser(request);
         } catch (Exception e) {
             throw new RuntimeException("Error al activar usuario en Cognito: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Cambia la contraseña del usuario (requiere el Access Token válido)
+     */
+    public void cambiarPassword(String accessToken, String oldPassword, String newPassword) {
+        try {
+            ChangePasswordRequest request = ChangePasswordRequest.builder()
+                    .accessToken(accessToken)
+                    .previousPassword(oldPassword)
+                    .proposedPassword(newPassword)
+                    .build();
+
+            cognitoClient.changePassword(request);
+        } catch (InvalidPasswordException e) {
+            throw new RuntimeException("La nueva contraseña no cumple con los requisitos de seguridad.", e);
+        } catch (NotAuthorizedException e) {
+            throw new RuntimeException("La contraseña actual es incorrecta o el token ha expirado.", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Error al cambiar la contraseña: " + e.getMessage(), e);
         }
     }
 }

@@ -125,7 +125,8 @@ public class FacturaController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String moneda
     ) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
@@ -135,7 +136,16 @@ public class FacturaController {
             org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
                     page, size, org.springframework.data.domain.Sort.by(direction, sortBy));
 
-            org.springframework.data.domain.Page<Factura> facturas = facturaService.listarPaginadasPorOrganizacion(empresaId, pageable);
+            registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+
+            org.springframework.data.domain.Page<Factura> facturas = facturaService.listarPaginadasPorOrganizacion(empresaId, monedaEnum, pageable);
             return ResponseEntity.ok(facturas);
         } catch (RuntimeException e) {
             log.error("Error al obtener facturas paginadas: {}", e.getMessage());
@@ -150,18 +160,43 @@ public class FacturaController {
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate fechaHasta,
             @RequestParam(required = false) String tipoFactura,
             @RequestParam(required = false) registro.cargarDatos.models.EstadoPago estadoPago,
+            @RequestParam(required = false) Double montoMin,
+            @RequestParam(required = false) Double montoMax,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate searchDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String moneda
     ) {
         try {
-            Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+            Long empresaId;
+            try {
+                empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+            } catch (RuntimeException e) {
+                // Si no se encuentra la empresa/usuario, devolvemos página vacía en vez de 400
+                org.springframework.data.domain.Sort.Direction direction = sortDir.equalsIgnoreCase("asc")
+                        ? org.springframework.data.domain.Sort.Direction.ASC
+                        : org.springframework.data.domain.Sort.Direction.DESC;
+                org.springframework.data.domain.Pageable emptyPageable = org.springframework.data.domain.PageRequest.of(
+                        page, size, org.springframework.data.domain.Sort.by(direction, sortBy));
+                return ResponseEntity.ok(org.springframework.data.domain.Page.empty(emptyPageable));
+            }
             org.springframework.data.domain.Sort.Direction direction = sortDir.equalsIgnoreCase("asc")
                     ? org.springframework.data.domain.Sort.Direction.ASC
                     : org.springframework.data.domain.Sort.Direction.DESC;
             org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
                     page, size, org.springframework.data.domain.Sort.by(direction, sortBy));
+
+            registro.cargarDatos.models.TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = registro.cargarDatos.models.TipoMoneda.fromString(moneda);
+                } catch (Exception ex) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
 
             org.springframework.data.domain.Page<Factura> facturas = facturaService.buscarFacturas(
                     empresaId,
@@ -170,6 +205,11 @@ public class FacturaController {
                     fechaHasta,
                     tipoFactura,
                     estadoPago,
+                    monedaEnum,
+                    montoMin,
+                    montoMax,
+                    search,
+                    searchDate,
                     pageable
             );
             return ResponseEntity.ok(facturas);
@@ -256,4 +296,3 @@ public class FacturaController {
         }
     }
 }
-

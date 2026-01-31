@@ -29,7 +29,8 @@ public class CashflowService {
         String url = registroUrl + "/registros";
         RegistroDTO[] registros = restTemplate.getForObject(url, RegistroDTO[].class);
 
-        if (registros == null) return List.of();
+        if (registros == null)
+            return List.of();
 
         // Filtrar solo ingresos y egresos válidos para el año
         List<String> mediosValidos = List.of("Efectivo", "Transferencia", "MercadoPago");
@@ -38,22 +39,38 @@ public class CashflowService {
                 .filter(r -> r.getFechaEmision() != null
                         && r.getFechaEmision().toLocalDate().getYear() == anio
                         && r.getTipo() != null
-                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo()))
-                        && r.getMedioPago() != null
-                        && mediosValidos.contains(r.getMedioPago()))
+                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo())))
+                // && r.getMedioPago() != null
+                // && mediosValidos.contains(r.getMedioPago()))
                 .collect(Collectors.toList());
     }
 
-    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String authorization) {
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub) {
+        return obtenerRegistrosPorAnio(anio, userSub, null, null);
+    }
+
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String moneda) {
+        return obtenerRegistrosPorAnio(anio, userSub, moneda, null);
+    }
+
+    public List<RegistroDTO> obtenerRegistrosPorAnio(int anio, String userSub, String moneda, String authorization) {
         LocalDate desde = LocalDate.of(anio, 1, 1);
         LocalDate hasta = LocalDate.of(anio, 12, 31);
         String url = registroUrl + "/movimientos?fechaDesde=" + desde +
                 "&fechaHasta=" + hasta +
                 "&tipos=Ingreso&tipos=Egreso&page=0&size=1000&sortBy=fechaEmision&sortDir=asc";
 
+        if (moneda != null && !moneda.isBlank()) {
+            url = url + "&moneda=" + moneda;
+        }
+
         HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Usuario-Sub", userSub);
-        headers.add("Authorization", authorization);
+        if (userSub != null) {
+            headers.add("X-Usuario-Sub", userSub);
+        }
+        if (authorization != null && !authorization.isBlank()) {
+            headers.add("Authorization", authorization);
+        }
 
         ResponseEntity<reporte.dtos.PageResponse<RegistroDTO>> response;
         try {
@@ -61,8 +78,8 @@ public class CashflowService {
                     url,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {}
-            );
+                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {
+                    });
         } catch (HttpClientErrorException e) {
             var status = e.getStatusCode();
             if (status.value() == HttpStatus.UNAUTHORIZED.value() || status.value() == HttpStatus.FORBIDDEN.value()) {
@@ -81,9 +98,9 @@ public class CashflowService {
                 .filter(r -> r.getFechaEmision() != null
                         && r.getFechaEmision().toLocalDate().getYear() == anio
                         && r.getTipo() != null
-                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo()))
-                        && r.getMedioPago() != null
-                        && mediosValidos.contains(r.getMedioPago()))
+                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo())))
+                // && r.getMedioPago() != null
+                // && mediosValidos.contains(r.getMedioPago()))
                 .collect(Collectors.toList());
     }
 

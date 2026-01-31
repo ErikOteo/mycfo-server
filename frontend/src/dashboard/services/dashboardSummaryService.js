@@ -6,6 +6,7 @@ export const fetchDashboardSummary = async ({
   months = 12,
   limitMovements = 6,
   limitInvoices = 6,
+  currency,
 } = {}) => {
   const params = new URLSearchParams();
 
@@ -16,6 +17,7 @@ export const fetchDashboardSummary = async ({
   if (months) params.set("meses", String(months));
   if (limitMovements) params.set("limiteMovimientos", String(limitMovements));
   if (limitInvoices) params.set("limiteFacturas", String(limitInvoices));
+  if (currency) params.set("moneda", currency);
 
   const qs = params.toString();
   const url = `${API_CONFIG.REGISTRO}/movimientos/resumen/dashboard${qs ? `?${qs}` : ""}`;

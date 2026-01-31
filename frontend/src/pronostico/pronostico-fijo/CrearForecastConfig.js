@@ -12,6 +12,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
+import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
 
 export default function CrearForecastConfig() {
   const { id } = useParams(); // Si existe, estamos editando
@@ -105,6 +106,25 @@ export default function CrearForecastConfig() {
   const handleCancel = () => {
     navigate('/pronostico-fijo');
   };
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "configuracion-pronostico",
+      mode: id ? "editar" : "nuevo",
+      loading,
+      loadingData,
+      error,
+      success,
+      formData: {
+        nombre: formData.nombre,
+        horizonteMeses: formData.horizonteMeses,
+        mesesFrecuencia: formData.mesesFrecuencia,
+      },
+    }),
+    [id, loading, loadingData, error, success, formData]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   if (loadingData) {
     return (

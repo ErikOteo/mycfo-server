@@ -1,6 +1,7 @@
 // Configuración de URLs de los microservicios para AZURE
 //const BASE_URL = process.env.REACT_APP_BASE_URL || 'http://4.206.176.204';
 const BASE_URL = process.env.REACT_APP_BASE_URL || 'https://mycfo.com.ar';
+const WS_URL = process.env.REACT_APP_WEBSOCKET_URL;
 
 const API_CONFIG = {
   // URLs apuntando al Proxy Nginx (Puerto 80)
@@ -16,7 +17,7 @@ const API_CONFIG = {
   FORECAST:       `${BASE_URL}/api/forecast`,
   
   // WebSocket (Nginx maneja la conexión WS también)
-  WEBSOCKET:      `${BASE_URL.replace(/^http/, 'ws')}/api/notificacion/ws`,
+  WEBSOCKET:      WS_URL || `${BASE_URL.replace(/^http/, 'ws')}/api/notificacion/ws`,
   
   // URL base
   BASE: BASE_URL

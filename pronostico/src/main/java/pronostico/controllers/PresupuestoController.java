@@ -22,6 +22,7 @@ import pronostico.repositories.PresupuestoLineaRepository;
 import pronostico.services.AdministracionService;
 import pronostico.services.PresupuestoService;
 import pronostico.services.PresupuestoService.ListStatus;
+import pronostico.services.PresupuestoEventService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,9 +44,19 @@ public class PresupuestoController {
     private final PresupuestoService service;
     private final PresupuestoLineaRepository presupuestoLineaRepository;
     private final AdministracionService administracionService;
+    private final PresupuestoEventService presupuestoEventService;
 
     private static final DateTimeFormatter YM = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final Pattern YM_PATTERN = Pattern.compile("^(\\d{4})-(\\d{1,2})(?:-(\\d{1,2}))?$");
+
+    private String normalizeMoneda(String moneda) {
+        if (moneda == null || moneda.isBlank()) return null;
+        String up = moneda.trim().toUpperCase(Locale.ROOT);
+        if (!up.equals("ARS") && !up.equals("USD")) {
+            throw new IllegalArgumentException("Moneda inválida. Use ARS o USD.");
+        }
+        return up;
+    }
 
     @GetMapping("/presupuestos")
     public Page<PresupuestoDTO> getAll(
@@ -56,25 +67,27 @@ public class PresupuestoController {
         @RequestParam(value = "page", defaultValue = "0") int page,
         @RequestParam(value = "size", defaultValue = "3") int size,
         @RequestParam(value = "sort", defaultValue = "createdAt,desc") String sortParam,
+        @RequestParam(value = "moneda", required = false) String moneda,
         @RequestHeader(value = "X-Usuario-Sub", required = false) String usuarioSubHeader,
         @AuthenticationPrincipal Jwt jwt
     ) {
         RequestContext ctx = resolveContext(usuarioSubHeader, jwt);
         ListStatus status = ListStatus.from(statusParam);
+        String monedaNormalized = normalizeMoneda(moneda);
         try {
             Pageable pageable = buildPageable(page, size, sortParam);
             if (from != null || to != null) {
                 if (from == null || to == null) {
                     throw new IllegalArgumentException("Debe especificar las fechas 'from' y 'to' para el rango");
                 }
-                return service.findByRange(from, to, ctx.organizacionId(), status, pageable);
+                return service.findByRange(from, to, ctx.organizacionId(), status, pageable, monedaNormalized);
             }
             if (year != null) {
                 LocalDate start = LocalDate.of(year, 1, 1);
                 LocalDate end = LocalDate.of(year, 12, 31);
-                return service.findByRange(start, end, ctx.organizacionId(), status, pageable);
+                return service.findByRange(start, end, ctx.organizacionId(), status, pageable, monedaNormalized);
             }
-            return service.listByStatus(ctx.organizacionId(), status, pageable);
+            return service.listByStatus(ctx.organizacionId(), status, pageable, monedaNormalized);
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
         }
@@ -253,7 +266,7 @@ public class PresupuestoController {
     ) {
         RequestContext ctx = resolveContext(usuarioSubHeader, jwt);
         Presupuesto presupuesto = service.mustOwn(id, ctx.sub(), ctx.organizacionId());
-        return upsertLinea(presupuesto, ym, lineaId, req, true);
+        return upsertLinea(ctx, presupuesto, ym, lineaId, req, true);
     }
 
     @PutMapping("/presupuestos/{id}/mes/{ym}/lineas/{lineaId}")
@@ -267,7 +280,7 @@ public class PresupuestoController {
     ) {
         RequestContext ctx = resolveContext(usuarioSubHeader, jwt);
         Presupuesto presupuesto = service.mustOwn(id, ctx.sub(), ctx.organizacionId());
-        return upsertLinea(presupuesto, ym, lineaId, req, false);
+        return upsertLinea(ctx, presupuesto, ym, lineaId, req, false);
     }
 
     @DeleteMapping("/presupuestos/{id}/mes/{ym}/lineas/{lineaId}")
@@ -293,6 +306,7 @@ public class PresupuestoController {
     }
 
     private ResponseEntity<Map<String, Object>> upsertLinea(
+        RequestContext ctx,
         Presupuesto presupuesto,
         String ym,
         Long lineaId,
@@ -326,6 +340,31 @@ public class PresupuestoController {
         }
 
         PresupuestoLinea saved = presupuestoLineaRepository.save(linea);
+
+        // Notificación de presupuesto excedido si el real supera el estimado
+        if (saved.getMontoEstimado() != null
+                && saved.getMontoReal() != null
+                && saved.getMontoReal().compareTo(saved.getMontoEstimado()) > 0) {
+            presupuestoEventService.sendBudgetExceededEvent(presupuesto, saved, ctx.sub());
+        }
+
+        // Chequeo anual de egresos totales
+        try {
+            BigDecimal totalEstimadoEgreso = presupuestoLineaRepository.sumEstimadoEgreso(presupuesto.getId());
+            BigDecimal totalRealEgreso = presupuestoLineaRepository.sumRealEgreso(presupuesto.getId());
+            if (totalEstimadoEgreso != null
+                    && totalRealEgreso != null
+                    && totalRealEgreso.compareTo(totalEstimadoEgreso) > 0) {
+                presupuestoEventService.sendBudgetExceededAnnual(
+                        presupuesto,
+                        totalEstimadoEgreso,
+                        totalRealEgreso,
+                        ctx.sub());
+            }
+        } catch (Exception e) {
+            System.err.println("Error evaluando excedente anual: " + e.getMessage());
+        }
+
         return ResponseEntity.ok(toLineaDTO(saved));
     }
 
@@ -519,8 +558,6 @@ public class PresupuestoController {
         }
     }
 }
-
-
 
 
 

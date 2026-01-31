@@ -11,25 +11,11 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import useResolvedColorTokens from "../useResolvedColorTokens";
+import { formatCurrencyByCode } from "../../utils/formatters";
 
 const numberFormatter = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 0,
 });
-
-const formatCurrency = (value) => {
-  if (value === null || value === undefined) {
-    return "--";
-  }
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "--";
-  }
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(numeric);
-};
 
 const percentFormatter = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 0,
@@ -59,9 +45,14 @@ const ReconciliationWidget = ({
   error = null,
   onRetry,
   onNavigate,
+  currency = "ARS",
 }) => {
   const { resolvedMode } = useResolvedColorTokens();
   const isDarkMode = resolvedMode === "dark";
+  const formatAmount = React.useCallback(
+    (value) => formatCurrencyByCode(value, currency, { fallback: "--" }),
+    [currency]
+  );
 
   if (loading) {
     return (
@@ -119,14 +110,14 @@ const ReconciliationWidget = ({
         flex: 1,
       }}
     >
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.primary">
         {label}
       </Typography>
       <Typography variant="subtitle1" fontWeight={600}>
         {value}
       </Typography>
       {helper ? (
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.primary">
           {helper}
         </Typography>
       ) : null}
@@ -140,6 +131,7 @@ const ReconciliationWidget = ({
         subheader={
           summary?.periodLabel ? `Período ${summary.periodLabel}` : "Resumen del último período"
         }
+        subheaderTypographyProps={{ color: 'text.primary' }}
       />
       <CardContent sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         {summary ? (
@@ -155,15 +147,15 @@ const ReconciliationWidget = ({
                 "Total del período"
               )}
               {renderMetric(
-              "Conciliados",
-              numberFormatter.format(summary.conciliados ?? 0),
-              formatPercent(conciliadosPercent)
-            )}
-            {renderMetric(
-              "Pendientes",
-              numberFormatter.format(summary.pendientes ?? 0),
-              formatPercent(pendientesPercent)
-            )}
+                "Conciliados",
+                numberFormatter.format(summary.conciliados ?? 0),
+                formatPercent(conciliadosPercent)
+              )}
+              {renderMetric(
+                "Pendientes",
+                numberFormatter.format(summary.pendientes ?? 0),
+                formatPercent(pendientesPercent)
+              )}
             </Stack>
 
             <Box>
@@ -174,7 +166,7 @@ const ReconciliationWidget = ({
                 sx={{ mb: 0.75 }}
               >
                 <Typography variant="subtitle2">Avance general</Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.primary">
                   {formatPercent(progress)}
                 </Typography>
               </Stack>
@@ -194,10 +186,10 @@ const ReconciliationWidget = ({
 
             <Stack spacing={0.5}>
               <Typography variant="subtitle2">Últimas referencias</Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.primary">
                 Última conciliación: {formatDate(summary.ultimaConciliacion)}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.primary">
                 Último movimiento pendiente: {formatDate(summary.ultimoPendiente)}
               </Typography>
             </Stack>
@@ -222,7 +214,7 @@ const ReconciliationWidget = ({
                         <Typography variant="body2" fontWeight={600}>
                           {item?.tipo ?? "Sin tipo"}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.primary">
                           {formatPercent(itemProgress)}
                         </Typography>
                       </Stack>
@@ -239,19 +231,19 @@ const ReconciliationWidget = ({
                         }}
                       />
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.primary">
                           {numberFormatter.format(item?.conciliados ?? 0)} /{" "}
                           {numberFormatter.format(item?.total ?? 0)} conciliados
                         </Typography>
                         {(item?.montoTotal !== undefined && item?.montoTotal !== null) && (
-                          <Typography 
-                            variant="body2" 
+                          <Typography
+                            variant="body2"
                             fontWeight={700}
-                            sx={{ 
-                              color: (item.tipo === "Egreso" || item.montoTotal < 0) ? "error.main" : "success.main" 
+                            sx={{
+                              color: (item.tipo === "Egreso" || item.montoTotal < 0) ? "error.main" : "success.main"
                             }}
                           >
-                            {formatCurrency(item.montoTotal)}
+                            {formatAmount(item.montoTotal)}
                           </Typography>
                         )}
                       </Stack>
@@ -259,7 +251,7 @@ const ReconciliationWidget = ({
                   );
                 })
               ) : (
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.primary">
                   No hay movimientos clasificados por tipo en este período.
                 </Typography>
               )}
@@ -267,7 +259,7 @@ const ReconciliationWidget = ({
           </>
         ) : (
           <Stack spacing={2} alignItems="flex-start">
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.primary">
               Todavía no hay movimientos que analizar en este período. Carga o importa operaciones
               para comenzar a conciliarlas.
             </Typography>
@@ -284,7 +276,10 @@ const ReconciliationWidget = ({
           variant="outlined"
           onClick={() => onNavigate?.()}
           disabled={!onNavigate}
-          sx={isDarkMode ? { color: "#42897f" } : undefined}
+          sx={{
+            lineHeight: 1.2,
+            ...(isDarkMode && { color: "#42897f" }),
+          }}
         >
           Ir a conciliación
         </Button>

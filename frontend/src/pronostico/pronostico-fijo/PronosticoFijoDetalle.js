@@ -6,7 +6,12 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Alert,
-  Button
+  Button,
+  FormControl,
+  Select,
+  MenuItem,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -25,10 +30,15 @@ import {
 import LoadingSpinner from '../../shared-components/LoadingSpinner';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
+import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
 
 export default function PronosticoFijoDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
   const [loading, setLoading] = React.useState(true);
   const [forecast, setForecast] = React.useState(null);
   const [error, setError] = React.useState(null);
@@ -36,14 +46,20 @@ export default function PronosticoFijoDetalle() {
 
   React.useEffect(() => {
     cargarForecast();
-  }, [id]);
+  }, [id]); // Removido currency de dependencias para evitar recargas innecesarias si es fijo
 
   const cargarForecast = async () => {
     setLoading(true);
     setError(null);
     try {
+      // Cargamos el forecast. El endpoint ignora el query param moneda si es fijo, pero lo dejamos por consistencia
       const response = await http.get(`${API_CONFIG.PRONOSTICO}/api/forecasts/${id}`);
       setForecast(response.data);
+
+      // Si el forecast tiene moneda fija, forzamos esa moneda
+      if (response.data.moneda) {
+        setCurrency(response.data.moneda);
+      }
     } catch (err) {
       console.error('Error cargando forecast:', err);
       setError(err.response?.data?.message || 'Error al cargar el pronóstico. Por favor intenta nuevamente.');
@@ -74,6 +90,57 @@ export default function PronosticoFijoDetalle() {
 
   const chartData = prepareChartData();
 
+  const chartSummary = React.useMemo(() => {
+    if (!chartData || chartData.length === 0) return null;
+    const first = chartData[0];
+    const last = chartData[chartData.length - 1];
+    const realCount = chartData.filter((item) => item.tipo === 'real').length;
+    return {
+      meses: chartData.length,
+      rango: {
+        desde: first.mes,
+        hasta: last.mes,
+      },
+      reales: realCount,
+      estimados: chartData.length - realCount,
+      ultimo: {
+        mes: last.mes,
+        tipo: last.tipo,
+        ingresos: last.ingresos,
+        egresos: last.egresos,
+        balance: last.balance,
+      },
+    };
+  }, [chartData]);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "pronostico-fijo-detalle",
+      forecastId: id,
+      currency,
+      loading,
+      error,
+      viewMode,
+      forecast: forecast
+        ? {
+            id: forecast.id,
+            nombre: forecast.nombre,
+            horizonteMeses: forecast.horizonteMeses,
+            mesesFrecuencia: forecast.mesesFrecuencia,
+            periodosAnalizados: forecast.periodosAnalizados,
+            createdAt: forecast.createdAt,
+            mesInicioPronostico: forecast.mesInicioPronostico,
+            mesFinPronostico: forecast.mesFinPronostico,
+            moneda: forecast.moneda,
+          }
+        : null,
+      resumen: chartSummary,
+    }),
+    [id, currency, loading, error, viewMode, forecast, chartSummary]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   // Determinar el punto de cambio entre real y estimado
   const getSplitPoint = () => {
     if (!chartData || chartData.length === 0) return -1;
@@ -94,11 +161,11 @@ export default function PronosticoFijoDetalle() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="ingresos" 
-                stroke="#2e7d32" 
-                strokeWidth={2} 
-                name="Ingresos" 
+              <Line
+                dataKey="ingresos"
+                stroke="#2e7d32"
+                strokeWidth={2}
+                name="Ingresos"
                 dot={false}
               />
             </>
@@ -109,11 +176,11 @@ export default function PronosticoFijoDetalle() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="egresos" 
-                stroke="#c62828" 
-                strokeWidth={2} 
-                name="Egresos" 
+              <Line
+                dataKey="egresos"
+                stroke="#c62828"
+                strokeWidth={2}
+                name="Egresos"
                 dot={false}
               />
             </>
@@ -124,11 +191,11 @@ export default function PronosticoFijoDetalle() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="balance" 
-                stroke="#1565c0" 
-                strokeWidth={2} 
-                name="Balance" 
+              <Line
+                dataKey="balance"
+                stroke="#1565c0"
+                strokeWidth={2}
+                name="Balance"
                 dot={false}
               />
             </>
@@ -271,51 +338,73 @@ export default function PronosticoFijoDetalle() {
       {/* Controles de visualización del gráfico */}
       {chartData.length > 0 && (
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ mr: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <CurrencyTabs
+              value={currency}
+              onChange={setCurrency}
+              sx={{ mb: 0 }}
+              disabled={!!forecast?.moneda} // Determina si se deshabilita
+            />
+            <Typography variant="h6" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
               Visualización
             </Typography>
-            <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={(e, newMode) => newMode && setViewMode(newMode)}
-              size="small"
-            >
-              <ToggleButton value="todos">
-                Todos
-              </ToggleButton>
-              <ToggleButton value="ingresos">
-                Solo Ingresos
-              </ToggleButton>
-              <ToggleButton value="egresos">
-                Solo Egresos
-              </ToggleButton>
-              <ToggleButton value="balance">
-                Solo Balance
-              </ToggleButton>
-            </ToggleButtonGroup>
+
+            {isMobile ? (
+              <FormControl size="small" sx={{ minWidth: 100, flexGrow: 1 }}>
+                <Select
+                  value={viewMode}
+                  onChange={(e) => setViewMode(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="todos">Todos</MenuItem>
+                  <MenuItem value="ingresos">Solo Ingresos</MenuItem>
+                  <MenuItem value="egresos">Solo Egresos</MenuItem>
+                  <MenuItem value="balance">Solo Balance</MenuItem>
+                </Select>
+              </FormControl>
+            ) : (
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(e, newMode) => newMode && setViewMode(newMode)}
+                size="small"
+              >
+                <ToggleButton value="todos">
+                  Todos
+                </ToggleButton>
+                <ToggleButton value="ingresos">
+                  Solo Ingresos
+                </ToggleButton>
+                <ToggleButton value="egresos">
+                  Solo Egresos
+                </ToggleButton>
+                <ToggleButton value="balance">
+                  Solo Balance
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
           </Box>
 
           {/* Gráfico */}
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={400} minWidth={0}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mes" />
-              <YAxis />
+              <YAxis width={70} />
               <Tooltip formatter={(value) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
               <Legend />
               {getSplitPointMes() && (
                 <>
-                  <ReferenceLine 
-                    x={getSplitPointMes()} 
-                    stroke="#9e9e9e" 
-                    strokeWidth={2} 
+                  <ReferenceLine
+                    x={getSplitPointMes()}
+                    stroke="#9e9e9e"
+                    strokeWidth={2}
                     strokeDasharray="3 3"
                     label={{ value: "Estimado", position: "top", fill: "#9e9e9e" }}
                   />
-                  <ReferenceArea 
-                    x1={getSplitPointMes()} 
-                    fill="#e3f2fd" 
+                  <ReferenceArea
+                    x1={getSplitPointMes()}
+                    fill="#e3f2fd"
                     fillOpacity={0.3}
                   />
                 </>
