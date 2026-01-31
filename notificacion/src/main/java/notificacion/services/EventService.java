@@ -474,8 +474,6 @@ public class EventService {
         String currency = evt.currency() != null ? evt.currency().toUpperCase() : "ARS";
         String symbol = "USD".equals(currency) ? "US$" : "$";
         return desc + symbol + (evt.amount() != null ? evt.amount() : "0");
-
-        return desc + formatMoney(evt.amount());
     }
 
     private String formatMoney(BigDecimal amount) {

@@ -181,7 +181,7 @@ public class PresupuestoService {
         existing.setDeletedAt(now);
         existing.setDeletedBy(ownerSub);
         log.info("Presupuesto {} marcado como eliminado por {}", id, ownerSub);
-        eventService.sendBudgetDeletedEvent(existing);
+        eventService.sendBudgetDeletedEvent(existing, ownerSub);
     }
 
     @Transactional
@@ -561,7 +561,7 @@ public class PresupuestoService {
             }
         }
 
-        eventService.sendBudgetCreatedEvent(presupuesto);
+        eventService.sendBudgetCreatedEvent(presupuesto, ownerSub);
         return presupuesto;
     }
 }
