@@ -466,8 +466,10 @@ export default function NotificationSettings() {
         <CardContent>
           <Box
             sx={{
-              columnCount: { xs: 1, sm: 2, md: 3, lg: 4 },
-              columnGap: { xs: 2, sm: 2.5 },
+              display: "flex",
+              flexWrap: "wrap",
+              gap: { xs: 2, sm: 2.5 },
+              justifyContent: "center",
             }}
           >
             {notificationTypes.map((type) => {
@@ -503,6 +505,9 @@ export default function NotificationSettings() {
                   sx={{
                     breakInside: "avoid",
                     display: "inline-block",
+                    flex: "1 1 280px",
+                    maxWidth: 340,
+                    minWidth: 260,
                     width: "100%",
                     mb: 2,
                   }}
