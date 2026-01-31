@@ -158,24 +158,8 @@ public class EventService {
 
     @Transactional
     public void handleBudgetExceeded(BudgetExceededEvent evt) {
-        TenantContext baseCtx = resolveTenant(evt.userId());
-        Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
-
-        String title = "Presupuesto excedido: " + evt.budgetName();
-        String body = String.format("Categoria: %s | Presupuestado: %s | Real: %s | Diferencia: %s",
-                evt.category(),
-                formatMoney(evt.budgeted()),
-                formatMoney(evt.actual()),
-                formatMoney(evt.variance()));
-
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
-                NotificationType.BUDGET_EXCEEDED,
-                ResourceType.BUDGET,
-                "budget_" + evt.budgetId() + "_" + evt.category(),
-                title,
-                body,
-                Severity.WARN,
-                createdAt));
+        // Deshabilitado: no procesar alertas de presupuesto excedido
+        return;
     }
 
     @Transactional
@@ -190,6 +174,9 @@ public class EventService {
         NotificationType type = isMonthly
                 ? NotificationType.MONTHLY_SUMMARY
                 : (evt.hasAnomalies() ? NotificationType.REPORT_ANOMALY : NotificationType.REPORT_READY);
+        if (type == NotificationType.REPORT_ANOMALY) {
+            return; // deshabilitado
+        }
         Severity severity = evt.hasAnomalies() ? Severity.WARN : Severity.INFO;
 
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
@@ -244,10 +231,10 @@ public class EventService {
         TenantContext baseCtx = resolveTenant(evt.userId());
         Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
 
-        String title = "Categoría sin presupuesto: " + evt.category();
+        String title = "CategorÃ­a sin presupuesto: " + evt.category();
         String body = "No hay presupuesto asignado para %s en %s".formatted(
                 evt.category(),
-                evt.period() != null ? evt.period() : "el período actual");
+                evt.period() != null ? evt.period() : "el perÃ­odo actual");
 
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
                 NotificationType.BUDGET_MISSING_CATEGORY,
@@ -261,30 +248,13 @@ public class EventService {
 
     @Transactional
     public void handleCashFlowAlert(CashFlowAlertEvent evt) {
-        TenantContext baseCtx = resolveTenant(evt.userId());
-        Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
-
-        String title = "Alerta de Cash Flow";
-        String body = evt.message() != null
-                ? evt.message()
-                : String.format("Balance actual: %s | Balance pronosticado: %s",
-                        formatMoney(evt.currentBalance()), formatMoney(evt.forecastBalance()));
-
-        Severity severity = "NEGATIVE".equals(evt.alertType()) ? Severity.CRIT : Severity.WARN;
-
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
-                NotificationType.CASH_FLOW_ALERT,
-                ResourceType.CASH_FLOW,
-                "cashflow_" + evt.alertType() + "_" + evt.period(),
-                title,
-                body,
-                severity,
-                createdAt));
+        // Deshabilitado: no procesar alertas de cash flow
+        return;
     }
 
     @Transactional
     public void handleReminderDeadline(ReminderDeadlineEvent evt) {
-        // Deshabilitado: no enviamos recordatorios de "pr�ximo a vencer"
+        // Deshabilitado: no enviamos recordatorios de "próximo a vencer"
         return;
     }
 
@@ -314,8 +284,8 @@ public class EventService {
                         NotificationType.FORECAST_REMINDER,
                         ResourceType.SYSTEM,
                         "forecast_" + defaultString(evt.periodLabel(), "periodo"),
-                        "No olvides generar tus pronósticos",
-                        String.format("Período: %s", defaultString(evt.periodLabel(), "Actual")),
+                        "No olvides generar tus pronÃ³sticos",
+                        String.format("PerÃ­odo: %s", defaultString(evt.periodLabel(), "Actual")),
                         Severity.INFO,
                         createdAt));
     }
@@ -330,8 +300,8 @@ public class EventService {
                         NotificationType.CONCILIATION_REMINDER,
                         ResourceType.MOVEMENT,
                         "conciliation_reminder_" + defaultString(evt.accountName(), "general"),
-                        "Recordatorio de conciliación",
-                        String.format("Cuenta: %s | Días pendientes: %d",
+                        "Recordatorio de conciliaciÃ³n",
+                        String.format("Cuenta: %s | DÃ­as pendientes: %d",
                                 defaultString(evt.accountName(), "-"),
                                 evt.pendingDays()),
                         Severity.INFO,
@@ -344,7 +314,7 @@ public class EventService {
         Instant createdAt = evt.dueDate() != null ? evt.dueDate() : Instant.now();
 
         String title = "Factura por vencer: " + (evt.billNumber() != null ? evt.billNumber() : evt.billId());
-        String body = "Monto: %s | Vence en %s días".formatted(
+        String body = "Monto: %s | Vence en %s dÃ­as".formatted(
                 formatMoney(evt.amount()),
                 evt.daysUntilDue() != null ? evt.daysUntilDue() : "?");
 
@@ -372,7 +342,7 @@ public class EventService {
                         NotificationType.MOVEMENT_IMPORT,
                         ResourceType.MOVEMENT,
                         evt.importId() != null ? evt.importId() : "import",
-                        "Importación de movimientos",
+                        "ImportaciÃ³n de movimientos",
                         String.format("Fuente: %s | Registros: %d",
                                 defaultString(evt.sourceName(), "Excel"),
                                 evt.totalRows()),
@@ -391,7 +361,7 @@ public class EventService {
                         ResourceType.MOVEMENT,
                         evt.refId(),
                         "Movimiento duplicado detectado",
-                        String.format("Descripción: %s | Cuenta: %s | Duplica: %s",
+                        String.format("DescripciÃ³n: %s | Cuenta: %s | Duplica: %s",
                                 defaultString(evt.description(), "-"),
                                 defaultString(evt.accountName(), "-"),
                                 defaultString(evt.duplicateOfRef(), "-")),
@@ -420,7 +390,7 @@ public class EventService {
         TenantContext baseCtx = resolveTenant(evt.userId());
         Instant createdAt = evt.asOf() != null ? evt.asOf() : Instant.now();
 
-        String title = "Conciliación pendiente hace %s días".formatted(evt.daysStale());
+        String title = "ConciliaciÃ³n pendiente hace %s dÃ­as".formatted(evt.daysStale());
         String body = "Cuenta: %s | Pendientes: %d".formatted(
                 evt.accountName() != null ? evt.accountName() : "sin nombre",
                 evt.pendingCount());
@@ -506,7 +476,7 @@ public class EventService {
         notification.setResourceId(resourceId);
         notification.setCreatedAt(createdAt);
 
-        // Usamos el servicio para que aplique validaciones y envíe email si corresponde
+        // Usamos el servicio para que aplique validaciones y envÃ­e email si corresponde
         notificationService.create(notification);
     }
 
@@ -542,7 +512,7 @@ public class EventService {
         return new TenantContext(organizacionId, usuarioId);
     }
 
-    // Método sobrecargado para compatibilidad con eventos que usan Long userId
+    // MÃ©todo sobrecargado para compatibilidad con eventos que usan Long userId
     private TenantContext resolveTenant(Long userIdFromEvent) {
         String usuarioId = userIdFromEvent != null ? userIdFromEvent.toString() : defaultUsuarioId;
         Long organizacionId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioId);
@@ -552,5 +522,7 @@ public class EventService {
     private record TenantContext(Long organizacionId, String usuarioId) {
     }
 }
+
+
 
 

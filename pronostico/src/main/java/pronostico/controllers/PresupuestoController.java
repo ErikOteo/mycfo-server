@@ -348,6 +348,23 @@ public class PresupuestoController {
             presupuestoEventService.sendBudgetExceededEvent(presupuesto, saved, ctx.sub());
         }
 
+        // Chequeo anual de egresos totales
+        try {
+            BigDecimal totalEstimadoEgreso = presupuestoLineaRepository.sumEstimadoEgreso(presupuesto.getId());
+            BigDecimal totalRealEgreso = presupuestoLineaRepository.sumRealEgreso(presupuesto.getId());
+            if (totalEstimadoEgreso != null
+                    && totalRealEgreso != null
+                    && totalRealEgreso.compareTo(totalEstimadoEgreso) > 0) {
+                presupuestoEventService.sendBudgetExceededAnnual(
+                        presupuesto,
+                        totalEstimadoEgreso,
+                        totalRealEgreso,
+                        ctx.sub());
+            }
+        } catch (Exception e) {
+            System.err.println("Error evaluando excedente anual: " + e.getMessage());
+        }
+
         return ResponseEntity.ok(toLineaDTO(saved));
     }
 

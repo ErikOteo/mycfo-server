@@ -103,12 +103,12 @@ export default function NotificationSettings() {
 
     { value: "BUDGET_CREATED", label: "Presupuesto Creado" },
     { value: "BUDGET_DELETED", label: "Presupuesto Eliminado" },
-    { value: "BUDGET_EXCEEDED", label: "Presupuesto Excedido" },
+    // { value: "BUDGET_EXCEEDED", label: "Presupuesto Excedido" }, // ocultado
 
     { value: "REPORT_READY", label: "Reporte Generado" },
-    { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" },
+    // { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" }, // ocultado
     { value: "MONTHLY_SUMMARY", label: "Resumen Mensual Listo" },
-    { value: "CASH_FLOW_ALERT", label: "Alerta de Cash Flow" },
+    // { value: "CASH_FLOW_ALERT", label: "Alerta de Cash Flow" }, // ocultado
   ];
 
   const daysOfWeek = [
