@@ -26,6 +26,7 @@ import {
 import dayjs from "dayjs";
 import CustomTimePicker from "../../../shared-components/CustomTimePicker";
 import API_CONFIG from "../../../config/api-config";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 const FieldBox = ({ label, children }) => (
   <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -121,6 +122,42 @@ export default function NotificationSettings() {
     { value: "SATURDAY", label: "Sábado" },
     { value: "SUNDAY", label: "Domingo" },
   ];
+
+  const chatbotContext = React.useMemo(() => {
+    const typeConfigs = notificationTypes
+      .map((type) => {
+        const config = preferences.typeConfigs?.[type.value] || {};
+        return {
+          type: type.value,
+          enabled: config.enabled ?? true,
+          emailEnabled: config.emailEnabled ?? true,
+          inAppEnabled: config.inAppEnabled ?? true,
+        };
+      })
+      .slice(0, 20);
+
+    return {
+      screen: "configuracion-notificaciones",
+      loading,
+      saved,
+      preferences: {
+        emailEnabled: preferences.emailEnabled,
+        inAppEnabled: preferences.inAppEnabled,
+        pushEnabled: preferences.pushEnabled,
+        dailyDigestEnabled: preferences.dailyDigestEnabled,
+        weeklyDigestEnabled: preferences.weeklyDigestEnabled,
+        digestTime: preferences.digestTime,
+        quietStart: preferences.quietStart,
+        quietEnd: preferences.quietEnd,
+        quietDaysCount: preferences.quietDays?.length ?? 0,
+        userEmail: preferences.userEmail,
+      },
+      typeConfigs,
+      tiposDisponibles: notificationTypes.map((type) => type.value),
+    };
+  }, [notificationTypes, preferences, loading, saved]);
+
+  useChatbotScreenContext(chatbotContext);
 
   const handlePreferenceChange = (field, value) => {
     setPreferences((prev) => ({

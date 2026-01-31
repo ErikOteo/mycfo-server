@@ -86,14 +86,14 @@ public class EventService {
 
         Instant now = Instant.now();
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> {
-            boolean recentDuplicate = repo.existsByOrganizacionIdAndUsuarioIdAndTypeAndResourceTypeAndResourceIdAndCreatedAtAfter(
-                    ctx.organizacionId(),
-                    ctx.usuarioId(),
-                    NotificationType.BUDGET_CREATED,
-                    ResourceType.BUDGET,
-                    String.valueOf(budgetId),
-                    now.minusSeconds(10)
-            );
+            boolean recentDuplicate = repo
+                    .existsByOrganizacionIdAndUsuarioIdAndTypeAndResourceTypeAndResourceIdAndCreatedAtAfter(
+                            ctx.organizacionId(),
+                            ctx.usuarioId(),
+                            NotificationType.BUDGET_CREATED,
+                            ResourceType.BUDGET,
+                            String.valueOf(budgetId),
+                            now.minusSeconds(10));
             if (recentDuplicate) {
                 return;
             }
@@ -103,16 +103,14 @@ public class EventService {
             notification.setTitle("Presupuesto creado");
             notification.setBody("Se creo el presupuesto %s%s".formatted(
                     budgetName,
-                    (evt.period() != null && !evt.period().isBlank()) ? " (" + evt.period() + ")" : ""
-            ));
+                    (evt.period() != null && !evt.period().isBlank()) ? " (" + evt.period() + ")" : ""));
             notification.setSeverity(Severity.INFO);
             notification.setResourceType(ResourceType.BUDGET);
             notification.setResourceId(String.valueOf(budgetId));
             notification.setActionUrl(
                     (evt.link() != null && !evt.link().isBlank())
                             ? evt.link()
-                            : "/app/presupuestos/%d/detalle/actual".formatted(budgetId)
-            );
+                            : "/app/presupuestos/%d/detalle/actual".formatted(budgetId));
             notification.setCreatedAt(now);
 
             notificationService.create(notification);
@@ -127,14 +125,14 @@ public class EventService {
 
         Instant now = Instant.now();
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> {
-            boolean recentDuplicate = repo.existsByOrganizacionIdAndUsuarioIdAndTypeAndResourceTypeAndResourceIdAndCreatedAtAfter(
-                    ctx.organizacionId(),
-                    ctx.usuarioId(),
-                    NotificationType.BUDGET_DELETED,
-                    ResourceType.BUDGET,
-                    String.valueOf(budgetId),
-                    now.minusSeconds(10)
-            );
+            boolean recentDuplicate = repo
+                    .existsByOrganizacionIdAndUsuarioIdAndTypeAndResourceTypeAndResourceIdAndCreatedAtAfter(
+                            ctx.organizacionId(),
+                            ctx.usuarioId(),
+                            NotificationType.BUDGET_DELETED,
+                            ResourceType.BUDGET,
+                            String.valueOf(budgetId),
+                            now.minusSeconds(10));
             if (recentDuplicate) {
                 return;
             }
@@ -144,16 +142,14 @@ public class EventService {
             notification.setTitle("Presupuesto eliminado");
             notification.setBody("Se elimino el presupuesto %s%s".formatted(
                     budgetName,
-                    (evt.period() != null && !evt.period().isBlank()) ? " (" + evt.period() + ")" : ""
-            ));
+                    (evt.period() != null && !evt.period().isBlank()) ? " (" + evt.period() + ")" : ""));
             notification.setSeverity(Severity.WARN);
             notification.setResourceType(ResourceType.BUDGET);
             notification.setResourceId(String.valueOf(budgetId));
             notification.setActionUrl(
                     (evt.link() != null && !evt.link().isBlank())
                             ? evt.link()
-                            : "/app/presupuestos?tab=eliminados"
-            );
+                            : "/app/presupuestos?tab=eliminados");
             notification.setCreatedAt(now);
 
             notificationService.create(notification);
@@ -166,18 +162,20 @@ public class EventService {
         Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
 
         String title = "Presupuesto excedido: " + evt.budgetName();
-        String body = String.format("Categoria: %s | Presupuestado: $%s | Real: $%s | Diferencia: $%s",
-                evt.category(), evt.budgeted(), evt.actual(), evt.variance());
+        String body = String.format("Categoria: %s | Presupuestado: %s | Real: %s | Diferencia: %s",
+                evt.category(),
+                formatMoney(evt.budgeted()),
+                formatMoney(evt.actual()),
+                formatMoney(evt.variance()));
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        NotificationType.BUDGET_EXCEEDED,
-                        ResourceType.BUDGET,
-                        "budget_" + evt.budgetId() + "_" + evt.category(),
-                        title,
-                        body,
-                        Severity.WARN,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                NotificationType.BUDGET_EXCEEDED,
+                ResourceType.BUDGET,
+                "budget_" + evt.budgetId() + "_" + evt.category(),
+                title,
+                body,
+                Severity.WARN,
+                createdAt));
     }
 
     @Transactional
@@ -194,15 +192,14 @@ public class EventService {
                 : (evt.hasAnomalies() ? NotificationType.REPORT_ANOMALY : NotificationType.REPORT_READY);
         Severity severity = evt.hasAnomalies() ? Severity.WARN : Severity.INFO;
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        type,
-                        ResourceType.REPORT,
-                        "report_" + evt.reportType() + "_" + evt.period(),
-                        title,
-                        body,
-                        severity,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                type,
+                ResourceType.REPORT,
+                "report_" + evt.reportType() + "_" + evt.period(),
+                title,
+                body,
+                severity,
+                createdAt));
     }
 
     @Transactional
@@ -225,23 +222,21 @@ public class EventService {
         Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
 
         String title = "Presupuesto al " + evt.executedPercent() + "%: " + evt.budgetName();
-        String body = "Categoria: %s | Presupuestado: $%s | Ejecutado: $%s".formatted(
+        String body = "Categoria: %s | Presupuestado: %s | Ejecutado: %s".formatted(
                 evt.category() != null ? evt.category() : "General",
-                evt.budgeted(),
-                evt.actual()
-        );
+                formatMoney(evt.budgeted()),
+                formatMoney(evt.actual()));
 
         String resourceId = "budget_" + evt.budgetId() + "_" + (evt.category() != null ? evt.category() : "general");
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        NotificationType.BUDGET_WARNING,
-                        ResourceType.BUDGET,
-                        resourceId,
-                        title,
-                        body,
-                        Severity.INFO,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                NotificationType.BUDGET_WARNING,
+                ResourceType.BUDGET,
+                resourceId,
+                title,
+                body,
+                Severity.INFO,
+                createdAt));
     }
 
     @Transactional
@@ -252,18 +247,16 @@ public class EventService {
         String title = "Categoría sin presupuesto: " + evt.category();
         String body = "No hay presupuesto asignado para %s en %s".formatted(
                 evt.category(),
-                evt.period() != null ? evt.period() : "el período actual"
-        );
+                evt.period() != null ? evt.period() : "el período actual");
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        NotificationType.BUDGET_MISSING_CATEGORY,
-                        ResourceType.BUDGET,
-                        "budget_missing_" + evt.category(),
-                        title,
-                        body,
-                        Severity.WARN,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                NotificationType.BUDGET_MISSING_CATEGORY,
+                ResourceType.BUDGET,
+                "budget_missing_" + evt.category(),
+                title,
+                body,
+                Severity.WARN,
+                createdAt));
     }
 
     @Transactional
@@ -274,20 +267,19 @@ public class EventService {
         String title = "Alerta de Cash Flow";
         String body = evt.message() != null
                 ? evt.message()
-                : String.format("Balance actual: $%s | Balance pronosticado: $%s",
-                evt.currentBalance(), evt.forecastBalance());
+                : String.format("Balance actual: %s | Balance pronosticado: %s",
+                        formatMoney(evt.currentBalance()), formatMoney(evt.forecastBalance()));
 
         Severity severity = "NEGATIVE".equals(evt.alertType()) ? Severity.CRIT : Severity.WARN;
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        NotificationType.CASH_FLOW_ALERT,
-                        ResourceType.CASH_FLOW,
-                        "cashflow_" + evt.alertType() + "_" + evt.period(),
-                        title,
-                        body,
-                        severity,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                NotificationType.CASH_FLOW_ALERT,
+                ResourceType.CASH_FLOW,
+                "cashflow_" + evt.alertType() + "_" + evt.period(),
+                title,
+                body,
+                severity,
+                createdAt));
     }
 
     @Transactional
@@ -362,10 +354,9 @@ public class EventService {
         Instant createdAt = evt.dueDate() != null ? evt.dueDate() : Instant.now();
 
         String title = "Factura por vencer: " + (evt.billNumber() != null ? evt.billNumber() : evt.billId());
-        String body = "Monto: $%s | Vence en %s días".formatted(
-                evt.amount() != null ? evt.amount() : "0",
-                evt.daysUntilDue() != null ? evt.daysUntilDue() : "?"
-        );
+        String body = "Monto: %s | Vence en %s días".formatted(
+                formatMoney(evt.amount()),
+                evt.daysUntilDue() != null ? evt.daysUntilDue() : "?");
 
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> {
             Notification notification = buildBaseNotification(ctx);
@@ -442,18 +433,16 @@ public class EventService {
         String title = "Conciliación pendiente hace %s días".formatted(evt.daysStale());
         String body = "Cuenta: %s | Pendientes: %d".formatted(
                 evt.accountName() != null ? evt.accountName() : "sin nombre",
-                evt.pendingCount()
-        );
+                evt.pendingCount());
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        NotificationType.RECONCILIATION_STALE,
-                        ResourceType.MOVEMENT,
-                        "recon_" + (evt.accountId() != null ? evt.accountId() : "default"),
-                        title,
-                        body,
-                        Severity.WARN,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                NotificationType.RECONCILIATION_STALE,
+                ResourceType.MOVEMENT,
+                "recon_" + (evt.accountId() != null ? evt.accountId() : "default"),
+                title,
+                body,
+                Severity.WARN,
+                createdAt));
     }
 
     @Transactional
@@ -468,15 +457,14 @@ public class EventService {
             default -> NotificationType.REMINDER_CUSTOM;
         };
 
-        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
-                saveIfNew(ctx,
-                        type,
-                        ResourceType.SYSTEM,
-                        "reminder_" + evt.title().hashCode(),
-                        evt.title(),
-                        evt.message(),
-                        Severity.INFO,
-                        createdAt));
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> saveIfNew(ctx,
+                type,
+                ResourceType.SYSTEM,
+                "reminder_" + evt.title().hashCode(),
+                evt.title(),
+                evt.message(),
+                Severity.INFO,
+                createdAt));
     }
 
     private String formatMovementBody(MovementCreatedEvent evt) {
@@ -486,16 +474,27 @@ public class EventService {
         String currency = evt.currency() != null ? evt.currency().toUpperCase() : "ARS";
         String symbol = "USD".equals(currency) ? "US$" : "$";
         return desc + symbol + (evt.amount() != null ? evt.amount() : "0");
+
+        return desc + formatMoney(evt.amount());
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        if (amount == null)
+            return "$0";
+        java.text.NumberFormat fmt = java.text.NumberFormat.getCurrencyInstance(new java.util.Locale("es", "AR"));
+        fmt.setMinimumFractionDigits(0);
+        fmt.setMaximumFractionDigits(2);
+        return fmt.format(amount);
     }
 
     private void saveIfNew(TenantContext ctx,
-                           NotificationType type,
-                           ResourceType resourceType,
-                           String resourceId,
-                           String title,
-                           String body,
-                           Severity severity,
-                           Instant createdAt) {
+            NotificationType type,
+            ResourceType resourceType,
+            String resourceId,
+            String title,
+            String body,
+            Severity severity,
+            Instant createdAt) {
         Instant start = createdAt.truncatedTo(ChronoUnit.DAYS);
         Instant end = start.plus(1, ChronoUnit.DAYS);
 
@@ -505,8 +504,7 @@ public class EventService {
                 type,
                 resourceId,
                 start,
-                end
-        );
+                end);
         if (exists) {
             return;
         }
@@ -563,5 +561,6 @@ public class EventService {
         return new TenantContext(organizacionId, usuarioId);
     }
 
-    private record TenantContext(Long organizacionId, String usuarioId) {}
+    private record TenantContext(Long organizacionId, String usuarioId) {
+    }
 }

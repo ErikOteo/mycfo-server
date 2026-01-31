@@ -11,34 +11,47 @@ export function useNotifications(userId) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!userId) {
-      setItems([]);
-      setUnread(0);
-      return;
-    }
+  const fetchNotifications = useCallback(
+    async (options = {}) => {
+      const { isBackground = false } = options;
 
-    try {
-      setLoading(true);
-      setError(null);
+      if (!userId) {
+        setItems([]);
+        setUnread(0);
+        return;
+      }
 
-      const data = await getNotifications({
-        userId,
-        status: "all",
-        limit: 50,
-      });
+      try {
+        if (!isBackground) {
+          setLoading(true);
+        }
+        setError(null);
 
-      // El backend devuelve { unread, items: [...] }
-      setItems(data.items || []);
-      // Si el backend no devuelve unread, usamos items.length
-      setUnread(typeof data.unread === "number" ? data.unread : (data.items || []).length);
-    } catch (err) {
-      console.error("Error obteniendo notificaciones:", err);
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+        const data = await getNotifications({
+          userId,
+          status: "all",
+          limit: 50,
+        });
+
+        // El backend devuelve { unread, items: [...] }
+        setItems(data.items || []);
+        // Si el backend no devuelve unread, usamos items.length
+        setUnread(
+          typeof data.unread === "number"
+            ? data.unread
+            : (data.items || []).length,
+        );
+      } catch (err) {
+        console.error("Error obteniendo notificaciones:", err);
+        setError(err);
+      } finally {
+        if (!isBackground) {
+          setLoading(false);
+        }
+      }
+    },
+    [userId],
+  );
 
   // Polling cada 60s
   useEffect(() => {
@@ -51,14 +64,39 @@ export function useNotifications(userId) {
     let cancelled = false;
 
     const loop = async () => {
-      await fetchNotifications();
+      // La primera vez (o al cambiar userId) podría no ser background si queremos mostrar spinner,
+      // pero como este efecto corre después del montaje, podemos asumir que la primera carga
+      // explicita (si la hubiese) o este loop manejan la carga.
+      // Para simplificar y mantener comportamiento:
+      // La primera ejecución del loop será isBackground: false (para mostrar spinner inicial)
+      // Las siguientes serán isBackground: true.
+
+      // NOTA: Para evitar race conditions con el "loop", idealmente deberíamos tener un flag.
+      // Pero dado el código actual, haremos que la PRIMERA de este efecto sea con loading
+      // y las subsiguientes (setTimeout) sean background.
+
+      await fetchNotifications({ isBackground: false });
+
       if (!cancelled) {
-        setTimeout(loop, 60000); // 60 segundos
+        const runBackgroundLoop = async () => {
+          if (cancelled) return;
+          await fetchNotifications({ isBackground: true });
+          if (!cancelled) setTimeout(runBackgroundLoop, 10000);
+        };
+        setTimeout(runBackgroundLoop, 10000);
       }
     };
 
-    // Primera carga inmediata + inicio del loop
-    loop();
+    // Sin embargo, para no complicar la lógica del loop recursivo original:
+    const simpleLoop = async (firstTime) => {
+      if (cancelled) return;
+      await fetchNotifications({ isBackground: !firstTime });
+      if (!cancelled) {
+        setTimeout(() => simpleLoop(false), 10000);
+      }
+    };
+
+    simpleLoop(true);
 
     return () => {
       cancelled = true;
@@ -80,11 +118,20 @@ export function useNotifications(userId) {
     };
 
     window.addEventListener("notification-mark-read", handleExternalMarkRead);
-    window.addEventListener("notification-mark-all-read", handleExternalMarkAll);
+    window.addEventListener(
+      "notification-mark-all-read",
+      handleExternalMarkAll,
+    );
 
     return () => {
-      window.removeEventListener("notification-mark-read", handleExternalMarkRead);
-      window.removeEventListener("notification-mark-all-read", handleExternalMarkAll);
+      window.removeEventListener(
+        "notification-mark-read",
+        handleExternalMarkRead,
+      );
+      window.removeEventListener(
+        "notification-mark-all-read",
+        handleExternalMarkAll,
+      );
     };
   }, []);
 
@@ -97,43 +144,38 @@ export function useNotifications(userId) {
 
         // Marcar en el estado local
         setItems((prev) =>
-          prev.map((n) =>
-            n.id === id ? { ...n, is_read: true } : n
-          )
+          prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
         );
         setUnread((prev) => Math.max(0, prev - 1));
 
         // Notificar a otros componentes (solapa) que esta notificación fue leída
         window.dispatchEvent(
-          new CustomEvent("notification-mark-read", { detail: { id } })
+          new CustomEvent("notification-mark-read", { detail: { id } }),
         );
       } catch (error) {
         console.error("Error marcando como leída:", error);
       }
     },
-    [userId]
+    [userId],
   );
 
-  const markAllAsRead = useCallback(
-    async () => {
-      if (!userId) return;
+  const markAllAsRead = useCallback(async () => {
+    if (!userId) return;
 
-      try {
-        const { markAllRead } = await import("../services/notificationsApi");
-        await markAllRead(userId);
+    try {
+      const { markAllRead } = await import("../services/notificationsApi");
+      await markAllRead(userId);
 
-        // Marcar todas como leídas en local
-        setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
-        setUnread(0);
+      // Marcar todas como leídas en local
+      setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnread(0);
 
-        // Notificar a otros componentes (solapa) que todas fueron leídas
-        window.dispatchEvent(new CustomEvent("notification-mark-all-read"));
-      } catch (error) {
-        console.error("Error marcando todas como leídas:", error);
-      }
-    },
-    [userId]
-  );
+      // Notificar a otros componentes (solapa) que todas fueron leídas
+      window.dispatchEvent(new CustomEvent("notification-mark-all-read"));
+    } catch (error) {
+      console.error("Error marcando todas como leídas:", error);
+    }
+  }, [userId]);
 
   return {
     items,

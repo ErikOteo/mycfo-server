@@ -172,7 +172,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         Carga Excel
       </Typography>
       {/* Desplegable para tipo de archivo */}
-      <FormControl fullWidth sx={{ mb: 4 }}>
+      <FormControl fullWidth sx={{ mb: 4 }} size="small">
         <InputLabel id="tipo-origen-label">Tipo de archivo</InputLabel>
         <Select
           labelId="tipo-origen-label"

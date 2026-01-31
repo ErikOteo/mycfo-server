@@ -39,7 +39,7 @@ import {
   formatNumber,
   formatMovementDate,
 } from "../../utils/formatters";
-import { deleteNotification } from "../../services/notificationsApi";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 export default function NotificationCenter() {
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -52,7 +52,7 @@ export default function NotificationCenter() {
 
   // Obtener userId del estado de autenticación
   const { userId, isAuthenticated } = useAuth();
-  
+
   // Solo usar notificaciones si está autenticado
   const { items, unread, loading, error, reload, markOneRead } =
     useNotifications(isAuthenticated ? userId : null);
@@ -75,7 +75,7 @@ export default function NotificationCenter() {
     setSelectedNotifications((prev) =>
       prev.includes(notificationId)
         ? prev.filter((id) => id !== notificationId)
-        : [...prev, notificationId]
+        : [...prev, notificationId],
     );
   };
 
@@ -110,7 +110,7 @@ export default function NotificationCenter() {
     if (!userId || selectedNotifications.length === 0) return;
     try {
       await Promise.all(
-        selectedNotifications.map((id) => deleteNotification(id, userId))
+        selectedNotifications.map((id) => deleteNotification(id, userId)),
       );
       setSelectedNotifications([]);
       reload();
@@ -128,21 +128,21 @@ export default function NotificationCenter() {
       filtered = filtered.filter(
         (notification) =>
           notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          notification.body.toLowerCase().includes(searchTerm.toLowerCase())
+          notification.body.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Filtro por tipo
     if (filterType !== "all") {
       filtered = filtered.filter(
-        (notification) => notification.badge === filterType
+        (notification) => notification.badge === filterType,
       );
     }
 
     // Filtro por severidad
     if (filterSeverity !== "all") {
       filtered = filtered.filter(
-        (notification) => notification.badge === filterSeverity
+        (notification) => notification.badge === filterSeverity,
       );
     }
 
@@ -166,8 +166,34 @@ export default function NotificationCenter() {
   const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
   const paginatedNotifications = filteredNotifications.slice(
     page * itemsPerPage,
-    (page + 1) * itemsPerPage
+    (page + 1) * itemsPerPage,
   );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "notificaciones",
+      filtros: {
+        searchTerm,
+        filterType,
+        filterSeverity,
+      },
+      total: filteredNotifications.length,
+      unread,
+      pagina: page + 1,
+      notificaciones: paginatedNotifications.slice(0, 5),
+    }),
+    [
+      searchTerm,
+      filterType,
+      filterSeverity,
+      filteredNotifications.length,
+      unread,
+      page,
+      paginatedNotifications,
+    ],
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   return (
     <Box
@@ -183,7 +209,7 @@ export default function NotificationCenter() {
         <Typography variant="h4" component="h1" gutterBottom>
           Centro de Notificaciones
         </Typography>
-        <Typography variant="body1" sx={{ color: 'text.primary' }}>
+        <Typography variant="body1" sx={{ color: "text.primary" }}>
           Gestiona todas tus notificaciones y alertas
         </Typography>
       </Box>
@@ -375,7 +401,7 @@ export default function NotificationCenter() {
                           ? "4px solid #9e9e9e"
                           : "4px solid #008375",
                         backgroundColor: selectedNotifications.includes(
-                          notification.id
+                          notification.id,
                         )
                           ? "action.selected"
                           : "background.paper",
@@ -452,14 +478,15 @@ export default function NotificationCenter() {
                         <Button
                           size="small"
                           startIcon={
-                            selectedNotifications.includes(notification.id)
-                              ? (
-                                <CheckBoxIcon />
-                              ) : (
-                                <CheckBoxOutlineBlankIcon />
-                              )
+                            selectedNotifications.includes(notification.id) ? (
+                              <CheckBoxIcon />
+                            ) : (
+                              <CheckBoxOutlineBlankIcon />
+                            )
                           }
-                          onClick={() => handleSelectNotification(notification.id)}
+                          onClick={() =>
+                            handleSelectNotification(notification.id)
+                          }
                           color={
                             selectedNotifications.includes(notification.id)
                               ? "primary"

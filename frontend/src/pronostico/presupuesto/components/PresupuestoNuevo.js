@@ -21,6 +21,7 @@ import API_CONFIG from '../../../config/api-config';
 import { getStoredCurrencyPreference, persistCurrencyPreference } from '../../../shared-components/CurrencyTabs';
 import { CURRENCY_OPTIONS, stripCurrencyTag, withCurrencyTag } from '../utils/currencyTag';
 import { fetchCategorias } from '../../../shared-services/categoriasService';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 const CustomStepIconRoot = styled('div')(({ theme, ownerState }) => {
   const { active, completed } = ownerState;
@@ -561,6 +562,72 @@ export default function PresupuestoNuevo() {
 
 
   // Guardar (CAMBIO MÍNIMO: enviar payload nuevo con `plantilla`)
+  const monthSummary = React.useMemo(
+    () =>
+      meses.slice(0, 6).map((mes) => ({
+        mes,
+        ingresos: monthTotals[mes]?.ingresos ?? 0,
+        egresos: monthTotals[mes]?.egresos ?? 0,
+        resultado: monthTotals[mes]?.resultado ?? 0,
+      })),
+    [meses, monthTotals]
+  );
+
+  const categoriasSummary = React.useMemo(
+    () =>
+      categorias.slice(0, 10).map((categoria) => ({
+        nombre: categoria.categoria,
+        tipo: categoria.tipo,
+        regla: categoria.regla?.modo,
+      })),
+    [categorias]
+  );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "presupuesto-nuevo",
+      isDraft: true,
+      step,
+      currency,
+      nombreBase,
+      fechaDesde,
+      fechaHasta,
+      mesesCount: meses.length,
+      categoriasCount: categorias.length,
+      categorias: categoriasSummary,
+      totals: {
+        ingresos: totalIngresos,
+        egresos: totalEgresos,
+        resultado: resultadoTotal,
+      },
+      hasLosses,
+      negativeMonths: negativeMonths.slice(0, 6),
+      monthSummary,
+      lockNegative,
+      errors,
+    }),
+    [
+      step,
+      currency,
+      nombreBase,
+      fechaDesde,
+      fechaHasta,
+      meses,
+      categorias,
+      categoriasSummary,
+      totalIngresos,
+      totalEgresos,
+      resultadoTotal,
+      hasLosses,
+      negativeMonths,
+      monthSummary,
+      lockNegative,
+      errors,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   const handleGuardar = async () => {
     if (creating) {
       return;

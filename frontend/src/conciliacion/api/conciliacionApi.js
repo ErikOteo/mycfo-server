@@ -24,6 +24,22 @@ export const conciliacionApi = {
   },
 
   /**
+   * Obtiene movimientos conciliados con paginación
+   */
+  obtenerMovimientosConciliados: async (
+    page = 0,
+    size = 10,
+    sortBy = "fechaEmision",
+    sortDir = "desc",
+    moneda
+  ) => {
+    const response = await http.get(`${API_BASE_URL}/movimientos/conciliados`, {
+      params: { page, size, sortBy, sortDir, moneda },
+    });
+    return response.data;
+  },
+
+  /**
    * Obtiene todos los movimientos (conciliados y sin conciliar) con paginación
    */
   obtenerTodosLosMovimientos: async (

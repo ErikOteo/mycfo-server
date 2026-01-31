@@ -42,6 +42,9 @@ import CurrencyTabs, {
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
+import CustomNoRowsOverlay from "../../shared-components/CustomNoRowsOverlay";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
+
 
 const FACTURA_PAGE_SIZE = 10;
 
@@ -94,6 +97,39 @@ const FacturaListPage = () => {
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
 
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "facturas",
+      currency,
+      totalFacturas: rowCount,
+      filtros: {
+        searchText,
+        fechaDesde: fechaDesde?.format ? fechaDesde.format("YYYY-MM-DD") : null,
+        fechaHasta: fechaHasta?.format ? fechaHasta.format("YYYY-MM-DD") : null,
+      },
+      facturas: facturas.slice(0, 5),
+      facturaSeleccionada: selectedFactura
+        ? {
+          id: selectedFactura.id,
+          tipo: selectedFactura.tipoFactura,
+          numero: selectedFactura.numeroDocumento,
+          monto: selectedFactura.montoTotal,
+          fecha: selectedFactura.fechaEmision,
+        }
+        : null,
+    }),
+    [
+      currency,
+      rowCount,
+      searchText,
+      fechaDesde,
+      fechaHasta,
+      facturas,
+      selectedFactura,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
   const parseMontoInput = useCallback((valor) => {
     if (valor === null || valor === undefined) return null;
     const cleaned = String(valor)
@@ -607,6 +643,8 @@ const FacturaListPage = () => {
       headerName: "Acciones",
       flex: 0.9,
       minWidth: 140,
+      align: 'center',
+      headerAlign: 'center',
       sortable: false,
       filterable: false,
       renderCell: (params) => {
@@ -654,6 +692,8 @@ const FacturaListPage = () => {
       headerName: isMobile ? "Fecha" : "Fecha emisión",
       flex: isMobile ? 0.7 : 0.8,
       minWidth: isMobile ? 120 : 160,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
         <Typography variant="body2">
           {formatFechaEmision(params?.row?.fechaEmision)}
@@ -675,6 +715,8 @@ const FacturaListPage = () => {
           headerName: "Número",
           flex: 0.9,
           minWidth: 120,
+          align: 'center',
+          headerAlign: 'center',
           renderCell: (params) => {
             const value =
               params?.row?.numeroDocumento ??
@@ -696,7 +738,6 @@ const FacturaListPage = () => {
             );
           },
         },
-        fechaColumn,
         accionesColumn,
       ];
     }
@@ -707,12 +748,16 @@ const FacturaListPage = () => {
         headerName: "Número",
         flex: 1,
         minWidth: 140,
+        align: 'center',
+        headerAlign: 'center',
       },
       {
         field: "tipoFactura",
         headerName: "Tipo",
         flex: 0.6,
         minWidth: 100,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) => (
           <Chip
             label={params.value ?? "-"}
@@ -728,12 +773,14 @@ const FacturaListPage = () => {
         headerName: "Monto",
         flex: 1,
         minWidth: 140,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) =>
           params.row.montoTotal != null
             ? formatCurrencyByCode(
-                params.row.montoTotal,
-                params.row.moneda || currency,
-              )
+              params.row.montoTotal,
+              params.row.moneda || currency,
+            )
             : "-",
       },
       {
@@ -741,12 +788,16 @@ const FacturaListPage = () => {
         headerName: "Moneda",
         flex: 0.5,
         minWidth: 90,
+        align: 'center',
+        headerAlign: 'center',
       },
       {
         field: "estadoPago",
         headerName: "Estado de pago",
         flex: 0.8,
         minWidth: 140,
+        align: 'center',
+        headerAlign: 'center',
         hide: true,
         renderCell: (params) => (
           <Chip
@@ -767,6 +818,8 @@ const FacturaListPage = () => {
         headerName: "Vendedor",
         flex: 1.2,
         minWidth: 160,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) => (
           <Box>
             <Typography variant="body2">{params.value ?? "-"}</Typography>
@@ -778,6 +831,8 @@ const FacturaListPage = () => {
         headerName: "Comprador",
         flex: 1.2,
         minWidth: 160,
+        align: 'center',
+        headerAlign: 'center',
         renderCell: (params) => (
           <Box>
             <Typography variant="body2">{params.value ?? "-"}</Typography>
@@ -1033,21 +1088,21 @@ const FacturaListPage = () => {
           montoDesde ||
           montoHasta ||
           montoRangeLabel) && (
-          <Button
-            size="small"
-            variant="text"
-            onClick={() => {
-              setFechaDesde(null);
-              setFechaHasta(null);
-              setMontoDesde("");
-              setMontoHasta("");
-              setMontoRangeLabel("");
-            }}
-            sx={{ ml: { xs: 0, md: "auto" } }}
-          >
-            Limpiar
-          </Button>
-        )}
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => {
+                setFechaDesde(null);
+                setFechaHasta(null);
+                setMontoDesde("");
+                setMontoHasta("");
+                setMontoRangeLabel("");
+              }}
+              sx={{ ml: { xs: 0, md: "auto" } }}
+            >
+              Limpiar
+            </Button>
+          )}
         <Box
           sx={{
             display: "flex",
@@ -1070,11 +1125,12 @@ const FacturaListPage = () => {
         </Box>
       </Box>
 
-      <Box sx={{ height: 700, width: "100%", mt: 0 }}>
+      <Box sx={{ width: "100%", mt: 0 }}>
         <DataGrid
           rows={facturas}
           columns={columns}
           loading={loading}
+          autoHeight
           getRowId={(row) =>
             row.id ??
             row.idDocumento ??
@@ -1109,6 +1165,7 @@ const FacturaListPage = () => {
                 }}
               />
             ),
+            noRowsOverlay: () => <CustomNoRowsOverlay message="No se encontraron facturas registradas" />,
           }}
           slotProps={{
             toolbar: {
@@ -1127,7 +1184,7 @@ const FacturaListPage = () => {
           sx={{
             backgroundColor: "background.paper",
             borderRadius: 2,
-            border: "none",
+            border: (theme) => `1px solid ${theme.palette.divider}`,
             "& .MuiDataGrid-cell": {
               borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
               display: "flex",
@@ -1144,6 +1201,7 @@ const FacturaListPage = () => {
             "& .MuiDataGrid-columnHeader": {
               "&:focus": { outline: "none" },
             },
+            "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
             "& .MuiDataGrid-sortIcon": {
               display: "none",
             },
@@ -1151,13 +1209,13 @@ const FacturaListPage = () => {
               visibility: "hidden",
             },
             "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer":
-              {
-                visibility: "visible",
-              },
+            {
+              visibility: "visible",
+            },
             "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
-              {
-                display: "none",
-              },
+            {
+              display: "none",
+            },
             "& .MuiDataGrid-row:hover": {
               backgroundColor: (theme) => theme.palette.action.hover,
             },

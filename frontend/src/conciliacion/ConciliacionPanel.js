@@ -21,6 +21,7 @@ import {
   LinearProgress,
   Pagination,
   useMediaQuery,
+  Skeleton,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -32,6 +33,7 @@ import conciliacionApi from "./api/conciliacionApi";
 import CurrencyTabs, {
   usePreferredCurrency,
 } from "../shared-components/CurrencyTabs";
+import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
 
 export default function ConciliacionPanel() {
   const theme = useTheme();
@@ -43,6 +45,7 @@ export default function ConciliacionPanel() {
   const [loading, setLoading] = useState(false);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
+  const [loadingEstadisticas, setLoadingEstadisticas] = useState(false);
   const [error, setError] = useState(null);
 
   // Paginación real del backend
@@ -59,6 +62,46 @@ export default function ConciliacionPanel() {
   const [paginaSugerencias, setPaginaSugerencias] = useState(1);
   const documentosPorPagina = 3;
 
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "conciliacion",
+      currency,
+      filtros: {
+        estado: filtroEstado,
+        tipo: filtroTipo,
+        busqueda: filtroBusqueda,
+      },
+      estadisticas,
+      movimientosTotal: totalElementos,
+      paginaActual,
+      movimientos: movimientos.slice(0, 5),
+      movimientoSeleccionado: movimientoSeleccionado
+        ? {
+            id: movimientoSeleccionado.id,
+            tipo: movimientoSeleccionado.tipo,
+            monto: movimientoSeleccionado.monto,
+            fecha: movimientoSeleccionado.fechaEmision,
+            conciliado: movimientoSeleccionado.conciliado,
+          }
+        : null,
+      sugerencias: sugerencias.slice(0, 5),
+    }),
+    [
+      currency,
+      filtroEstado,
+      filtroTipo,
+      filtroBusqueda,
+      estadisticas,
+      totalElementos,
+      paginaActual,
+      movimientos,
+      movimientoSeleccionado,
+      sugerencias,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   useEffect(() => {
     setPaginaActual(0);
   }, [filtroEstado, filtroTipo, filtroBusqueda, currency]);
@@ -74,42 +117,100 @@ export default function ConciliacionPanel() {
     setError(null);
     try {
       let response;
+      // Determinar si necesitamos fetching masivo para filtrado local
+      // Solo si hay Busqueda de texto (que el backend aun no soporta nativamente en estos endpoints)
+      // El cambio de ESTADO ahora sí es nativo y eficiente.
+      // El cambio de TIPO ahora es puramente visual (frontend) sobre los datos cargados.
+      const filtrosAvanzadosActivos = filtroBusqueda !== "";
+
+      const sizeToUse = filtrosAvanzadosActivos ? 1000 : tamanioPagina;
+      // Si filtramos localmente, pedimos la pagina 0 del backend para tener todo el lote y paginar nosotros
+      const pageToUse = filtrosAvanzadosActivos ? 0 : paginaActual;
+
       if (filtroEstado === "sin-conciliar") {
         response = await conciliacionApi.obtenerMovimientosSinConciliar(
-          paginaActual,
-          tamanioPagina,
+          pageToUse,
+          sizeToUse,
+          'fechaEmision',
+          'desc',
+          currency
+        );
+      } else if (filtroEstado === "conciliados") {
+        response = await conciliacionApi.obtenerMovimientosConciliados(
+          pageToUse,
+          sizeToUse,
           'fechaEmision',
           'desc',
           currency
         );
       } else {
         response = await conciliacionApi.obtenerTodosLosMovimientos(
-          paginaActual,
-          tamanioPagina,
+          pageToUse,
+          sizeToUse,
           'fechaEmision',
           'desc',
           currency
         );
       }
 
-      // El backend devuelve un objeto Page con content, totalPages, totalElements, etc.
-      setMovimientos(response.content || []);
-      setTotalPaginas(response.totalPages || 0);
-      setTotalElementos(response.totalElements || 0);
+      let content = response.content || [];
+
+      // --- FILTRADO LOCAL ---
+      if (filtrosAvanzadosActivos) {
+        // 1. Filtro Estado 
+        // 'sin-conciliar' ya viene filtrado del endpoint.
+        // 'conciliados': filtramos explicitamente.
+        if (filtroEstado === "conciliados") {
+          content = content.filter(m => m.conciliado);
+        }
+        // 'todos': no filtramos estado.
+
+        // 2. Filtro Tipo (Ingreso / Egreso) -> MOVIDO A FILTRO VISUAL EN RENDER
+
+        // 3. Filtro Busqueda
+        if (filtroBusqueda) {
+          const term = filtroBusqueda.toLowerCase();
+          content = content.filter(m =>
+            (m.descripcion || "").toLowerCase().includes(term) ||
+            (m.referencia || "").toLowerCase().includes(term) ||
+            String(m.importe || "").includes(term)
+          );
+        }
+
+        // Recalcular paginacion basada en resultados filtrados
+        setTotalElementos(content.length);
+        // Ojo: Si filterResults < sizeToUse, totalPages = 1 (o calculo local)
+        // Si trajimos 1000, asumimos que "todo" esta aqui.
+        setTotalPaginas(Math.ceil(content.length / tamanioPagina));
+
+        // Aplicar "Paginacion Local" (slicing)
+        const start = paginaActual * tamanioPagina;
+        const end = start + tamanioPagina;
+        setMovimientos(content.slice(start, end));
+
+      } else {
+        // Caso nativo original (solo sin-conciliar, sin busqueda)
+        setMovimientos(content);
+        setTotalPaginas(response.totalPages || 0);
+        setTotalElementos(response.totalElements || 0);
+      }
     } catch (err) {
       console.error("Error cargando movimientos:", err);
       setError("Error al cargar los movimientos");
     } finally {
       setLoading(false);
     }
-  }, [currency, filtroEstado, paginaActual, tamanioPagina]);
+  }, [currency, filtroEstado, filtroBusqueda, paginaActual, tamanioPagina]);
 
   const cargarEstadisticas = useCallback(async () => {
+    setLoadingEstadisticas(true);
     try {
       const stats = await conciliacionApi.obtenerEstadisticas(currency);
       setEstadisticas(stats);
     } catch (err) {
       console.error("Error cargando estadísticas:", err);
+    } finally {
+      setLoadingEstadisticas(false);
     }
   }, [currency]);
 
@@ -117,12 +218,12 @@ export default function ConciliacionPanel() {
     await Promise.all([cargarMovimientos(), cargarEstadisticas()]);
   }, [cargarMovimientos, cargarEstadisticas]);
 
-  // Cargar movimientos y estadísticas al montar el componente
+  // Cargar estadísticas independientemente de los filtros
   useEffect(() => {
-    cargarDatos();
-  }, [cargarDatos]);
+    cargarEstadisticas();
+  }, [cargarEstadisticas]);
 
-  // Recargar cuando cambia el filtro de estado
+  // Recargar movimientos cuando cambia el filtro de estado/tipo/busqueda
   useEffect(() => {
     cargarMovimientos();
   }, [cargarMovimientos]);
@@ -245,6 +346,18 @@ export default function ConciliacionPanel() {
     setPaginaActual(0);
   };
 
+  // Filtrado visual instantáneo por TIPO sobre los datos ya cargados
+  const movimientosFiltrados = React.useMemo(() => {
+    let result = movimientos;
+    // 2. Filtro Tipo (Ingreso / Egreso) - Visual Only
+    if (filtroTipo === "Ingreso") {
+      result = result.filter(m => m.tipo === "Ingreso");
+    } else if (filtroTipo === "Egreso") {
+      result = result.filter(m => m.tipo === "Egreso");
+    }
+    return result;
+  }, [movimientos, filtroTipo]);
+
   return (
     <Box
       sx={{
@@ -276,7 +389,7 @@ export default function ConciliacionPanel() {
       </Box>
 
       {/* Estadísticas */}
-      {estadisticas && (
+      {(estadisticas || loadingEstadisticas) && (
         <Paper
           sx={{
             p: 2,
@@ -286,94 +399,214 @@ export default function ConciliacionPanel() {
               (theme.vars || theme).palette.background.paper,
             border: (theme) =>
               `1px solid ${(theme.vars || theme).palette.divider}`,
+            minHeight: isMobile ? 120 : 80, // Mantener altura mínima para evitar saltos
           }}
         >
-          <Stack direction="row" spacing={3} alignItems="center">
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Total de movimientos
-              </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                {estadisticas.total}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Sin conciliar
-              </Typography>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 600,
-                  color: (theme) => (theme.vars || theme).palette.warning.main,
-                }}
-              >
-                {estadisticas.sinConciliar}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Conciliados
-              </Typography>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 600,
-                  color: (theme) => (theme.vars || theme).palette.success.main,
-                }}
-              >
-                {estadisticas.conciliados}
-              </Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.primary">
-                Progreso
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={estadisticas.porcentajeConciliado}
-                  sx={{ flex: 1, height: 8, borderRadius: 4 }}
-                />
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {Math.round(estadisticas.porcentajeConciliado)}%
+          {loadingEstadisticas ? (
+            isMobile ? (
+              <Grid container spacing={2}>
+                {[1, 2, 3, 4].map((i) => (
+                  <Grid key={i} size={6}>
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
+                      <Skeleton width={40} height={15} />
+                      <Skeleton width={60} height={30} />
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Stack direction="row" spacing={3} alignItems="center">
+                {[1, 2, 3, 4].map((i) => (
+                  <React.Fragment key={i}>
+                    <Box sx={{ flex: 1 }}>
+                      <Skeleton width="60%" height={15} sx={{ mb: 0.5 }} />
+                      <Skeleton width="40%" height={30} />
+                    </Box>
+                    {i < 4 && <Divider orientation="vertical" flexItem />}
+                  </React.Fragment>
+                ))}
+              </Stack>
+            )
+          ) : isMobile ? (
+            <Grid container spacing={2}>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    {estadisticas?.total}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Sin conciliar
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 600,
+                      color: (theme) => (theme.vars || theme).palette.warning.main,
+                    }}
+                  >
+                    {estadisticas?.sinConciliar}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Conciliados
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 600,
+                      color: (theme) => (theme.vars || theme).palette.success.main,
+                    }}
+                  >
+                    {estadisticas?.conciliados}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid size={6}>
+                <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", gap: 1 }}>
+                  <Typography variant="caption" color="text.primary">
+                    Progreso
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "60%" }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={estadisticas?.porcentajeConciliado || 0}
+                      sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                    />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {Math.round(estadisticas?.porcentajeConciliado || 0)}%
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          ) : (
+            <Stack direction="row" spacing={3} alignItems="center">
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Total de movimientos
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                  {estadisticas?.total}
                 </Typography>
               </Box>
-            </Box>
-          </Stack>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Sin conciliar
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 600,
+                    color: (theme) => (theme.vars || theme).palette.warning.main,
+                  }}
+                >
+                  {estadisticas?.sinConciliar}
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Conciliados
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 600,
+                    color: (theme) => (theme.vars || theme).palette.success.main,
+                  }}
+                >
+                  {estadisticas?.conciliados}
+                </Typography>
+              </Box>
+              <Divider orientation="vertical" flexItem />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.primary">
+                  Progreso
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={estadisticas?.porcentajeConciliado || 0}
+                    sx={{ flex: 1, height: 8, borderRadius: 4 }}
+                  />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {Math.round(estadisticas?.porcentajeConciliado || 0)}%
+                  </Typography>
+                </Box>
+              </Box>
+            </Stack>
+          )}
         </Paper>
       )}
 
       {/* Filtros */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
-          direction="row"
+          direction={{ xs: "column", md: "row" }}
           spacing={2}
-          alignItems="center"
-          sx={{ flexWrap: "wrap", gap: 2 }}
+          alignItems={{ xs: "stretch", md: "center" }}
+          sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}
         >
           {/* Filtro de estado */}
-          <ToggleButtonGroup
-            value={filtroEstado}
-            exclusive
-            onChange={(e, value) => value && setFiltroEstado(value)}
-            size="small"
-          >
-            <ToggleButton value="sin-conciliar">
-              <PendingIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Sin conciliar
-            </ToggleButton>
-            <ToggleButton value="conciliados">
-              <CheckCircleIcon sx={{ mr: 0.5, fontSize: 18 }} />
-              Conciliados
-            </ToggleButton>
-            <ToggleButton value="todos">Todos</ToggleButton>
-          </ToggleButtonGroup>
+          {isMobile ? (
+            <FormControl size="small" sx={{ minWidth: 150, flex: "1 1 auto" }}>
+              <InputLabel>Estado</InputLabel>
+              <Select
+                value={filtroEstado}
+                label="Estado"
+                onChange={(e) => setFiltroEstado(e.target.value)}
+              >
+                <MenuItem value="sin-conciliar">
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <PendingIcon sx={{ mr: 1, fontSize: 18 }} />
+                    Sin conciliar
+                  </Box>
+                </MenuItem>
+                <MenuItem value="conciliados">
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <CheckCircleIcon sx={{ mr: 1, fontSize: 18 }} />
+                    Conciliados
+                  </Box>
+                </MenuItem>
+                <MenuItem value="todos">Todos</MenuItem>
+              </Select>
+            </FormControl>
+          ) : (
+            <ToggleButtonGroup
+              value={filtroEstado}
+              exclusive
+              onChange={(e, value) => value && setFiltroEstado(value)}
+              size="small"
+              fullWidth
+            >
+              <ToggleButton value="sin-conciliar">
+                <PendingIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                Sin conciliar
+              </ToggleButton>
+              <ToggleButton value="conciliados">
+                <CheckCircleIcon sx={{ mr: 0.5, fontSize: 18 }} />
+                Conciliados
+              </ToggleButton>
+              <ToggleButton value="todos">Todos</ToggleButton>
+            </ToggleButtonGroup>
+          )}
 
-          <Divider orientation="vertical" flexItem />
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ display: { xs: "none", md: "block" } }}
+          />
 
           {/* Filtro de tipo */}
           <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -411,6 +644,7 @@ export default function ConciliacionPanel() {
             startIcon={<RefreshIcon />}
             onClick={cargarDatos}
             size="small"
+            sx={{ minWidth: "fit-content", whiteSpace: "nowrap" }}
           >
             Recargar
           </Button>
@@ -419,9 +653,7 @@ export default function ConciliacionPanel() {
         {/* Contador de resultados */}
         <Box sx={{ mt: 1 }}>
           <Typography variant="caption" color="text.primary">
-            Mostrando {movimientos.length} de{" "}
-            {totalElementos} movimientos (página{" "}
-            {paginaActual + 1}/{totalPaginas})
+            Mostrando {movimientosFiltrados.length} visualizados (de {movimientos.length} cargados) / Total en servidor: {totalElementos}
           </Typography>
         </Box>
       </Paper>
@@ -488,7 +720,7 @@ export default function ConciliacionPanel() {
                 >
                   <CircularProgress />
                 </Box>
-              ) : movimientos.length === 0 ? (
+              ) : movimientosFiltrados.length === 0 ? (
                 <Box sx={{ textAlign: "center", py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     No hay movimientos que coincidan con los filtros
@@ -497,7 +729,7 @@ export default function ConciliacionPanel() {
               ) : (
                 <>
                   <Box sx={{ flex: 1, overflow: "auto", pr: 1 }}>
-                    {movimientos.map((mov) => (
+                    {movimientosFiltrados.map((mov) => (
                       <MovimientoCard
                         key={mov.id}
                         movimiento={mov}

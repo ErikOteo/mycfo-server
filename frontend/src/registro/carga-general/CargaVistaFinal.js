@@ -16,6 +16,7 @@ import VerEgreso from "../movimientos-cargados/components/VerEgreso";
 import VerDeuda from "../movimientos-cargados/components/VerDeuda";
 import VerAcreencia from "../movimientos-cargados/components/VerAcreencia";
 import API_CONFIG from "../../config/api-config";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 // Lazy loading para componentes pesados
 const CargaFormulario = React.lazy(() =>
@@ -76,6 +77,22 @@ export default function CargaVistaFinal() {
   };
 
   const endpoint = endpointMap[tipo]?.[modo];
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-vista-final",
+      tipo,
+      modo,
+      endpoint,
+      formData,
+      dialogOpen: formDialogOpen,
+      dialogMessage,
+      vistaPreviaDisponible: Boolean(dialogData),
+    }),
+    [tipo, modo, endpoint, formData, formDialogOpen, dialogMessage, dialogData]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const prepararVistaPrevia = (datos) => {
     if (!datos) return null;

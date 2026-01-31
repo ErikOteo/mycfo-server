@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Grid, Paper, useTheme } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
+import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
 const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
   const theme = useTheme();
@@ -97,24 +98,24 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
     <Box sx={{ width: '100%', px: 0, py: 2 }}>
       {/* Totales arriba */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ p: 2 }}>
+        <Grid item xs={12} sm={4}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Ingresos</Typography>
             <Typography variant="h6" color="green">
               {currencyFormatter(totalIngresos)}
             </Typography>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ p: 2 }}>
+        <Grid item xs={12} sm={4}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Egresos</Typography>
             <Typography variant="h6" color="red">
               {currencyFormatter(totalEgresos)}
             </Typography>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Paper sx={{ p: 2 }}>
+        <Grid item xs={12} sm={4}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Balance</Typography>
             <Typography variant="h6" color={balance >= 0 ? 'green' : 'red'}>
               {currencyFormatter(balance)}
@@ -147,6 +148,9 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
               disableColumnResize
               disableRowSelectionOnClick
               sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: () => <CustomNoRowsOverlay message="No hay ingresos registrados este mes" />,
+              }}
             />
           </Box>
         </Box>
@@ -167,6 +171,9 @@ const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
               disableColumnResize
               disableRowSelectionOnClick
               sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: () => <CustomNoRowsOverlay message="No hay egresos registrados este mes" />,
+              }}
             />
           </Box>
         </Box>
