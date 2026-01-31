@@ -97,7 +97,6 @@ export default function NotificationSettings() {
     { value: "BUDGET_CREATED", label: "Presupuesto Creado" },
     { value: "BUDGET_DELETED", label: "Presupuesto Eliminado" },
     { value: "BUDGET_EXCEEDED", label: "Presupuesto Excedido" },
-    { value: "BUDGET_WARNING", label: "Presupuesto en Alerta" },
 
     { value: "REPORT_READY", label: "Reporte Generado" },
     { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" },

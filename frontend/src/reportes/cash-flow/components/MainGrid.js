@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
@@ -162,7 +163,7 @@ export default function MainGrid() {
 
     useChatbotScreenContext(chatbotContext);
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const excelData = [];
         const numMesesVisibles = mesesVisibles.length;
 
@@ -227,6 +228,14 @@ export default function MainGrid() {
                 freezePane: { rowSplit: 3, colSplit: 2 },
             }
         );
+
+        await sendReportGenerated({
+            reportType: "CASH_FLOW",
+            reportName: "Flujo de caja (Excel)",
+            period: `${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
@@ -268,6 +277,14 @@ export default function MainGrid() {
                         { label: "Cash final", value: formatCurrency(cashFinal) },
                     ],
                 },
+            });
+
+            await sendReportGenerated({
+                reportType: "CASH_FLOW",
+                reportName: "Flujo de caja (PDF)",
+                period: `${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
             });
         } catch (e) {
             console.error("Error al exportar PDF de cash flow:", e);
