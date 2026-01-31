@@ -4,10 +4,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 public record BudgetExceededEvent(
-    Long userId,
+    String userId,
     Long budgetId,
     String budgetName,
     String category,
+    String period,
     BigDecimal budgeted,
     BigDecimal actual,
     BigDecimal variance,

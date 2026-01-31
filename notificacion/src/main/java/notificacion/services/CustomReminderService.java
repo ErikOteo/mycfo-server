@@ -126,23 +126,6 @@ public class CustomReminderService {
     public void processDueReminders() {
         Instant now = Instant.now();
 
-        // Notificar próximos a vencer (dentro de 24h)
-        Instant in24h = now.plus(24, java.time.temporal.ChronoUnit.HOURS);
-        List<CustomReminder> upcoming = reminderRepository.findRecurringReminders(in24h);
-        for (CustomReminder reminder : upcoming) {
-            Notification n = new Notification();
-            n.setOrganizacionId(reminder.getOrganizacionId());
-            n.setUsuarioId(reminder.getUsuarioId());
-            n.setType(NotificationType.REMINDER_DEADLINE);
-            n.setTitle("Recordatorio próximo");
-            n.setBody(reminder.getTitle());
-            n.setSeverity(Severity.INFO);
-            n.setResourceType(notificacion.models.ResourceType.SYSTEM);
-            n.setResourceId("reminder_deadline_" + reminder.getId());
-            n.setCreatedAt(now);
-            notificationService.create(n);
-        }
-
         List<CustomReminder> dueReminders = reminderRepository.findDueReminders(now);
         for (CustomReminder reminder : dueReminders) {
             createNotificationFromReminder(reminder);
@@ -175,6 +158,7 @@ public class CustomReminderService {
 
         notificationService.create(notification);
 
+        // Enviamos el mail específico de recordatorio (sujeto "Recordatorio: <titulo>")
         try {
             emailService.sendReminderEmail(reminder.getOrganizacionId(), reminder.getUsuarioId(), reminder);
         } catch (Exception e) {

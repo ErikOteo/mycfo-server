@@ -39,6 +39,7 @@ public class PresupuestoEventService {
             event.put("budgetId", presupuesto.getId());
             event.put("budgetName", presupuesto.getNombre());
             event.put("category", linea.getCategoria());
+            event.put("period", linea.getMes());
             event.put("budgeted", budgeted);
             event.put("actual", actual);
             event.put("variance", variance);
@@ -53,6 +54,33 @@ public class PresupuestoEventService {
             
         } catch (Exception e) {
             System.err.println("Error enviando evento de presupuesto excedido: " + e.getMessage());
+        }
+    }
+
+    public void sendBudgetExceededAnnual(Presupuesto presupuesto,
+                                         BigDecimal budgeted,
+                                         BigDecimal actual,
+                                         String userSub) {
+        try {
+            BigDecimal variance = actual.subtract(budgeted);
+
+            Map<String, Object> event = new HashMap<>();
+            event.put("userId", userSub);
+            event.put("budgetId", presupuesto.getId());
+            event.put("budgetName", presupuesto.getNombre());
+            event.put("category", "EGRESOS_TOTALES");
+            event.put("period", buildPeriod(presupuesto));
+            event.put("budgeted", budgeted);
+            event.put("actual", actual);
+            event.put("variance", variance);
+            event.put("occurredAt", Instant.now());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(event, headers);
+            postWithFallback("/api/events/budget-exceeded", request);
+        } catch (Exception e) {
+            System.err.println("Error enviando evento anual de presupuesto excedido: " + e.getMessage());
         }
     }
 
