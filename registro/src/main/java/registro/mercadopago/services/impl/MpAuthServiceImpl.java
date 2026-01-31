@@ -15,10 +15,14 @@ import org.springframework.web.client.RestTemplate;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import registro.movimientosexcel.services.NotificationsEventPublisher;
 
 @Service
 public class MpAuthServiceImpl implements MpAuthService {
@@ -26,18 +30,24 @@ public class MpAuthServiceImpl implements MpAuthService {
     private final MpAccountLinkRepository repo;
     private final MpPaymentRepository paymentRepo;
     private final MpWalletMovementRepository movementRepo;
+    private final NotificationsEventPublisher notificationsEventPublisher;
     private final RestTemplate rest = new RestTemplate();
+
+    @Value("${notificacion.service.url:http://localhost:8084}")
+    private String notificacionServiceUrl;
 
     public MpAuthServiceImpl(
             MpProperties props,
             MpAccountLinkRepository repo,
             MpPaymentRepository paymentRepo,
-            MpWalletMovementRepository movementRepo
+            MpWalletMovementRepository movementRepo,
+            NotificationsEventPublisher notificationsEventPublisher
     ) {
         this.props = props;
         this.repo = repo;
         this.paymentRepo = paymentRepo;
         this.movementRepo = movementRepo;
+        this.notificationsEventPublisher = notificationsEventPublisher;
     }
 
     @Override
@@ -161,6 +171,13 @@ public class MpAuthServiceImpl implements MpAuthService {
         repo.save(link);
         
         System.out.println(">>> Cuenta MP vinculada exitosamente para usuario: " + userIdApp);
+
+        // Notificar vinculación exitosa
+        try {
+            notificationsEventPublisher.publishMpLinked(userIdApp, link.getId(), link.getEmail());
+        } catch (Exception e) {
+            System.out.println(">>> No se pudo notificar vinculación MP: " + e.getMessage());
+        }
     }
 
     /* =========================

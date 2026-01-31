@@ -44,6 +44,7 @@ import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
 import CustomNoRowsOverlay from "../../shared-components/CustomNoRowsOverlay";
 import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
+import { sendReportGenerated } from "../../notificaciones/services/reportGeneratedService";
 
 
 const FACTURA_PAGE_SIZE = 10;
@@ -888,6 +889,14 @@ const FacturaListPage = () => {
         freezePane: { rowSplit: 1, colSplit: 1 },
       },
     );
+
+    await sendReportGenerated({
+      reportType: "FACTURAS_EXPORT",
+      reportName: "Facturas (Excel)",
+      period: new Date().toLocaleString("es-AR"),
+      downloadUrl: null,
+      hasAnomalies: false,
+    });
   };
 
   const handleExportPdf = async () => {
@@ -927,6 +936,14 @@ const FacturaListPage = () => {
         ],
         summary: ["Incluye filtros aplicados y rango de fechas."],
       },
+    });
+
+    await sendReportGenerated({
+      reportType: "FACTURAS_EXPORT",
+      reportName: "Facturas (PDF)",
+      period: new Date().toLocaleString("es-AR"),
+      downloadUrl: null,
+      hasAnomalies: false,
     });
   };
 

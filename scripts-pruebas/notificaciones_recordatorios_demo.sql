@@ -1,7 +1,7 @@
 -- Bulk insert de notificaciones y recordatorios demo para MyCFO
 -- Ajustar estos valores antes de ejecutar si es necesario
-SET @ORGANIZACION_ID := 2;
-SET @USUARIO_ID   := '73fc2afa-c031-705e-2ed0-cad82d5e5619';
+SET @ORGANIZACION_ID := 1;
+SET @USUARIO_ID   := '335c7a9a-d021-704f-ba63-9c18f37959f8';
 
 -- Preferencias de notificación para el usuario demo
 INSERT INTO notification_preferences

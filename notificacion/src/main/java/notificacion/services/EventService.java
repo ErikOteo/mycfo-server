@@ -2,6 +2,7 @@ package notificacion.services;
 
 import notificacion.dtos.*;
 import notificacion.models.Notification;
+import notificacion.models.NotificationPreferences;
 import notificacion.models.NotificationType;
 import notificacion.models.ResourceType;
 import notificacion.models.Severity;
@@ -22,6 +23,7 @@ public class EventService {
     private final NotificationRepository repo;
     private final NotificationService notificationService;
     private final AdministracionService administracionService;
+    private final NotificationPreferencesService preferencesService;
 
     @Value("${notifications.default-user-id:demo-user}")
     private String defaultUsuarioId;
@@ -29,12 +31,17 @@ public class EventService {
     @Value("${notifications.high-threshold:100000}")
     private BigDecimal highThreshold;
 
+    @Value("${notifications.high-threshold-usd:1000}")
+    private BigDecimal highThresholdUsd;
+
     public EventService(NotificationRepository repo,
-            NotificationService notificationService,
-            AdministracionService administracionService) {
+                        NotificationService notificationService,
+                        AdministracionService administracionService,
+                        NotificationPreferencesService preferencesService) {
         this.repo = repo;
         this.notificationService = notificationService;
         this.administracionService = administracionService;
+        this.preferencesService = preferencesService;
     }
 
     @Transactional
@@ -45,12 +52,24 @@ public class EventService {
         boolean isIncome = evt.amount() != null && evt.amount().signum() >= 0;
 
         forEachUserInEmpresa(baseCtx.organizacionId(), ctx -> {
-            saveIfNew(ctx, NotificationType.MOVEMENT_NEW, ResourceType.MOVEMENT, refId,
-                    isIncome ? "Ingreso detectado" : "Egreso registrado",
-                    formatMovementBody(evt),
-                    Severity.INFO, createdAt);
+            BigDecimal threshold = preferencesService
+                    .getPreferences(ctx.organizacionId(), ctx.usuarioId())
+                    .map(NotificationPreferences::getMovementHighThreshold)
+                    .orElse(highThreshold);
+            BigDecimal thresholdUsd = preferencesService
+                    .getPreferences(ctx.organizacionId(), ctx.usuarioId())
+                    .map(NotificationPreferences::getMovementHighThresholdUsd)
+                    .orElse(highThresholdUsd);
 
-            if (evt.amount() != null && evt.amount().abs().compareTo(highThreshold) >= 0) {
+            String currency = evt.currency() != null ? evt.currency().toUpperCase() : "ARS";
+            BigDecimal selectedThreshold = switch (currency) {
+                case "USD", "USDT", "DOL", "DOLAR" -> thresholdUsd != null ? thresholdUsd : threshold;
+                default -> threshold;
+            };
+
+            if (evt.amount() != null && evt.amount().signum() > 0 &&
+                    selectedThreshold != null &&
+                    evt.amount().abs().compareTo(selectedThreshold) >= 0) {
                 saveIfNew(ctx, NotificationType.MOVEMENT_HIGH, ResourceType.MOVEMENT, refId,
                         "Movimiento alto detectado",
                         formatMovementBody(evt),
@@ -184,6 +203,20 @@ public class EventService {
     }
 
     @Transactional
+    public void handleReportAnomaly(ReportGeneratedEvent evt) {
+        ReportGeneratedEvent anomalyEvt = new ReportGeneratedEvent(
+                evt.userId(),
+                evt.reportType(),
+                evt.reportName(),
+                evt.period(),
+                evt.downloadUrl(),
+                evt.generatedAt(),
+                true
+        );
+        handleReportGenerated(anomalyEvt);
+    }
+
+    @Transactional
     public void handleBudgetWarning(BudgetWarningEvent evt) {
         TenantContext baseCtx = resolveTenant(evt.userId());
         Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
@@ -250,6 +283,72 @@ public class EventService {
     }
 
     @Transactional
+    public void handleReminderDeadline(ReminderDeadlineEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.dueDate() != null ? evt.dueDate().minus(1, ChronoUnit.DAYS) : Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.REMINDER_DEADLINE,
+                        ResourceType.SYSTEM,
+                        "reminder_deadline_" + evt.title().hashCode(),
+                        "Recordatorio próximo a vencer",
+                        String.format("%s - %s", defaultString(evt.title(), "Recordatorio"), defaultString(evt.message(), "")),
+                        Severity.INFO,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleReminderCreated(ReminderCreatedEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.scheduledFor() != null ? evt.scheduledFor() : Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.REMINDER_CREATED,
+                        ResourceType.SYSTEM,
+                        "reminder_created_" + evt.title().hashCode(),
+                        "Nuevo recordatorio creado",
+                        String.format("%s - %s | Para: %s", defaultString(evt.title(), ""), defaultString(evt.message(), ""), createdAt),
+                        Severity.INFO,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleForecastReminder(ForecastReminderEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.FORECAST_REMINDER,
+                        ResourceType.SYSTEM,
+                        "forecast_" + defaultString(evt.periodLabel(), "periodo"),
+                        "No olvides generar tus pronósticos",
+                        String.format("Período: %s", defaultString(evt.periodLabel(), "Actual")),
+                        Severity.INFO,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleConciliationReminder(ConciliationReminderEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.CONCILIATION_REMINDER,
+                        ResourceType.MOVEMENT,
+                        "conciliation_reminder_" + defaultString(evt.accountName(), "general"),
+                        "Recordatorio de conciliación",
+                        String.format("Cuenta: %s | Días pendientes: %d",
+                                defaultString(evt.accountName(), "-"),
+                                evt.pendingDays()),
+                        Severity.INFO,
+                        createdAt));
+    }
+
+    @Transactional
     public void handleBillDue(BillDueEvent evt) {
         TenantContext baseCtx = resolveTenant(evt.userId());
         Instant createdAt = evt.dueDate() != null ? evt.dueDate() : Instant.now();
@@ -271,6 +370,59 @@ public class EventService {
             notification.setCreatedAt(createdAt);
             notificationService.create(notification);
         });
+    }
+
+    @Transactional
+    public void handleMovementsImported(MovementImportEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.importedAt() != null ? evt.importedAt() : Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.MOVEMENT_IMPORT,
+                        ResourceType.MOVEMENT,
+                        evt.importId() != null ? evt.importId() : "import",
+                        "Importación de movimientos",
+                        String.format("Fuente: %s | Registros: %d",
+                                defaultString(evt.sourceName(), "Excel"),
+                                evt.totalRows()),
+                        Severity.INFO,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleMovementDuplicate(MovementDuplicateEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = evt.occurredAt() != null ? evt.occurredAt() : Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.MOVEMENT_DUPLICATE,
+                        ResourceType.MOVEMENT,
+                        evt.refId(),
+                        "Movimiento duplicado detectado",
+                        String.format("Descripción: %s | Cuenta: %s | Duplica: %s",
+                                defaultString(evt.description(), "-"),
+                                defaultString(evt.accountName(), "-"),
+                                defaultString(evt.duplicateOfRef(), "-")),
+                        Severity.WARN,
+                        createdAt));
+    }
+
+    @Transactional
+    public void handleMpLinked(AccountMpLinkedEvent evt) {
+        TenantContext baseCtx = resolveTenant(evt.userId());
+        Instant createdAt = Instant.now();
+
+        forEachUserInEmpresa(baseCtx.organizacionId(), ctx ->
+                saveIfNew(ctx,
+                        NotificationType.ACCOUNT_MP_LINKED,
+                        ResourceType.SYSTEM,
+                        evt.accountId() != null ? evt.accountId().toString() : "mp_link",
+                        "Cuenta vinculada a Mercado Pago",
+                        String.format("Cuenta: %s", defaultString(evt.accountName(), "-")),
+                        Severity.INFO,
+                        createdAt));
     }
 
     @Transactional
@@ -319,8 +471,9 @@ public class EventService {
         String desc = evt.description() != null && !evt.description().isBlank()
                 ? evt.description() + " - "
                 : "";
-
-        return desc + formatMoney(evt.amount());
+        String currency = evt.currency() != null ? evt.currency().toUpperCase() : "ARS";
+        String symbol = "USD".equals(currency) ? "US$" : "$";
+        return desc + symbol + (evt.amount() != null ? evt.amount() : "0");
     }
 
     private String formatMoney(BigDecimal amount) {
@@ -363,7 +516,8 @@ public class EventService {
         notification.setResourceId(resourceId);
         notification.setCreatedAt(createdAt);
 
-        repo.save(notification);
+        // Usamos el servicio para que aplique validaciones y envíe email si corresponde
+        notificationService.create(notification);
     }
 
     private Notification buildBaseNotification(TenantContext ctx) {
@@ -372,6 +526,10 @@ public class EventService {
         notification.setUsuarioId(ctx.usuarioId());
         notification.setRead(false);
         return notification;
+    }
+
+    private String defaultString(String value, String defaultVal) {
+        return (value == null || value.isBlank()) ? defaultVal : value;
     }
 
     private void forEachUserInEmpresa(Long organizacionId, java.util.function.Consumer<TenantContext> consumer) {

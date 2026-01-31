@@ -45,7 +45,6 @@ const timeStringToDayjs = (timeStr) => {
 export default function NotificationSettings() {
   const [preferences, setPreferences] = React.useState({
     emailEnabled: true,
-    inAppEnabled: true,
     pushEnabled: false,
     dailyDigestEnabled: true,
     weeklyDigestEnabled: false,
@@ -55,6 +54,7 @@ export default function NotificationSettings() {
     quietDays: [],
     typeConfigs: {},
     userEmail: "",
+    movementHighThreshold: 100000,
   });
 
   const [loading, setLoading] = React.useState(false);
@@ -90,20 +90,20 @@ export default function NotificationSettings() {
   }, []);
 
   const notificationTypes = [
-    { value: "MOVEMENT_NEW", label: "Nuevos Movimientos" },
     { value: "MOVEMENT_HIGH", label: "Movimientos Altos" },
-    { value: "RECONCILIATION_STALE", label: "Conciliación Pendiente" },
-    { value: "REMINDER_BILL_DUE", label: "Facturas por Vencer" },
-    { value: "USER_INVITED", label: "Usuarios Invitados" },
-    { value: "ROLE_CHANGED", label: "Cambios de Rol" },
-    { value: "BUDGET_EXCEEDED", label: "Presupuestos Excedidos" },
-    { value: "BUDGET_WARNING", label: "Presupuestos al 80%" },
-    { value: "BUDGET_MISSING_CATEGORY", label: "Categorías sin Presupuesto" },
-    { value: "CASH_FLOW_ALERT", label: "Alertas de Cash Flow" },
-    { value: "REPORT_READY", label: "Reportes Listos" },
-    { value: "MONTHLY_SUMMARY", label: "Resumen Mensual" },
-    { value: "REMINDER_CUSTOM", label: "Recordatorios" },
-    { value: "SYSTEM_MAINTENANCE", label: "Mantenimiento del Sistema" },
+    { value: "MOVEMENT_IMPORT", label: "Importación de Movimientos" },
+    { value: "ACCOUNT_MP_LINKED", label: "Vinculación Mercado Pago" },
+
+    { value: "BUDGET_CREATED", label: "Presupuesto Creado" },
+    { value: "BUDGET_DELETED", label: "Presupuesto Eliminado" },
+    { value: "BUDGET_EXCEEDED", label: "Presupuesto Excedido" },
+
+    { value: "REPORT_READY", label: "Reporte Generado" },
+    { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" },
+    { value: "MONTHLY_SUMMARY", label: "Resumen Mensual Listo" },
+    { value: "CASH_FLOW_ALERT", label: "Alerta de Cash Flow" },
+
+    { value: "REMINDER_DEADLINE", label: "Recordatorio Próximo a Vencer" },
   ];
 
   const daysOfWeek = [
@@ -308,17 +308,6 @@ export default function NotificationSettings() {
                   }
                   label="Notificaciones por Email"
                 />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={preferences.inAppEnabled}
-                      onChange={(e) =>
-                        handlePreferenceChange("inAppEnabled", e.target.checked)
-                      }
-                    />
-                  }
-                  label="Notificaciones en la Aplicación"
-                />
                 {/*<FormControlLabel
                   control={
                     <Switch
@@ -331,9 +320,6 @@ export default function NotificationSettings() {
                   label="Notificaciones Push"
                 />*/}
               </FormGroup>
-
-              {/* Espaciado adicional */}
-              <Box sx={{ mt: 2 }} />
 
               {/* Campo de Email del Usuario */}
               <TextField
@@ -493,10 +479,7 @@ export default function NotificationSettings() {
                             )
                           }
                           size="small"
-                          disabled={
-                            !preferences.emailEnabled &&
-                            !preferences.inAppEnabled
-                          }
+                      disabled={!preferences.emailEnabled}
                         />
                       }
                       label="Habilitado"
@@ -504,12 +487,12 @@ export default function NotificationSettings() {
                     <FormControlLabel
                       control={
                         <Switch
-                          checked={
-                            (preferences.emailEnabled &&
-                              preferences.typeConfigs[type.value]
-                                ?.emailEnabled) ??
-                            true
-                          }
+                        checked={
+                          (preferences.emailEnabled &&
+                            preferences.typeConfigs[type.value]
+                              ?.emailEnabled) ??
+                          true
+                        }
                           onChange={(e) =>
                             handleTypeConfigChange(
                               type.value,
@@ -523,28 +506,38 @@ export default function NotificationSettings() {
                       }
                       label="Email"
                     />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={
-                            (preferences.inAppEnabled &&
-                              preferences.typeConfigs[type.value]
-                                ?.inAppEnabled) ??
-                            true
-                          }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "inAppEnabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                          disabled={!preferences.inAppEnabled}
-                        />
-                      }
-                      label="En App"
-                    />
+                    {type.value === "MOVEMENT_HIGH" && (
+                      <Box sx={{ mt: 1.5 }}>
+                        <FieldBox label="Umbral de movimiento alto (ARS)">
+                          <TextField
+                            type="number"
+                            fullWidth
+                            inputProps={{ min: 0, step: 1000 }}
+                            value={preferences.movementHighThreshold ?? 100000}
+                            onChange={(e) =>
+                              handlePreferenceChange(
+                                "movementHighThreshold",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </FieldBox>
+                        <FieldBox label="Umbral de movimiento alto (USD)">
+                          <TextField
+                            type="number"
+                            fullWidth
+                            inputProps={{ min: 0, step: 50 }}
+                            value={preferences.movementHighThresholdUsd ?? 1000}
+                            onChange={(e) =>
+                              handlePreferenceChange(
+                                "movementHighThresholdUsd",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </FieldBox>
+                      </Box>
+                    )}
                   </FormGroup>
                 </Paper>
               </Box>

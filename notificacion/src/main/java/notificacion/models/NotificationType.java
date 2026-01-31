@@ -7,6 +7,8 @@ public enum NotificationType {
     MOVEMENT_HIGH,          // Movimiento con monto alto
     MOVEMENT_DUPLICATE,     // Movimiento duplicado detectado
     MOVEMENT_CATEGORIZED,   // Movimiento categorizado automáticamente
+    MOVEMENT_IMPORT,        // Importación de movimientos (Excel/CSV)
+    ACCOUNT_MP_LINKED,      // Cuenta vinculada a Mercado Pago
     
     // PRESUPUESTOS Y PRONÓSTICOS
     BUDGET_CREATED,         // Presupuesto creado
@@ -29,6 +31,9 @@ public enum NotificationType {
     REMINDER_RECURRING,     // Recordatorio recurrente
     REMINDER_DATA_LOAD,     // Recordatorio de carga de datos
     REMINDER_BILL_DUE,      // Recordatorio de vencimiento de factura
+    REMINDER_CREATED,       // Se creó un nuevo recordatorio
+    FORECAST_REMINDER,      // Recordatorio para generar pronósticos
+    CONCILIATION_REMINDER,  // Recordatorio para conciliar movimientos
     
     // SISTEMA Y ADMINISTRACIÓN
     SYSTEM_MAINTENANCE,     // Mantenimiento programado

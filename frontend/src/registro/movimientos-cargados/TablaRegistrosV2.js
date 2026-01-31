@@ -48,6 +48,7 @@ import VerIngreso from "./components/VerIngreso";
 import VerEgreso from "./components/VerEgreso";
 import VerDeuda from "./components/VerDeuda";
 import VerAcreencia from "./components/VerAcreencia";
+import { sendReportGenerated } from "../../notificaciones/services/reportGeneratedService";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
@@ -1165,6 +1166,14 @@ export default function TablaRegistrosV2() {
       zebra: true,
       freezePane: { rowSplit: 1, colSplit: 1 },
     });
+
+    await sendReportGenerated({
+      reportType: "MOVEMENTS_EXPORT",
+      reportName: "Movimientos financieros (Excel)",
+      period: new Date().toLocaleString("es-AR"),
+      downloadUrl: null,
+      hasAnomalies: false,
+    });
   };
 
   const handleExportPdf = async () => {
@@ -1203,6 +1212,14 @@ export default function TablaRegistrosV2() {
         ],
         summary: ["Incluye filtros y rango de fechas aplicados."],
       },
+    });
+
+    await sendReportGenerated({
+      reportType: "MOVEMENTS_EXPORT",
+      reportName: "Movimientos financieros (PDF)",
+      period: new Date().toLocaleString("es-AR"),
+      downloadUrl: null,
+      hasAnomalies: false,
     });
   };
 
