@@ -104,10 +104,6 @@ export default function NotificationSettings() {
     { value: "CASH_FLOW_ALERT", label: "Alerta de Cash Flow" },
 
     { value: "REMINDER_DEADLINE", label: "Recordatorio Próximo a Vencer" },
-    { value: "REMINDER_CREATED", label: "Recordatorio Creado" },
-    { value: "FORECAST_REMINDER", label: "Recordatorio de Pronóstico" },
-    { value: "CONCILIATION_REMINDER", label: "Recordatorio de Conciliación" },
-    { value: "REMINDER_CUSTOM", label: "Recordatorios Personalizados" },
   ];
 
   const daysOfWeek = [
