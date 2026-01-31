@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html xmlns:th="http://www.thymeleaf.org">
   <head>
     <meta charset="UTF-8" />
@@ -106,23 +106,10 @@
         >
           <h3 th:text="${notification.title}">Título</h3>
           <p th:text="${notification.body}">Contenido de la notificación</p>
-
-          <div th:if="${notification.resourceType != null}">
-            <p>
-              <strong>Tipo de Recurso:</strong>
-              <span th:text="${notification.resourceType}">-</span>
-            </p>
-            <p th:if="${notification.resourceId != null}">
-              <strong>ID:</strong>
-              <span th:text="${notification.resourceId}">-</span>
-            </p>
-          </div>
         </div>
 
         <div style="text-align: center; margin-top: 30px">
-          <a th:href="${frontendUrl + '/listado-notificaciones'}" class="btn">
-            Ver en MyCFO
-          </a>
+          <a th:href="${frontendUrl}" class="btn"> Ver en MyCFO </a>
         </div>
 
         <div
@@ -148,7 +135,7 @@
           Si no deseas recibir estas notificaciones, puedes configurarlas en tu
           perfil.
         </p>
-        <p>&copy; 2024 MyCFO. Todos los derechos reservados.</p>
+        <p>&copy; 2026 MyCFO. Todos los derechos reservados.</p>
       </div>
     </div>
   </body>

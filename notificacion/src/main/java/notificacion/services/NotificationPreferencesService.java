@@ -63,6 +63,9 @@ public class NotificationPreferencesService {
             });
         }
 
+        existing.setMovementHighThreshold(preferences.getMovementHighThreshold());
+        existing.setMovementHighThresholdUsd(preferences.getMovementHighThresholdUsd());
+
         return repository.save(existing);
     }
 
