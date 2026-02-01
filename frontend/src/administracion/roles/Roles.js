@@ -18,7 +18,9 @@ import {
   IconButton,
   Tooltip,
   Checkbox,
-  useTheme
+  useTheme,
+  useMediaQuery,
+  Divider
 } from '@mui/material';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
@@ -405,6 +407,9 @@ export default function Roles(props) {
     }
   };
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
@@ -414,26 +419,34 @@ export default function Roles(props) {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4, px: isMobile ? 2 : 3 }}>
+      <Box sx={{
+        mb: 4,
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'flex-start' : 'flex-end',
+        gap: isMobile ? 2 : 0
+      }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 700 }}>
             Permisos de Miembros
           </Typography>
-          <Typography variant="body1" color="text.primary">
+          <Typography variant="body2" color="text.primary">
             Configura individualmente quién puede Ver y quién puede Editar cada sección.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={2} sx={{ width: isMobile ? '100%' : 'auto' }}>
           <IconButton onClick={cargarDatos} disabled={guardando}>
             <RefreshRoundedIcon />
           </IconButton>
           <Button
             variant="contained"
+            fullWidth={isMobile}
             startIcon={guardando ? <CircularProgress size={20} color="inherit" /> : <SaveRoundedIcon />}
             onClick={handleGuardar}
             disabled={guardando}
-            sx={{ borderRadius: 2 }}
+            sx={{ borderRadius: 2, lineHeight: 1.2 }}
           >
             {guardando ? 'Guardando...' : 'Guardar'}
           </Button>
@@ -443,159 +456,254 @@ export default function Roles(props) {
       {mensajeExito && <Alert severity="success" sx={{ mb: 3 }}>¡Permisos guardados con éxito!</Alert>}
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-      <Paper
-        elevation={0}
-        sx={{
-          borderRadius: 4,
-          overflow: 'hidden',
-          border: '1px solid',
-          borderColor: 'divider',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-        }}
-      >
-        <TableContainer sx={{ maxHeight: '75vh' }}>
-          <Table stickyHeader sx={{ tableLayout: 'fixed', minWidth: '100%' }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{
-                  fontWeight: 800,
-                  bgcolor: 'background.paper',
-                  zIndex: 3,
-                  width: '180px', // Un poco más de ancho para el nombre
-                  borderBottom: '2px solid',
-                  borderColor: 'primary.main',
-                  verticalAlign: 'middle',
-                  py: 2
-                }}>
-                  Miembro
-                </TableCell>
-                <TableCell align="center" sx={{
-                  fontWeight: 800,
-                  bgcolor: 'background.paper',
-                  width: '110px', // Aumentado de 90px para dar aire
-                  borderBottom: '2px solid',
-                  borderColor: 'divider',
-                  verticalAlign: 'middle',
-                  py: 2
-                }}>
-                  Rango
-                </TableCell>
-                {PANTALLAS.map(p => (
-                  <TableCell key={p.id} align="center" sx={{
+      {!isMobile ? (
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 4,
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+          }}
+        >
+          <TableContainer sx={{ maxHeight: '75vh' }}>
+            <Table stickyHeader sx={{ tableLayout: 'fixed', minWidth: '100%' }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{
                     fontWeight: 800,
                     bgcolor: 'background.paper',
-                    px: 0.5,
-                    verticalAlign: 'middle',
-                    py: 2,
+                    zIndex: 3,
+                    width: '180px',
                     borderBottom: '2px solid',
-                    borderColor: 'divider'
+                    borderColor: 'primary.main',
+                    verticalAlign: 'middle',
+                    py: 2
                   }}>
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        lineHeight: 1.1,
-                        display: 'block',
-                        whiteSpace: 'normal',
-                        fontSize: '0.75rem',
-                        color: 'text.primary',
-                        fontFamily: 'Inter, sans-serif'
-                      }}
-                    >
-                      {p.name}
-                    </Typography>
+                    Miembro
                   </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {empleados.map((emp) => {
-                const isAdmin = emp.isLocalAdmin;
-                const isSelf = emp.email === sessionStorage.getItem('email');
-                const isOwner = emp.esPropietario;
-
-                return (
-                  <TableRow key={emp.sub} hover>
-                    <TableCell sx={{ py: 1.5 }}>
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Box sx={{ position: 'relative' }}>
-                          {isOwner && (
-                            <Tooltip title="Propietario de la Empresa">
-                              <Box sx={{
-                                position: 'absolute',
-                                top: -8,
-                                right: -8,
-                                zIndex: 1,
-                                fontSize: '14px',
-                                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
-                              }}>
-                                👑
-                              </Box>
-                            </Tooltip>
-                          )}
-                          <Avatar sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: emp.avatarColor || '#9e9e9e',
-                            fontSize: '0.9rem',
-                            fontWeight: 700,
-                            color: '#ffffff',
-                            border: emp.avatarColor === '#ffffff' ? '1px solid #e0e0e0' : 'none'
-                          }}>
-                            {emp.nombre.charAt(0)}
-                          </Avatar>
-                        </Box>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem', color: 'text.primary' }}>
-                            {emp.nombre}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </TableCell>
-
-                    <TableCell align="center" sx={{ borderLeft: '1px solid', borderColor: 'divider', px: 0.5 }}>
-                      <RoleSelector
-                        isAdmin={isAdmin}
-                        onToggle={() => {
-                          setEmpleados(prev => prev.map(e =>
-                            e.sub === emp.sub ? { ...e, isLocalAdmin: !isAdmin } : e
-                          ));
+                  <TableCell align="center" sx={{
+                    fontWeight: 800,
+                    bgcolor: 'background.paper',
+                    width: '110px',
+                    borderBottom: '2px solid',
+                    borderColor: 'divider',
+                    verticalAlign: 'middle',
+                    py: 2
+                  }}>
+                    Rango
+                  </TableCell>
+                  {PANTALLAS.map(p => (
+                    <TableCell key={p.id} align="center" sx={{
+                      fontWeight: 800,
+                      bgcolor: 'background.paper',
+                      px: 0.5,
+                      verticalAlign: 'middle',
+                      py: 2,
+                      borderBottom: '2px solid',
+                      borderColor: 'divider'
+                    }}>
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          lineHeight: 1.1,
+                          display: 'block',
+                          whiteSpace: 'normal',
+                          fontSize: '0.75rem',
+                          color: 'text.primary',
+                          fontFamily: 'Inter, sans-serif'
                         }}
-                        disabled={isSelf || isOwner}
-                      />
+                      >
+                        {p.name}
+                      </Typography>
                     </TableCell>
-                    {PANTALLAS.map(p => {
-                      const userPerms = permisos[emp.sub]?.[p.id] || { view: false, edit: false };
-                      const viewActive = isAdmin || userPerms.view;
-                      const editActive = isAdmin || userPerms.edit;
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {empleados.map((emp) => {
+                  const isAdmin = emp.isLocalAdmin;
+                  const isSelf = emp.email === sessionStorage.getItem('email');
+                  const isOwner = emp.esPropietario;
 
-                      return (
-                        <TableCell key={p.id} align="center" sx={{ px: 0.5, py: 0.75, borderLeft: '1px solid', borderColor: 'divider' }}>
-                          <AccessLevelSelector
-                            pId={p.id}
-                            disabled={isAdmin}
-                            value={{ view: viewActive, edit: editActive }}
-                            onChange={(newVal) => {
-                              if (!isAdmin) {
-                                setPermisos(prev => ({
-                                  ...prev,
-                                  [emp.sub]: {
-                                    ...prev[emp.sub],
-                                    [p.id]: newVal
-                                  }
-                                }));
-                              }
-                            }}
-                          />
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                  return (
+                    <TableRow key={emp.sub} hover>
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Box sx={{ position: 'relative' }}>
+                            {isOwner && (
+                              <Tooltip title="Propietario de la Empresa">
+                                <Box sx={{
+                                  position: 'absolute',
+                                  top: -8,
+                                  right: -8,
+                                  zIndex: 1,
+                                  fontSize: '14px',
+                                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
+                                }}>
+                                  👑
+                                </Box>
+                              </Tooltip>
+                            )}
+                            <Avatar sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: emp.avatarColor || '#9e9e9e',
+                              fontSize: '0.9rem',
+                              fontWeight: 700,
+                              color: '#ffffff',
+                              border: emp.avatarColor === '#ffffff' ? '1px solid #e0e0e0' : 'none'
+                            }}>
+                              {emp.nombre.charAt(0)}
+                            </Avatar>
+                          </Box>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem', color: 'text.primary' }}>
+                              {emp.nombre}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+
+                      <TableCell align="center" sx={{ borderLeft: '1px solid', borderColor: 'divider', px: 0.5 }}>
+                        <RoleSelector
+                          isAdmin={isAdmin}
+                          onToggle={() => {
+                            setEmpleados(prev => prev.map(e =>
+                              e.sub === emp.sub ? { ...e, isLocalAdmin: !isAdmin } : e
+                            ));
+                          }}
+                          disabled={isSelf || isOwner}
+                        />
+                      </TableCell>
+                      {PANTALLAS.map(p => {
+                        const userPerms = permisos[emp.sub]?.[p.id] || { view: false, edit: false };
+                        const viewActive = isAdmin || userPerms.view;
+                        const editActive = isAdmin || userPerms.edit;
+
+                        return (
+                          <TableCell key={p.id} align="center" sx={{ px: 0.5, py: 0.75, borderLeft: '1px solid', borderColor: 'divider' }}>
+                            <AccessLevelSelector
+                              pId={p.id}
+                              disabled={isAdmin}
+                              value={{ view: viewActive, edit: editActive }}
+                              onChange={(newVal) => {
+                                if (!isAdmin) {
+                                  setPermisos(prev => ({
+                                    ...prev,
+                                    [emp.sub]: {
+                                      ...prev[emp.sub],
+                                      [p.id]: newVal
+                                    }
+                                  }));
+                                }
+                              }}
+                            />
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      ) : (
+        <Stack spacing={2}>
+          {empleados.map((emp) => {
+            const isAdmin = emp.isLocalAdmin;
+            const isSelf = emp.email === sessionStorage.getItem('email');
+            const isOwner = emp.esPropietario;
+
+            return (
+              <Paper
+                key={emp.sub}
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: isAdmin ? 'primary.main' : 'divider',
+                  bgcolor: isAdmin ? 'rgba(255, 255, 255, 0.7)' : 'background.paper',
+                  boxShadow: '0 2px 12px rgba(255, 255, 255, 0.05)'
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box sx={{ position: 'relative' }}>
+                      {isOwner && (
+                        <Box sx={{ position: 'absolute', top: -5, right: -5, fontSize: '12px', zIndex: 1 }}>👑</Box>
+                      )}
+                      <Avatar sx={{
+                        width: 32,
+                        height: 32,
+                        bgcolor: emp.avatarColor || '#9e9e9e',
+                        fontSize: '0.8rem',
+                        color: '#fff'
+                      }}>
+                        {emp.nombre.charAt(0)}
+                      </Avatar>
+                    </Box>
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                        {emp.nombre}
+                      </Typography>
+                      <Typography variant="caption" color="text.primary">
+                        {emp.email}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <RoleSelector
+                    isAdmin={isAdmin}
+                    onToggle={() => {
+                      setEmpleados(prev => prev.map(e =>
+                        e.sub === emp.sub ? { ...e, isLocalAdmin: !isAdmin } : e
+                      ));
+                    }}
+                    disabled={isSelf || isOwner}
+                  />
+                </Box>
+
+                <Divider sx={{ mb: 2, opacity: 0.6 }} />
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                  {PANTALLAS.map(p => {
+                    const userPerms = permisos[emp.sub]?.[p.id] || { view: false, edit: false };
+                    const viewActive = isAdmin || userPerms.view;
+                    const editActive = isAdmin || userPerms.edit;
+
+                    return (
+                      <Box key={p.id} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                          {p.name}
+                        </Typography>
+                        <AccessLevelSelector
+                          pId={p.id}
+                          disabled={isAdmin}
+                          value={{ view: viewActive, edit: editActive }}
+                          onChange={(newVal) => {
+                            if (!isAdmin) {
+                              setPermisos(prev => ({
+                                ...prev,
+                                [emp.sub]: {
+                                  ...prev[emp.sub],
+                                  [p.id]: newVal
+                                }
+                              }));
+                            }
+                          }}
+                        />
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Paper>
+            );
+          })}
+        </Stack>
+      )}
 
       <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <Typography variant="caption" color="text.primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
