@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {
-    Box, Typography, Paper, CssBaseline
+    Box, Typography, Paper, CssBaseline, Snackbar, Alert
 } from '@mui/material';
 import Filtros from './Filtros';
 import TablaDetalle from './TablaDetalle';
@@ -27,6 +27,7 @@ export default function MainGrid() {
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
     const chartRef = React.useRef(null);
     const [currency, setCurrency] = usePreferredCurrency("ARS");
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
     // Formateador de moneda para tooltips del gráfico
     const formatCurrency = React.useCallback(
@@ -203,7 +204,7 @@ export default function MainGrid() {
     const handleExportPdf = async () => {
         const chartElement = chartRef.current;
         if (!chartElement) {
-            alert("No se pudo encontrar el grafico para exportar.");
+            setSnackbar({ open: true, message: "No se pudo encontrar el gráfico para exportar.", severity: "warning" });
             return;
         }
 
@@ -261,7 +262,7 @@ export default function MainGrid() {
             });
         } catch (e) {
             console.error("Error al exportar PDF de P&L:", e);
-            alert("No se pudo generar el PDF. Intente nuevamente.");
+            setSnackbar({ open: true, message: "No se pudo generar el PDF. Intente nuevamente.", severity: "error" });
         } finally {
             setExportingPdf(false);
         }
@@ -291,8 +292,8 @@ export default function MainGrid() {
                     mx: 'auto',
                 }}
             >
-            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography component="h2" variant="h4">
                         Estado de Resultados
                     </Typography>
@@ -303,7 +304,7 @@ export default function MainGrid() {
                     />
                 </Box>
 
-            <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />
+                <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />
                 <TablaDetalle year={selectedYear} ingresos={data.detalleIngresos} egresos={data.detalleEgresos} />
 
                 <div ref={chartRef}>
@@ -322,6 +323,22 @@ export default function MainGrid() {
                         </ResponsiveContainer>
                     </Paper>
                 </div>
+
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={4000}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                >
+                    <Alert
+                        onClose={() => setSnackbar({ ...snackbar, open: false })}
+                        severity={snackbar.severity}
+                        variant="filled"
+                        sx={{ width: '100%', borderRadius: 2 }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
 
             </Box>
         </React.Fragment>

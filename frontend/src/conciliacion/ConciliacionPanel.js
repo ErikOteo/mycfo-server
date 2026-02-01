@@ -22,6 +22,7 @@ import {
   Pagination,
   useMediaQuery,
   Skeleton,
+  Snackbar,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -34,6 +35,7 @@ import CurrencyTabs, {
   usePreferredCurrency,
 } from "../shared-components/CurrencyTabs";
 import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
+import usePermisos from "../hooks/usePermisos";
 
 export default function ConciliacionPanel() {
   const theme = useTheme();
@@ -54,6 +56,9 @@ export default function ConciliacionPanel() {
   const [totalElementos, setTotalElementos] = useState(0);
   const [tamanioPagina, setTamanioPagina] = useState(isMobile ? 1 : 10);
   const [currency, setCurrency] = usePreferredCurrency("ARS");
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('concil', 'edit');
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
   // Filtros
   const [filtroEstado, setFiltroEstado] = useState("sin-conciliar"); // 'todos', 'sin-conciliar', 'conciliados'
@@ -77,12 +82,12 @@ export default function ConciliacionPanel() {
       movimientos: movimientos.slice(0, 5),
       movimientoSeleccionado: movimientoSeleccionado
         ? {
-            id: movimientoSeleccionado.id,
-            tipo: movimientoSeleccionado.tipo,
-            monto: movimientoSeleccionado.monto,
-            fecha: movimientoSeleccionado.fechaEmision,
-            conciliado: movimientoSeleccionado.conciliado,
-          }
+          id: movimientoSeleccionado.id,
+          tipo: movimientoSeleccionado.tipo,
+          monto: movimientoSeleccionado.monto,
+          fecha: movimientoSeleccionado.fechaEmision,
+          conciliado: movimientoSeleccionado.conciliado,
+        }
         : null,
       sugerencias: sugerencias.slice(0, 5),
     }),
@@ -284,7 +289,7 @@ export default function ConciliacionPanel() {
       setMovimientoSeleccionado(null);
     } catch (err) {
       console.error("Error vinculando movimiento:", err);
-      alert("Error al vincular el movimiento");
+      setSnackbar({ open: true, message: "Error al vincular el movimiento", severity: "error" });
     }
   };
 
@@ -303,7 +308,7 @@ export default function ConciliacionPanel() {
       }
     } catch (err) {
       console.error("Error desvinculando movimiento:", err);
-      alert("Error al desvincular el movimiento");
+      setSnackbar({ open: true, message: "Error al desvincular el movimiento", severity: "error" });
     }
   };
 
@@ -735,7 +740,7 @@ export default function ConciliacionPanel() {
                         movimiento={mov}
                         selected={movimientoSeleccionado?.id === mov.id}
                         onClick={() => handleSeleccionarMovimiento(mov)}
-                        onDesvincular={handleDesvincular}
+                        onDesvincular={canEdit ? handleDesvincular : null}
                       />
                     ))}
                   </Box>
@@ -844,7 +849,7 @@ export default function ConciliacionPanel() {
                       <DocumentoCard
                         key={doc.idDocumento}
                         documento={doc}
-                        onVincular={handleVincular}
+                        onVincular={canEdit ? handleVincular : null}
                       />
                     ))}
                   </Box>
@@ -871,6 +876,22 @@ export default function ConciliacionPanel() {
           </Grid>
         </Grid>
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

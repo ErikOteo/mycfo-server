@@ -50,6 +50,7 @@ export default function MpLinkCard({ onLinked }) {
       <CardHeader
         title="Vincular tu cuenta de Mercado Pago"
         subheader="Conecta tu cuenta para importar pagos y movimientos."
+        subheaderTypographyProps={{ color: 'text.primary' }}
         sx={{ pb: 0 }}
       />
 
@@ -88,7 +89,12 @@ export default function MpLinkCard({ onLinked }) {
           <Box
             sx={{ width: "100%", display: "flex", justifyContent: "center" }}
           >
-            <Button variant="contained" onClick={startLink} disabled={busy}>
+            <Button
+              variant="contained"
+              onClick={startLink}
+              disabled={busy}
+              sx={{ lineHeight: 1.2 }}
+            >
               {busy ? "Redirigiendo..." : "Vincular cuenta"}
             </Button>
           </Box>

@@ -36,6 +36,7 @@ import { TODAS_LAS_CATEGORIAS } from '../../../shared-components/categorias';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
+import usePermisos from '../../../hooks/usePermisos';
 
 // ===== Helpers =====
 const safeNumber = (v) =>
@@ -208,7 +209,8 @@ export default function MesDetalle() {
   const [deletePrompt, setDeletePrompt] = React.useState({ open: false, id: null, categoria: '', tipo: '' });
   const [categoriasOptions, setCategoriasOptions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
-  const [usuarioRol, setUsuarioRol] = React.useState(null);
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('pres', 'edit');
 
   const categoriasPronosticadas = React.useMemo(() => {
     const ocupadas = new Set();
@@ -275,25 +277,7 @@ export default function MesDetalle() {
     };
   }, []);
 
-  React.useEffect(() => {
-    const cargarRolUsuario = async () => {
-      try {
-        const sub = sessionStorage.getItem('sub');
-        if (!sub) return;
-        const res = await fetch(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
-          headers: { 'X-Usuario-Sub': sub },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data && data.rol) {
-          setUsuarioRol(data.rol);
-        }
-      } catch (err) {
-        console.error('Error cargando rol de usuario para presupuesto:', err);
-      }
-    };
-    cargarRolUsuario();
-  }, []);
+  // Se eliminó la carga manual de rol, ahora se usa usePermisos
 
   React.useEffect(() => {
     const loadLogo = async () => {
@@ -310,10 +294,7 @@ export default function MesDetalle() {
     loadLogo();
   }, []);
 
-  const esAdmin = React.useMemo(
-    () => (usuarioRol || '').toUpperCase().includes('ADMIN'),
-    [usuarioRol]
-  );
+
 
   // ===== Carga de datos =====
   const fetchMes = React.useCallback(async (pid, ymStr, { skipStateUpdate = false } = {}) => {
@@ -895,8 +876,8 @@ export default function MesDetalle() {
         },
       });
     } catch (e) {
-      console.error('Error al exportar PDF de mes:', e);
-      alert('No se pudo generar el PDF. Intente nuevamente.');
+      console.error('Error al exportar PDF de presupuesto:', e);
+      setSnack({ open: true, message: 'No se pudo generar el PDF. Intente nuevamente.', severity: 'error' });
     }
   };
 
@@ -922,7 +903,7 @@ export default function MesDetalle() {
 
   const patchLinea = async (l) => {
     try {
-      if (!esAdmin) {
+      if (!canEdit) {
         setSnack({
           open: true,
           message: 'No tienes permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
@@ -1000,7 +981,7 @@ export default function MesDetalle() {
 
   const deleteLinea = async (lineaId) => {
     try {
-      if (!esAdmin) {
+      if (!canEdit) {
         setSnack({
           open: true,
           message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
@@ -1028,7 +1009,7 @@ export default function MesDetalle() {
 
   const addLinea = async () => {
     try {
-      if (!esAdmin) {
+      if (!canEdit) {
         setSnack({
           open: true,
           message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
@@ -1059,7 +1040,7 @@ export default function MesDetalle() {
 
   const crearLineaDesdeReal = async (l) => {
     try {
-      if (!esAdmin) {
+      if (!canEdit) {
         setSnack({
           open: true,
           message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
@@ -1095,7 +1076,7 @@ export default function MesDetalle() {
 
   const ejecutarBulk = async () => {
     try {
-      if (!esAdmin) {
+      if (!canEdit) {
         setSnack({
           open: true,
           message: 'No tenés permisos para editar este presupuesto. Solo los administradores pueden editar datos brutos.',
@@ -1480,7 +1461,7 @@ export default function MesDetalle() {
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
           {/* Agregar nueva línea */}
-          {esAdmin && (
+          {canEdit && (
             <Box sx={{ mb: 2 }}>
               {!agregando ? (
                 <Button startIcon={<AddCircleOutlineIcon />} variant="contained" onClick={() => setAgregando(true)}>
@@ -1591,7 +1572,7 @@ export default function MesDetalle() {
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Estimado</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Real</th>
                   <th style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)' }}>Desvío</th>
-                  {esAdmin && <th style={{ padding: 12 }}>Acciones</th>}
+                  {canEdit && <th style={{ padding: 12 }}>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1632,7 +1613,7 @@ export default function MesDetalle() {
                       <tr key={item.id} style={{ borderBottom: '1px solid var(--mui-palette-divider)' }}>
                         <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', minWidth: 215 }}>
                           <Box display="flex" alignItems="center" gap={1}>
-                            {esAdmin && manualEnabled ? (
+                            {canEdit && manualEnabled ? (
                               (() => {
                                 // Oculta las categorías ya asignadas a otras líneas del mismo mes.
                                 const categoriaActual = e.categoria || '';
@@ -1719,15 +1700,15 @@ export default function MesDetalle() {
                           </Box>
                         </td>
                         <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', minWidth: 100 }}>
-                          <FormControl size="small" fullWidth disabled={!manualEnabled || !esAdmin} sx={buildTipoSelectSx(e.tipo)}>
+                          <FormControl size="small" fullWidth disabled={!manualEnabled || !canEdit} sx={buildTipoSelectSx(e.tipo)}>
                             <Select
                               value={e.tipo}
                               onChange={(ev) => {
-                                if (!manualEnabled || !esAdmin) return;
+                                if (!manualEnabled || !canEdit) return;
                                 updateField('tipo', ev.target.value);
                               }}
                               size="small"
-                              disabled={!manualEnabled || !esAdmin}
+                              disabled={!manualEnabled || !canEdit}
                             >
                               <MenuItem value="Ingreso">INGRESO</MenuItem>
                               <MenuItem value="Egreso">EGRESO</MenuItem>
@@ -1745,10 +1726,10 @@ export default function MesDetalle() {
                                 if (!manualEnabled) return;
                                 updateField('montoEstimado', parseCurrency(ev.target.value));
                               }}
-                              InputProps={{ readOnly: !manualEnabled || !esAdmin }}
+                              InputProps={{ readOnly: !manualEnabled || !canEdit }}
                               inputProps={{ inputMode: 'numeric' }}
                             />
-                            {esAdmin && (
+                            {canEdit && (
                               manualEnabled ? (
                                 <Tooltip title="Deshabilitar edición manual">
                                   <IconButton size="small" onClick={() => toggleManualGuard(item.id, 'categoria', false)}>
@@ -1785,7 +1766,7 @@ export default function MesDetalle() {
                         <td style={{ padding: 12, borderRight: '1px solid var(--mui-palette-divider)', color: desvio >= 0 ? '#66bb6a' : '#ef5350', minWidth: 100 }}>
                           {desvio >= 0 ? '+' : '-'}{formatCurrency(Math.abs(desvio))}
                         </td>
-                        {esAdmin && (
+                        {canEdit && (
                           <td style={{ padding: 12, whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
                               <Tooltip title={esSoloReal ? 'Crear linea de presupuesto con este movimiento' : 'Guardar cambios'}>
@@ -1837,7 +1818,7 @@ export default function MesDetalle() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={esAdmin ? 6 : 5} style={{ textAlign: 'center', padding: 20, color: 'var(--mui-palette-text-secondary)' }}>
+                    <td colSpan={canEdit ? 6 : 5} style={{ textAlign: 'center', padding: 20, color: 'var(--mui-palette-text-secondary)' }}>
                       No hay datos disponibles.
                     </td>
                   </tr>
@@ -1937,7 +1918,7 @@ export default function MesDetalle() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDlgReglas(false)}>Cerrar</Button>
-          <Button variant="contained" disabled={!simulacion} onClick={() => { setDlgReglas(false); window.alert('Simulación: regla aplicada (visual).'); }}>
+          <Button variant="contained" disabled={!simulacion} onClick={() => { setDlgReglas(false); setSnack({ open: true, message: 'Simulación: regla aplicada (visual).', severity: 'info' }); }}>
             Aplicar (visual)
           </Button>
         </DialogActions>

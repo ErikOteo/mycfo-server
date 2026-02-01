@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
 import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
+import usePermisos from '../../hooks/usePermisos';
 
 export default function CrearForecastConfig() {
   const { id } = useParams(); // Si existe, estamos editando
@@ -21,18 +22,26 @@ export default function CrearForecastConfig() {
   const [loadingData, setLoadingData] = React.useState(!!id);
   const [error, setError] = React.useState(null);
   const [success, setSuccess] = React.useState(null);
-  
+
   const [formData, setFormData] = React.useState({
     nombre: '',
     horizonteMeses: 6,
     mesesFrecuencia: 6
   });
 
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('pron', 'edit');
+
   React.useEffect(() => {
+    if (!canEdit) {
+      setError('No tenés permisos para editar configuraciones de pronóstico.');
+      setTimeout(() => navigate('/pronostico-fijo'), 3000);
+      return;
+    }
     if (id) {
       cargarConfiguracion();
     }
-  }, [id]);
+  }, [id, canEdit, navigate]);
 
   const cargarConfiguracion = async () => {
     setLoadingData(true);

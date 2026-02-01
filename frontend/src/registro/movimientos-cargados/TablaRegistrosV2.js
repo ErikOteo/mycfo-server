@@ -63,6 +63,7 @@ import CurrencyTabs, {
   getStoredCurrencyPreference,
   persistCurrencyPreference,
 } from "../../shared-components/CurrencyTabs";
+import usePermisos from "../../hooks/usePermisos";
 
 export default function TablaRegistrosV2() {
   const [movimientos, setMovimientos] = useState([]);
@@ -77,6 +78,8 @@ export default function TablaRegistrosV2() {
   });
   const [rowCount, setRowCount] = useState(0);
   const [currency, setCurrency] = useState(getStoredCurrencyPreference());
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('movs', 'edit');
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("view"); // "view" o "edit"
@@ -346,7 +349,7 @@ export default function TablaRegistrosV2() {
 
       if (!usuarioSub) {
         console.error("No se encontró sub de usuario en la sesión");
-        alert("Error: No se encontró usuario en la sesión");
+        setSnackbar({ open: true, message: "Error: No se encontró usuario en la sesión", severity: "error" });
         return;
       }
 
@@ -527,7 +530,7 @@ export default function TablaRegistrosV2() {
 
   const handleGuardarCambios = async () => {
     if (!validarCamposObligatorios()) {
-      alert("⚠️ Por favor completa todos los campos obligatorios");
+      setSnackbar({ open: true, message: "⚠️ Por favor completa todos los campos obligatorios", severity: "warning" });
       return;
     }
 
@@ -597,10 +600,11 @@ export default function TablaRegistrosV2() {
     } catch (error) {
       console.error("Error actualizando movimiento:", error);
       console.error("Datos enviados:", formData);
-      alert(
-        "❌ Error al actualizar: " +
-        (error.response?.data?.mensaje || error.message),
-      );
+      setSnackbar({
+        open: true,
+        message: "❌ Error al actualizar: " + (error.response?.data?.mensaje || error.message),
+        severity: "error"
+      });
     }
   };
 
@@ -626,10 +630,11 @@ export default function TablaRegistrosV2() {
       cargarMovimientos();
     } catch (error) {
       console.error("Error eliminando movimiento:", error);
-      alert(
-        "❌ Error al eliminar: " +
-        (error.response?.data?.mensaje || error.message),
-      );
+      setSnackbar({
+        open: true,
+        message: "❌ Error al eliminar: " + (error.response?.data?.mensaje || error.message),
+        severity: "error"
+      });
     }
   };
 
@@ -797,7 +802,7 @@ export default function TablaRegistrosV2() {
   const fetchMovimientosParaExportar = async () => {
     const usuarioSub = sessionStorage.getItem("sub");
     if (!usuarioSub) {
-      alert("No se encontró usuario en la sesión.");
+      setSnackbar({ open: true, message: "No se encontró usuario en la sesión.", severity: "error" });
       return [];
     }
 
@@ -819,7 +824,7 @@ export default function TablaRegistrosV2() {
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error("Error al exportar movimientos:", error);
-      alert("No se pudieron obtener los movimientos para exportar.");
+      setSnackbar({ open: true, message: "No se pudieron obtener los movimientos para exportar.", severity: "error" });
       return [];
     }
   };
@@ -1079,7 +1084,7 @@ export default function TablaRegistrosV2() {
             >
               <VisibilityIcon fontSize="small" />
             </IconButton>
-            {isAdmin && (
+            {canEdit && (
               <>
                 <IconButton
                   size="small"
@@ -1408,9 +1413,11 @@ export default function TablaRegistrosV2() {
             flexWrap: "wrap",
           }}
         >
-          <Button variant="contained" onClick={() => navigate("/carga")}>
-            Cargar movimiento
-          </Button>
+          {canEdit && (
+            <Button variant="contained" onClick={() => navigate("/carga")}>
+              Cargar movimiento
+            </Button>
+          )}
           <ExportadorSimple
             onExportPdf={handleExportPdf}
             onExportExcel={handleExportExcel}

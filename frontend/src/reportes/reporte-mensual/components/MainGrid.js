@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {
-    Box, Typography, Grid, Paper
+    Box, Typography, Grid, Paper, Snackbar, Alert
 } from '@mui/material';
 import TablaDetalle from './TablaDetalle';
 import Filtros from './Filtros';
@@ -26,6 +26,7 @@ export default function MainGrid() {
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
     const [currency, setCurrency] = usePreferredCurrency("ARS");
 
@@ -224,7 +225,7 @@ export default function MainGrid() {
     const handleExportPdf = async () => {
         const charts = [chartRefIngresos.current, chartRefEgresos.current].filter(Boolean);
         if (!charts.length) {
-            alert("No se encontraron graficos para exportar.");
+            setSnackbar({ open: true, message: "No se encontraron gráficos para exportar.", severity: "warning" });
             return;
         }
 
@@ -282,7 +283,7 @@ export default function MainGrid() {
             });
         } catch (e) {
             console.error("Error al generar el PDF:", e);
-            alert("No se pudo generar el PDF. Intente nuevamente.");
+            setSnackbar({ open: true, message: "No se pudo generar el PDF. Intente nuevamente.", severity: "error" });
         } finally {
             setExportingPdf(false);
         }
@@ -428,6 +429,21 @@ export default function MainGrid() {
                     </div>
                 </Grid>
             </Grid>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: "100%", borderRadius: 2 }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

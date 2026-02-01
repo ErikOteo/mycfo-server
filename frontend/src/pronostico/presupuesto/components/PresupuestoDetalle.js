@@ -2,7 +2,8 @@ import * as React from 'react';
 import {
   Box, Typography, Paper, Grid, Button, Tabs, Tab, Avatar, Chip, Stack, Tooltip,
   IconButton, Divider, Drawer, List, ListItem, ListItemText, TextField, MenuItem, Switch,
-  FormControlLabel, Menu, Table, TableHead, TableRow, TableCell, TableBody
+  FormControlLabel, Menu, Table, TableHead, TableRow, TableCell, TableBody,
+  Snackbar, Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -154,6 +155,7 @@ export default function PresupuestoDetalle() {
 
   const [tab, setTab] = React.useState(0); // 0: resumen, 1: tabla
   const [logoDataUrl, setLogoDataUrl] = React.useState(null);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
   // Filtros UI
   const [verSoloDeficit, setVerSoloDeficit] = React.useState(false);
@@ -466,7 +468,7 @@ export default function PresupuestoDetalle() {
     // ⚠️ Antes exigías fila.id → muchos casos no lo traen.
     // Con "mes" alcanza para derivar el nombre del mes.
     if (!fila?.mes) {
-      alert('Mes no válido');
+      setSnackbar({ open: true, message: 'Mes no válido', severity: 'warning' });
       return;
     }
     const nombreNormalizado = encodeURIComponent((presupuesto.nombre || '').trim().toLowerCase().replace(/\s+/g, '-'));
@@ -605,7 +607,7 @@ export default function PresupuestoDetalle() {
       });
     } catch (e) {
       console.error('Error al exportar PDF de presupuesto:', e);
-      alert('No se pudo generar el PDF.');
+      setSnackbar({ open: true, message: 'No se pudo generar el PDF.', severity: 'error' });
     }
   };
 
@@ -1115,6 +1117,22 @@ export default function PresupuestoDetalle() {
           </List>
         </Box>
       </Drawer>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

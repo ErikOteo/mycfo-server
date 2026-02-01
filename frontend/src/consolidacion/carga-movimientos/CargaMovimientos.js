@@ -5,6 +5,8 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 
 import CamposRequeridos from "./components/CamposRequeridos";
 import ResumenCarga from "./components/ResumenCarga";
@@ -30,6 +32,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
     dateFormat: "dd/MM/yyyy",
     decimalSeparator: ",",
   });
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
   const obtenerUsuarioSub = () => sessionStorage.getItem("sub");
 
   const handleTipoOrigenChange = (event) => {
@@ -70,9 +73,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         colMap.descripcion === undefined ||
         colMap.monto === undefined
       ) {
-        alert(
-          "Configurá el mapeo: fecha, descripción y monto son obligatorios.",
-        );
+        setSnackbar({ open: true, message: "Configurá el mapeo: fecha, descripción y monto son obligatorios.", severity: "warning" });
         return;
       }
     }
@@ -81,7 +82,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
     try {
       const usuarioSub = obtenerUsuarioSub();
       if (!usuarioSub) {
-        alert("No se encontró la sesión del usuario. Volvé a iniciar sesión.");
+        setSnackbar({ open: true, message: "No se encontró la sesión del usuario. Volvé a iniciar sesión.", severity: "error" });
         setPreviewLoading(false);
         return;
       }
@@ -114,7 +115,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       setPreviewOpen(true);
     } catch (error) {
       console.error("Error al procesar el archivo:", error);
-      alert("Ocurrió un error al procesar el archivo. Revisar consola.");
+      setSnackbar({ open: true, message: "Ocurrió un error al procesar el archivo. Revisar consola.", severity: "error" });
     } finally {
       setPreviewLoading(false);
     }
@@ -124,7 +125,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
     try {
       const usuarioSub = obtenerUsuarioSub();
       if (!usuarioSub) {
-        alert("No se encontró la sesión del usuario. Volvé a iniciar sesión.");
+        setSnackbar({ open: true, message: "No se encontró la sesión del usuario. Volvé a iniciar sesión.", severity: "error" });
         return;
       }
       const requestData = {
@@ -160,7 +161,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       onCargaCompletada?.();
     } catch (error) {
       console.error("Error al guardar los registros:", error);
-      alert("Ocurrió un error al guardar los registros. Revisar consola.");
+      setSnackbar({ open: true, message: "Ocurrió un error al guardar los registros. Revisar consola.", severity: "error" });
     }
   };
 
@@ -238,6 +239,21 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         fileName={fileName}
         tipoOrigen={tipoOrigen}
       />
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

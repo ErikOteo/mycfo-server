@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-import { Box, Typography, CircularProgress, Stack, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Divider } from "@mui/material";
+import { Box, Typography, CircularProgress, Stack, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Divider, Snackbar, Alert } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import CampoEditable from "../../shared-components/CampoEditable";
 import BotonConsolidar from "../../shared-components/CustomButton";
@@ -17,6 +17,7 @@ export default function Perfil() {
   });
   const [editados, setEditados] = useState({}); // campos editados
   const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   // Estado para el color del avatar
   const [avatarColor, setAvatarColor] = useState(localStorage.getItem('avatarColor') || '#008375');
@@ -25,8 +26,8 @@ export default function Perfil() {
   // Manejo del cambio de color
   const handleColorChange = (color) => {
     setAvatarColor(color);
-    localStorage.setItem('avatarColor', color);
-    window.dispatchEvent(new Event('avatarUpdated'));
+    // Ya no guardamos en localStorage aquí, se guardará al apretar "Consolidar"
+    setEditados((prev) => ({ ...prev, avatarColor: true }));
   };
 
   // 🔹 Cargar datos desde la sesión al montar el componente
@@ -39,6 +40,10 @@ export default function Perfil() {
         telefono: usuario.telefono || "",
         email: usuario.email || "",
       });
+
+      // El color inicial viene de sessionStorage (sincronizado en Home.js)
+      const cachedColor = sessionStorage.getItem('avatarColor');
+      if (cachedColor) setAvatarColor(cachedColor);
 
       setLoading(false);
     };
@@ -58,10 +63,19 @@ export default function Perfil() {
       const sub = sessionStorage.getItem("sub");
 
       // 🔹 Actualizar datos del usuario en BD y Cognito mediante el backend
+      // Recuperamos el rol actual para no perder los permisos al guardar el color
+      const currentRol = sessionStorage.getItem("rol") || "COLABORADOR";
+      let baseRol = currentRol.split('|PERM:')[0];
+      let permsPart = currentRol.includes('|PERM:') ? currentRol.split('|PERM:')[1].split('|COLOR:')[0] : "{}";
+
+      // Formato: ROL_BASE|PERM:JSON|COLOR:#HEX
+      const finalRol = `${baseRol}|PERM:${permsPart}|COLOR:${avatarColor}`;
+
       await axios.put(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
         nombre: perfil.nombre,
         email: perfil.email,
         telefono: perfil.telefono,
+        rol: finalRol
       }, {
         headers: {
           "X-Usuario-Sub": sub
@@ -72,13 +86,16 @@ export default function Perfil() {
       sessionStorage.setItem("nombre", perfil.nombre);
       sessionStorage.setItem("email", perfil.email);
       sessionStorage.setItem("telefono", perfil.telefono);
+      sessionStorage.setItem("rol", finalRol);
+      sessionStorage.setItem("avatarColor", avatarColor);
 
-      alert("Cambios guardados con éxito ✅");
+      setSnackbar({ open: true, message: "Cambios guardados con éxito ✅", severity: "success" });
       setEditados({});
       window.dispatchEvent(new Event("userDataUpdated"));
+      window.dispatchEvent(new Event("avatarUpdated"));
     } catch (error) {
       console.error("Error actualizando perfil:", error);
-      alert("Hubo un error al actualizar el perfil.");
+      setSnackbar({ open: true, message: "Hubo un error al actualizar el perfil.", severity: "error" });
     }
   };
 
@@ -127,7 +144,7 @@ export default function Perfil() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      alert("Contraseña actualizada con éxito");
+      setSnackbar({ open: true, message: "Contraseña actualizada con éxito ✅", severity: "success" });
       setOpenPasswordDialog(false);
       setPasswords({ old: '', new: '', confirm: '' });
       setPassError('');
@@ -344,6 +361,21 @@ export default function Perfil() {
           width="100%"
         />
       )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

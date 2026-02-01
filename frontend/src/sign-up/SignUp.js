@@ -11,6 +11,8 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
 import MuiCard from "@mui/material/Card";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 import { styled } from "@mui/material/styles";
 import AppTheme from "../shared-theme/AppTheme";
 import ColorModeIconDropdown from "../shared-theme/ColorModeIconDropdown";
@@ -80,6 +82,7 @@ export default function SignUp(props) {
   const [errors, setErrors] = React.useState({});
   const [loading, setLoading] = React.useState(false);
   const [successMsg, setSuccessMsg] = React.useState("");
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
   // No hay validación de token, solo pre-llenar empresa
 
   const validateInputs = () => {
@@ -112,7 +115,7 @@ export default function SignUp(props) {
 
     try {
       // Registrar usuario completo en backend
-      const response = await axios.post(`${API_CONFIG.ADMINISTRACION}/api/auth/registro`, { 
+      const response = await axios.post(`${API_CONFIG.ADMINISTRACION}/api/auth/registro`, {
         email: formData.email,
         password: formData.password,
         nombre: formData.nombre,
@@ -122,10 +125,10 @@ export default function SignUp(props) {
       });
 
       console.log("Usuario registrado:", response.data);
-      
+
       // Guardar email temporalmente para la confirmación
       sessionStorage.setItem("tempEmail", formData.email);
-      
+
       setSuccessMsg(response.data.mensaje || "Cuenta creada correctamente.");
       setTimeout(() => navigate("/confirm-account"), 1500);
     } catch (err) {
@@ -149,7 +152,7 @@ export default function SignUp(props) {
           >
             {esInvitacion ? "Unirse a la empresa" : "Crear cuenta"}
           </Typography>
-          
+
           {esInvitacion && (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
               Has sido invitado a unirte a <strong>{formData.nombreEmpresa}</strong>
@@ -264,7 +267,7 @@ export default function SignUp(props) {
               fullWidth
               variant="outlined"
               onClick={() =>
-                alert("Registrar con Google (configurar Cognito Hosted UI)")
+                setSnackbar({ open: true, message: "Registro con Google próximamente 🚀", severity: "info" })
               }
               startIcon={<GoogleIcon />}
             >
@@ -274,7 +277,7 @@ export default function SignUp(props) {
               fullWidth
               variant="outlined"
               onClick={() =>
-                alert("Registrar con Facebook (configurar Cognito Hosted UI)")
+                setSnackbar({ open: true, message: "Registro con Facebook próximamente 🚀", severity: "info" })
               }
               startIcon={<FacebookIcon />}
             >
@@ -290,6 +293,21 @@ export default function SignUp(props) {
           </Box>
         </Card>
       </SignUpContainer>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </AppTheme>
   );
 }

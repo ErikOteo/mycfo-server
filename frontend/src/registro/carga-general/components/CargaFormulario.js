@@ -136,14 +136,14 @@ export default function CargaFormulario({
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
-      alert("⚠️ Por favor completa todos los campos obligatorios");
+      setSnackbar({ open: true, severity: "warning", message: "⚠️ Por favor completa todos los campos obligatorios" });
       return;
     }
 
     try {
       const usuarioSub = sessionStorage.getItem("sub");
       if (!usuarioSub) {
-        alert("❌ Error: No se encontró el usuario en la sesión. Por favor, inicia sesión nuevamente.");
+        setSnackbar({ open: true, severity: "error", message: "❌ Error: No se encontró el usuario en la sesión. Por favor, inicia sesión nuevamente." });
         return;
       }
 

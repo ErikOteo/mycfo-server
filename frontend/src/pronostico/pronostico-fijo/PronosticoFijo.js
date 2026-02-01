@@ -39,6 +39,7 @@ import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
 import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
 import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
+import usePermisos from '../../hooks/usePermisos';
 
 // Opciones de frecuencia
 const FRECUENCIAS = [
@@ -78,7 +79,8 @@ export default function PronosticoFijo() {
   });
   const [saving, setSaving] = React.useState(false);
   const [generatingForecastId, setGeneratingForecastId] = React.useState(null);
-  const [usuarioRol, setUsuarioRol] = React.useState(null);
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('pron', 'edit');
 
   const [detailDialogOpen, setDetailDialogOpen] = React.useState(false);
   const [selectedForecastDetail, setSelectedForecastDetail] = React.useState(null);
@@ -88,7 +90,6 @@ export default function PronosticoFijo() {
 
   React.useEffect(() => {
     cargarDatos();
-    cargarRolUsuario();
   }, []);
 
   const cargarDatos = async () => {
@@ -109,20 +110,7 @@ export default function PronosticoFijo() {
     }
   };
 
-  const cargarRolUsuario = async () => {
-    try {
-      const sub = sessionStorage.getItem('sub');
-      if (!sub) return;
-      const res = await fetch(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
-        headers: { 'X-Usuario-Sub': sub },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setUsuarioRol(data.rol || null);
-    } catch (e) {
-      console.error('Error cargando rol de usuario:', e);
-    }
-  };
+  // Se eliminó la carga manual de rol, ahora se usa usePermisos
 
   const handleVerForecast = (forecastId) => {
     navigate(`/pronostico-fijo/${forecastId}`);
@@ -321,8 +309,6 @@ export default function PronosticoFijo() {
     setDetailDialogOpen(true);
   };
 
-  const esAdmin = (usuarioRol || '').toUpperCase().includes('ADMIN');
-
   const filteredForecasts = React.useMemo(
     () => forecasts.filter((forecast) => (forecast.moneda || 'ARS') === currency),
     [forecasts, currency]
@@ -412,15 +398,17 @@ export default function PronosticoFijo() {
           <Typography variant="h6">
             Configuraciones
           </Typography>
-          <Tooltip title="Agregar nueva configuración">
-            <IconButton
-              color="primary"
-              onClick={handleAddNewConfig}
-              disabled={newConfigMode}
-            >
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
+          {canEdit && (
+            <Tooltip title="Agregar nueva configuración">
+              <IconButton
+                color="primary"
+                onClick={handleAddNewConfig}
+                disabled={newConfigMode}
+              >
+                <AddIcon />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
         <TableContainer>
           <Table>
@@ -429,7 +417,7 @@ export default function PronosticoFijo() {
                 <TableCell align="center"><strong>Nombre</strong></TableCell>
                 <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Frecuencia</strong></TableCell>
                 <TableCell align="center" sx={{ display: { xs: 'none', md: 'table-cell' } }}><strong>Horizonte</strong></TableCell>
-                <TableCell align="center"><strong>Acciones</strong></TableCell>
+                {canEdit && <TableCell align="center"><strong>Acciones</strong></TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -583,24 +571,28 @@ export default function PronosticoFijo() {
                               )}
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Editar">
-                            <IconButton
-                              color="primary"
-                              onClick={() => handleEditConfig(config)}
-                              size="small"
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Eliminar">
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDeleteConfigClick(config)}
-                              size="small"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
+                          {canEdit && (
+                            <>
+                              <Tooltip title="Editar">
+                                <IconButton
+                                  color="primary"
+                                  onClick={() => handleEditConfig(config)}
+                                  size="small"
+                                >
+                                  <EditIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Eliminar">
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleDeleteConfigClick(config)}
+                                  size="small"
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </TableCell>
                       </>
                     )}
@@ -660,7 +652,7 @@ export default function PronosticoFijo() {
                             <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
-                        {esAdmin && (
+                        {canEdit && (
                           <Tooltip title="Eliminar">
                             <IconButton
                               color="error"

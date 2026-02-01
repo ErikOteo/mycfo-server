@@ -21,6 +21,7 @@ import ApartmentIcon from '@mui/icons-material/Apartment';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import { CognitoUserPool } from 'amazon-cognito-identity-js';
 import { sessionService } from '../../shared-services/sessionService';
+import usePermisos from '../../hooks/usePermisos';
 
 const expandedWidth = 320;
 export const collapsedWidth = 76;
@@ -76,11 +77,12 @@ const SideMenu = React.memo(function SideMenu({
   onNavigate,
 }) {
   const navigate = useNavigate();
+  const { tienePermiso } = usePermisos();
   const [userData, setUserData] = React.useState({
     nombre: '',
     email: '',
   });
-  const [avatarColor, setAvatarColor] = React.useState(localStorage.getItem('avatarColor') || '#008375');
+  const [avatarColor, setAvatarColor] = React.useState(sessionStorage.getItem('avatarColor') || localStorage.getItem('avatarColor') || '#008375');
   const [logoHovered, setLogoHovered] = React.useState(false);
 
   // Estado para el menú desplegable del usuario
@@ -143,7 +145,7 @@ const SideMenu = React.memo(function SideMenu({
     window.addEventListener('userDataUpdated', updateUserData);
 
     const handleAvatarUpdate = () => {
-      const newColor = localStorage.getItem('avatarColor');
+      const newColor = sessionStorage.getItem('avatarColor') || localStorage.getItem('avatarColor');
       if (newColor) {
         setAvatarColor(newColor);
       }
@@ -370,12 +372,14 @@ const SideMenu = React.memo(function SideMenu({
             </ListItemIcon>
             Ver perfil
           </MenuItem>
-          <MenuItem onClick={() => navigate('/organizacion')}>
-            <ListItemIcon>
-              <ApartmentIcon fontSize="small" />
-            </ListItemIcon>
-            Ver organización
-          </MenuItem>
+          {tienePermiso('admin', 'view') && (
+            <MenuItem onClick={() => navigate('/organizacion')}>
+              <ListItemIcon>
+                <ApartmentIcon fontSize="small" />
+              </ListItemIcon>
+              Ver organización
+            </MenuItem>
+          )}
           <Divider />
           <MenuItem onClick={handleLogout}>
             <ListItemIcon>
