@@ -8,6 +8,7 @@ import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
@@ -150,7 +151,7 @@ export default function MainGrid() {
         return meses[mesIndex];
     };
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const { detalleIngresos, detalleEgresos } = data;
         const mesNombre = getNombreMes(selectedMonth);
 
@@ -211,6 +212,14 @@ export default function MainGrid() {
                 freezePane: { rowSplit: 2, colSplit: 1 },
             }
         );
+
+        await sendReportGenerated({
+            reportType: "MONTHLY_REPORT",
+            reportName: "Reporte mensual (Excel)",
+            period: `${mesNombre} ${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
@@ -263,6 +272,14 @@ export default function MainGrid() {
                         { label: "Neto", value: formatCurrency(totalIngresos - totalEgresos) },
                     ],
                 },
+            });
+
+            await sendReportGenerated({
+                reportType: "MONTHLY_REPORT",
+                reportName: "Reporte mensual (PDF)",
+                period: `${getNombreMes(selectedMonth)} ${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
             });
         } catch (e) {
             console.error("Error al generar el PDF:", e);

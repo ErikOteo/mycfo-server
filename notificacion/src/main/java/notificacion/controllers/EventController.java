@@ -22,6 +22,24 @@ public class EventController {
         return ResponseEntity.accepted().build(); // 202
     }
 
+    @PostMapping("/movements/imported")
+    public ResponseEntity<Void> onMovementsImported(@RequestBody MovementImportEvent evt) {
+        eventService.handleMovementsImported(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/movements/duplicate")
+    public ResponseEntity<Void> onMovementDuplicate(@RequestBody MovementDuplicateEvent evt) {
+        eventService.handleMovementDuplicate(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/accounts/mp-linked")
+    public ResponseEntity<Void> onMpLinked(@RequestBody AccountMpLinkedEvent evt) {
+        eventService.handleMpLinked(evt);
+        return ResponseEntity.accepted().build();
+    }
+
     @PostMapping("/budget-created")
     public ResponseEntity<Void> onBudgetCreated(@RequestBody @Valid BudgetCreatedEvent evt) {
         eventService.handleBudgetCreated(evt);
@@ -43,6 +61,12 @@ public class EventController {
     @PostMapping("/report-generated")
     public ResponseEntity<Void> onReportGenerated(@RequestBody ReportGeneratedEvent evt) {
         eventService.handleReportGenerated(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/reports/anomaly")
+    public ResponseEntity<Void> onReportAnomaly(@RequestBody ReportGeneratedEvent evt) {
+        eventService.handleReportAnomaly(evt);
         return ResponseEntity.accepted().build();
     }
 
@@ -73,6 +97,30 @@ public class EventController {
     @PostMapping("/reconciliation-stale")
     public ResponseEntity<Void> onReconciliationStale(@RequestBody ReconciliationStaleEvent evt) {
         eventService.handleReconciliationStale(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/reminders/deadline")
+    public ResponseEntity<Void> onReminderDeadline(@RequestBody ReminderDeadlineEvent evt) {
+        eventService.handleReminderDeadline(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/reminders/created")
+    public ResponseEntity<Void> onReminderCreated(@RequestBody ReminderCreatedEvent evt) {
+        eventService.handleReminderCreated(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/forecast/reminder")
+    public ResponseEntity<Void> onForecastReminder(@RequestBody ForecastReminderEvent evt) {
+        eventService.handleForecastReminder(evt);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/conciliation/reminder")
+    public ResponseEntity<Void> onConciliationReminder(@RequestBody ConciliationReminderEvent evt) {
+        eventService.handleConciliationReminder(evt);
         return ResponseEntity.accepted().build();
     }
 

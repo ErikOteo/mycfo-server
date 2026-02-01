@@ -8,6 +8,7 @@ import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
@@ -145,7 +146,7 @@ export default function MainGrid() {
 
     useChatbotScreenContext(chatbotContext);
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const { detalleIngresos, detalleEgresos } = data;
         const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
         const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
@@ -190,6 +191,14 @@ export default function MainGrid() {
                 freezePane: { rowSplit: 2, colSplit: 1 },
             }
         );
+
+        await sendReportGenerated({
+            reportType: "PROFIT_AND_LOSS",
+            reportName: "Estado de resultados (Excel)",
+            period: `${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
@@ -242,6 +251,14 @@ export default function MainGrid() {
                         { label: "Resultado", value: formatCurrency(resultado) },
                     ],
                 },
+            });
+
+            await sendReportGenerated({
+                reportType: "PROFIT_AND_LOSS",
+                reportName: "Estado de resultados (PDF)",
+                period: `${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
             });
         } catch (e) {
             console.error("Error al exportar PDF de P&L:", e);

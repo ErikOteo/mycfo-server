@@ -106,7 +106,7 @@ public class ExcelImportService {
                     
                     movimientoRepo.save(movimiento);
                     totalGuardados++;
-                    notifications.publishMovement(movimiento, 1L);
+                    notifications.publishMovement(movimiento, usuarioSub, 1L);
                     
                 } catch (Exception e) {
                     errores.add(new FilaConErrorDTO(preview.getFilaExcel(), e.getMessage()));
@@ -123,6 +123,20 @@ public class ExcelImportService {
         }
         
         importHistoryRepository.save(history);
+
+        // Notificar importación exitosa si hubo al menos un registro guardado y sin errores
+        Integer guardados = history.getRegistrosGuardados();
+        boolean sinErrores = errores.isEmpty();
+        if (guardados != null && guardados > 0 && sinErrores) {
+            notifications.publishImport(
+                    String.valueOf(history.getId()),
+                    history.getTipoOrigen(),
+                    history.getTipoOrigen(),
+                    request.getFileName(),
+                    guardados,
+                    usuarioSub
+            );
+        }
         
         return new ResumenCargaDTO(registrosSeleccionados.size(), totalGuardados, errores);
     }
@@ -276,7 +290,7 @@ public class ExcelImportService {
 
                     movimientoRepo.save(mov);
                     correctos++;
-                    notifications.publishMovement(mov, 1L);
+                    notifications.publishMovement(mov, usuarioSub, 1L);
 
                 } catch (Exception ex) {
                     errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
@@ -407,7 +421,7 @@ public class ExcelImportService {
 
                     movimientoRepo.save(mov);
                     correctos++;
-                    notifications.publishMovement(mov, 1L);
+                    notifications.publishMovement(mov, usuarioSub, 1L);
 
                 } catch (Exception ex) {
                     errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
@@ -473,7 +487,7 @@ public class ExcelImportService {
                     normalizarMontoMovimiento(mov);
                     movimientoRepo.save(mov);
                     correctos++;
-                    notifications.publishMovement(mov, 1L);
+                    notifications.publishMovement(mov, usuarioSub, 1L);
 
                 } catch (Exception ex) {
                     errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
@@ -1024,7 +1038,7 @@ public class ExcelImportService {
 
                     movimientoRepo.save(mov);
                     correctos++;
-                    notifications.publishMovement(mov, 1L);
+                    notifications.publishMovement(mov, usuarioSub, 1L);
 
                 } catch (Exception ex) {
                     errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
@@ -1091,7 +1105,7 @@ public class ExcelImportService {
                     normalizarMontoMovimiento(mov);
                     movimientoRepo.save(mov);
                     correctos++;
-                    notifications.publishMovement(mov, 1L);
+                    notifications.publishMovement(mov, usuarioSub, 1L);
 
                 } catch (Exception ex) {
                     errores.add(new FilaConErrorDTO(i + 1, ex.getMessage()));
@@ -1401,7 +1415,7 @@ public class ExcelImportService {
                     normalizarMontoMovimiento(mov);
                     movimientoRepo.save(mov);
                     correctos++;
-                    notifications.publishMovement(mov, 1L);
+                    notifications.publishMovement(mov, usuarioSub, 1L);
 
                 } catch (Exception ex) {
                     errores.add(new FilaConErrorDTO(movPdf.lineaOriginal(), ex.getMessage()));

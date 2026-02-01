@@ -8,5 +8,6 @@ public record MovementCreatedEvent(
         String refId,         // ID de referencia para idempotencia
         Instant date,         // Fecha del movimiento
         BigDecimal amount,    // Monto (positivo ingreso, negativo egreso)
-        String description    // Descripción del movimiento
+        String description,   // Descripción del movimiento
+        String currency       // Moneda (ARS, USD)
 ) {}

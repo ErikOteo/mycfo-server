@@ -33,6 +33,9 @@ public class EmailNotificationService {
     @Value("${notifications.email.from:${spring.mail.username}}")
     private String fromEmail;
 
+    @Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
+
     @Transactional
     public void sendNotificationEmail(Long organizacionId, String usuarioId, Notification notification) {
         if (!preferencesService.isEmailEnabled(organizacionId, usuarioId, notification.getType())) {
@@ -57,6 +60,7 @@ public class EmailNotificationService {
             context.setVariable("date", notification.getCreatedAt().toString());
             context.setVariable("severity", notification.getSeverity().name().toLowerCase());
             context.setVariable("notification", notification);
+            context.setVariable("frontendUrl", frontendUrl);
 
             String htmlContent = templateEngine.process("notification-email", context);
             helper.setText(htmlContent, true);
@@ -86,6 +90,7 @@ public class EmailNotificationService {
             context.setVariable("notifications", notifications);
             context.setVariable("digestType", "Diario");
             context.setVariable("date", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            context.setVariable("frontendUrl", frontendUrl);
 
             String htmlContent = templateEngine.process("digest-email", context);
             helper.setText(htmlContent, true);
@@ -115,6 +120,7 @@ public class EmailNotificationService {
             context.setVariable("notifications", notifications);
             context.setVariable("digestType", "Semanal");
             context.setVariable("date", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            context.setVariable("frontendUrl", frontendUrl);
 
             String htmlContent = templateEngine.process("digest-email", context);
             helper.setText(htmlContent, true);
@@ -139,6 +145,7 @@ public class EmailNotificationService {
 
             Context context = new Context(new Locale("es", "ES"));
             context.setVariable("reminder", reminder);
+            context.setVariable("frontendUrl", frontendUrl);
 
             String htmlContent = templateEngine.process("reminder-email", context);
             helper.setText(htmlContent, true);

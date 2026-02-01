@@ -4,49 +4,56 @@ import { getNotifications, markAsRead } from "../services/notificationsApi";
 // Hook de uso general para el "centro de notificaciones"
 // - NO hace polling
 // - Carga solo cuando el componente se monta (o cuando cambia userId)
-// - Solo trae notificaciones NO leídas (status="unread")
+// Por defecto trae todas las notificaciones (status="all") y permite marcar sin quitarlas de la lista.
 export function useNotifications(userId) {
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchNotifications = useCallback(async (options = {}) => {
-    const { isBackground = false } = options;
+  const fetchNotifications = useCallback(
+    async (options = {}) => {
+      const { isBackground = false } = options;
 
-    if (!userId) {
-      setItems([]);
-      setUnread(0);
-      return;
-    }
-
-    try {
-      if (!isBackground) {
-        setLoading(true);
+      if (!userId) {
+        setItems([]);
+        setUnread(0);
+        return;
       }
-      setError(null);
 
-      const data = await getNotifications({
-        userId,
-        status: "unread",
-        limit: 50,
-      });
+      try {
+        if (!isBackground) {
+          setLoading(true);
+        }
+        setError(null);
 
-      // El backend devuelve { unread, items: [...] }
-      setItems(data.items || []);
-      // Si el backend no devuelve unread, usamos items.length
-      setUnread(typeof data.unread === "number" ? data.unread : (data.items || []).length);
-    } catch (err) {
-      console.error("Error obteniendo notificaciones:", err);
-      setError(err);
-    } finally {
-      if (!isBackground) {
-        setLoading(false);
+        const data = await getNotifications({
+          userId,
+          status: "all",
+          limit: 50,
+        });
+
+        // El backend devuelve { unread, items: [...] }
+        setItems(data.items || []);
+        // Si el backend no devuelve unread, usamos items.length
+        setUnread(
+          typeof data.unread === "number"
+            ? data.unread
+            : (data.items || []).length,
+        );
+      } catch (err) {
+        console.error("Error obteniendo notificaciones:", err);
+        setError(err);
+      } finally {
+        if (!isBackground) {
+          setLoading(false);
+        }
       }
-    }
-  }, [userId]);
+    },
+    [userId],
+  );
 
-  // Polling cada 10s igual que la solapa (drawer)
+  // Polling cada 60s
   useEffect(() => {
     if (!userId) {
       setItems([]);
@@ -87,7 +94,7 @@ export function useNotifications(userId) {
       if (!cancelled) {
         setTimeout(() => simpleLoop(false), 10000);
       }
-    }
+    };
 
     simpleLoop(true);
 
@@ -111,11 +118,20 @@ export function useNotifications(userId) {
     };
 
     window.addEventListener("notification-mark-read", handleExternalMarkRead);
-    window.addEventListener("notification-mark-all-read", handleExternalMarkAll);
+    window.addEventListener(
+      "notification-mark-all-read",
+      handleExternalMarkAll,
+    );
 
     return () => {
-      window.removeEventListener("notification-mark-read", handleExternalMarkRead);
-      window.removeEventListener("notification-mark-all-read", handleExternalMarkAll);
+      window.removeEventListener(
+        "notification-mark-read",
+        handleExternalMarkRead,
+      );
+      window.removeEventListener(
+        "notification-mark-all-read",
+        handleExternalMarkAll,
+      );
     };
   }, []);
 
@@ -126,41 +142,40 @@ export function useNotifications(userId) {
       try {
         await markAsRead({ userId, notifId: id });
 
-        // Eliminar del listado local (porque ya está leída y no debe mostrarse)
-        setItems((prev) => prev.filter((n) => n.id !== id));
+        // Marcar en el estado local
+        setItems((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+        );
         setUnread((prev) => Math.max(0, prev - 1));
 
         // Notificar a otros componentes (solapa) que esta notificación fue leída
         window.dispatchEvent(
-          new CustomEvent("notification-mark-read", { detail: { id } })
+          new CustomEvent("notification-mark-read", { detail: { id } }),
         );
       } catch (error) {
         console.error("Error marcando como leída:", error);
       }
     },
-    [userId]
+    [userId],
   );
 
-  const markAllAsRead = useCallback(
-    async () => {
-      if (!userId) return;
+  const markAllAsRead = useCallback(async () => {
+    if (!userId) return;
 
-      try {
-        const { markAllRead } = await import("../services/notificationsApi");
-        await markAllRead(userId);
+    try {
+      const { markAllRead } = await import("../services/notificationsApi");
+      await markAllRead(userId);
 
-        // Vaciar listado local (todas quedan leídas y no deben mostrarse)
-        setItems([]);
-        setUnread(0);
+      // Marcar todas como leídas en local
+      setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnread(0);
 
-        // Notificar a otros componentes (solapa) que todas fueron leídas
-        window.dispatchEvent(new CustomEvent("notification-mark-all-read"));
-      } catch (error) {
-        console.error("Error marcando todas como leídas:", error);
-      }
-    },
-    [userId]
-  );
+      // Notificar a otros componentes (solapa) que todas fueron leídas
+      window.dispatchEvent(new CustomEvent("notification-mark-all-read"));
+    } catch (error) {
+      console.error("Error marcando todas como leídas:", error);
+    }
+  }, [userId]);
 
   return {
     items,
