@@ -24,6 +24,11 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
 import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
+import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import GroupAddRoundedIcon from "@mui/icons-material/GroupAddRounded";
+import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 
 // Lazy loading para componentes pesados
 const ReporteMensual = React.lazy(() => import("../reportes/reporte-mensual/ReporteMensual"));
@@ -46,6 +51,8 @@ const PronosticoFijoDetalle = React.lazy(() => import("../pronostico/pronostico-
 const HistorialCambios = React.lazy(() => import("../administracion/historial-cambios/HistorialCambios"));
 const Roles = React.lazy(() => import("../administracion/roles/Roles"));
 const Invitaciones = React.lazy(() => import("../administracion/invitaciones/Invitaciones"));
+const Organizacion = React.lazy(() => import("../administracion/organizacion/Organizacion"));
+const Perfil = React.lazy(() => import("../administracion/perfil/Perfil"));
 const MovimientosCargados = React.lazy(() => import("../registro/movimientos-cargados/MovimientosCargados"));
 const MercadoPagoPage = React.lazy(() => import("../consolidacion/mercado-pago/Mercado-Pago"));
 const TablaDetalle = React.lazy(() => import("../reportes/reporte-mensual/components/TablaDetalle"));
@@ -85,6 +92,7 @@ const routeConfig = [
     path: "/carga",
     icon: <CloudUploadRoundedIcon />,
     element: <CargaSeleccionTipo />,
+    modulo: "carga",
   },
   {
     path: "/carga/:tipo",
@@ -109,70 +117,82 @@ const routeConfig = [
     path: "/ver-movimientos",
     icon: <ListAltRoundedIcon />,
     element: <TablaRegistrosV2 />,
+    modulo: "movs",
   },
   {
     label: "Ver facturas",
     path: "/ver-facturas",
     icon: <RequestQuoteRoundedIcon />,
     element: <FacturaListPage />,
+    modulo: "facts",
   },
   {
     label: "Conciliación",
     path: "/conciliacion",
     icon: <CompareArrowsRoundedIcon />,
     element: <ConciliacionPanel />,
+    modulo: "concil",
   },
   {
-    label: "Vinculación Bancaria",
+    label: "Gestión Bancaria",
     icon: <AccountBalanceRoundedIcon />,
+    modulo: "banco",
     children: [
       {
         label: "Carga de movimientos",
         path: "/carga-movimientos",
         icon: <UploadFileRoundedIcon />,
         element: <ExcelManagement />,
+        modulo: "banco",
       },
       {
         label: "Mercado Pago",
         path: "/mercado-pago",
         icon: <DescriptionIcon />,
         element: <MercadoPagoPage />,
+        modulo: "banco",
       },
     ],
   },
   {
     label: "Reportes",
     icon: <AssessmentRoundedIcon />,
+    modulo: "reps",
     children: [
       {
         label: "Reporte mensual",
         path: "/reporte-mensual",
         icon: <CalendarMonthRoundedIcon />,
         element: <ReporteMensual />,
+        modulo: "reps",
       },
       {
         label: "Flujo de caja",
         path: "/flujo-de-caja",
         icon: <TimelineRoundedIcon />,
         element: <CashFlow />,
+        modulo: "reps",
       },
       {
         label: "Estado de Resultados",
         path: "/estado-de-resultado",
         icon: <PieChartRoundedIcon />,
         element: <ProfitLoss />,
+        modulo: "reps",
       },
     ],
   },
   {
     label: "Pronóstico",
     icon: <TrendingUpRoundedIcon />,
+    // Este es un contenedor para varios submódulos
     children: [
       {
         label: "Presupuestos",
         path: "/presupuestos",
         icon: <SavingsRoundedIcon />,
         element: <Presupuesto />,
+        modulo: "pres",
         children: [
           {
             label: "Nuevo",
@@ -204,12 +224,15 @@ const routeConfig = [
         path: "/pronostico-continuo",
         icon: <AutoGraphRoundedIcon />,
         element: <PronosticoContinuo />,
+        modulo: "pron",
+        accion: "edit",
       },
       {
         label: "Pronóstico Fijo",
         path: "/pronostico-fijo",
         icon: <TrendingFlatRoundedIcon />,
         element: <PronosticoFijo />,
+        modulo: "pron",
         children: [
           {
             label: "Nueva Configuración",
@@ -262,6 +285,26 @@ const routeConfig = [
       //   element: <EmailConfiguration />,
       // },
     ],
+  },
+  {
+    path: "/organizacion",
+    element: <Organizacion />,
+    hidden: true,
+  },
+  {
+    path: "/roles",
+    element: <Roles />,
+    hidden: true,
+  },
+  {
+    path: "/invitaciones",
+    element: <Invitaciones />,
+    hidden: true,
+  },
+  {
+    path: "/perfil",
+    element: <Perfil />,
+    hidden: true,
   },
 ];
 

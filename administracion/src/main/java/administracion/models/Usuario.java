@@ -28,19 +28,20 @@ public class Usuario {
 
     private String telefono;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Rol rol;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String rol;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id")
     private Empresa empresa;
 
     private LocalDateTime fechaCreacion;
-    
+
     private LocalDateTime fechaActualizacion;
-    
+
     private Boolean activo = true;
+
+    private Boolean esPropietario = false;
 
     @PrePersist
     protected void onCreate() {

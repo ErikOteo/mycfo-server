@@ -184,8 +184,8 @@ export default function MpPreviewDialog({
                   total={filteredData.length}
                   selected={selected}
                   onSelectChange={setSelected}
-                  onPageChange={() => {}}
-                  onPageSizeChange={() => {}}
+                  onPageChange={() => { }}
+                  onPageSizeChange={() => { }}
                 />
               </Paper>
 
@@ -204,6 +204,7 @@ export default function MpPreviewDialog({
                   size="small"
                   onClick={handleSelectAll}
                   disabled={filteredData.length === 0}
+                  sx={{ lineHeight: 1.2 }}
                 >
                   {selected.length === filteredData.length
                     ? "Deseleccionar todos"
@@ -216,13 +217,14 @@ export default function MpPreviewDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={importing}>
+        <Button onClick={onClose} disabled={importing} sx={{ lineHeight: 1.2 }}>
           Cancelar
         </Button>
         <Button
           variant="contained"
           onClick={handleImportSelected}
           disabled={selected.length === 0 || importing}
+          sx={{ lineHeight: 1.2 }}
         >
           {importing
             ? "Importando..."

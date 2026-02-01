@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Box, Typography, Button, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { Box, Typography, Button, ToggleButtonGroup, ToggleButton, Snackbar, Alert } from '@mui/material';
 import TablaDinamica from './components/TablaDinamica';
 import axios from 'axios';
 import ExportadorSimple from '../../shared-components/ExportadorSimple';
@@ -21,6 +21,7 @@ export default function MovimientosCargados() {
   const [error, setError] = useState(null);
   const [vista, setVista] = useState("tabla"); // Vista actual
   const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
   const visibleRows = filteredData.length > 0 ? filteredData : data;
   const sampleRows = React.useMemo(() => {
@@ -122,14 +123,14 @@ export default function MovimientosCargados() {
   const handleExportExcel = () => {
     const rows = filteredData.length > 0 ? filteredData : data;
     if (!rows || rows.length === 0) {
-      alert('No hay datos para exportar.');
+      setSnackbar({ open: true, message: 'No hay datos para exportar.', severity: 'warning' });
       return;
     }
 
     const visibleKeys = Object.keys(columnVisibilityModel).filter((k) => columnVisibilityModel[k] !== false);
     const keys = visibleKeys.length > 0 ? visibleKeys : Object.keys(rows[0] || {});
     if (keys.length === 0) {
-      alert('No hay columnas seleccionadas para exportar.');
+      setSnackbar({ open: true, message: 'No hay columnas seleccionadas para exportar.', severity: 'warning' });
       return;
     }
 
@@ -159,14 +160,14 @@ export default function MovimientosCargados() {
   const handleExportPdf = async () => {
     const rows = filteredData.length > 0 ? filteredData : data;
     if (!rows || rows.length === 0) {
-      alert('No hay datos para exportar.');
+      setSnackbar({ open: true, message: 'No hay datos para exportar.', severity: 'warning' });
       return;
     }
 
     const visibleKeys = Object.keys(columnVisibilityModel).filter((k) => columnVisibilityModel[k] !== false);
     const keys = visibleKeys.length > 0 ? visibleKeys : Object.keys(rows[0] || {});
     if (keys.length === 0) {
-      alert('No hay columnas seleccionadas para exportar.');
+      setSnackbar({ open: true, message: 'No hay columnas seleccionadas para exportar.', severity: 'warning' });
       return;
     }
 
@@ -258,7 +259,7 @@ export default function MovimientosCargados() {
         </Box>
       </Box>
 
-      
+
 
       {error && <Typography color="error">{error}</Typography>}
 
@@ -275,6 +276,21 @@ export default function MovimientosCargados() {
       ) : (
         <GraficoPorCategoria data={filteredData} />
       )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

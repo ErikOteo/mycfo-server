@@ -12,6 +12,8 @@ import Header from "./components/Header";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import ChatbotIaWidget from "../shared-components/ChatbotIAWidget"; // Corregido: ChatbotIAWidget con IA en mayúsculas
 import { ChatbotContextProvider } from "../shared-components/ChatbotContext";
+import axios from "axios";
+import API_CONFIG from "../config/api-config";
 
 const Home = React.memo(function Home(props) {
   const location = useLocation();
@@ -75,6 +77,78 @@ const Home = React.memo(function Home(props) {
     setMobileMenuOpen(false);
     setDesktopMenuExpanded(false);
   }, [location.pathname]);
+
+  // Sincronizar permisos del servidor al cargar (F5) para reflejar cambios del admin inmediatamente
+  React.useEffect(() => {
+    const syncPermissions = async () => {
+      const sub = sessionStorage.getItem("sub");
+      const accessToken = sessionStorage.getItem("accessToken");
+      if (!sub || !accessToken) return;
+
+      try {
+        const URL_ADMINISTRACION = API_CONFIG.ADMINISTRACION;
+        const response = await axios.get(`${URL_ADMINISTRACION}/api/usuarios/perfil`, {
+          headers: { "X-Usuario-Sub": sub }
+        });
+
+        const userData = response.data;
+        if (userData && userData.rol) {
+          // Actualizar Rol y Propietario
+          sessionStorage.setItem("rol", userData.rol);
+          sessionStorage.setItem("esPropietario", userData.esPropietario ? "true" : "false");
+
+          if (userData.nombre) sessionStorage.setItem("nombre", userData.nombre);
+          let permisos = null;
+          let color = null;
+
+          if (userData.rol.includes("|PERM:")) {
+            try {
+              const parts = userData.rol.split("|PERM:");
+              // El JSON de permisos puede estar seguido por |COLOR:
+              const permsAndColor = parts[1].split("|COLOR:");
+              permisos = JSON.parse(permsAndColor[0]);
+              if (permsAndColor[1]) color = permsAndColor[1];
+            } catch (e) {
+              console.error("Error parseando permisos sincronizados:", e);
+            }
+          }
+
+          // Fallback para administradores sin JSON
+          if (!permisos && userData.rol.startsWith("ADMINISTRADOR")) {
+            permisos = {
+              carga: { view: true, edit: true },
+              movs: { view: true, edit: true },
+              banco: { view: true, edit: true },
+              facts: { view: true, edit: true },
+              concil: { view: true, edit: true },
+              reps: { view: true, edit: true },
+              pron: { view: true, edit: true },
+              pres: { view: true, edit: true },
+              admin: { view: true, edit: true }
+            };
+          }
+
+          if (permisos) {
+            sessionStorage.setItem("permisos", JSON.stringify(permisos));
+          } else {
+            sessionStorage.removeItem("permisos");
+          }
+
+          if (color) {
+            sessionStorage.setItem("avatarColor", color);
+            window.dispatchEvent(new Event("avatarUpdated"));
+          }
+
+          // Avisar al resto de la app
+          window.dispatchEvent(new Event("userDataUpdated"));
+        }
+      } catch (err) {
+        console.error("No se pudo sincronizar el perfil al cargar:", err);
+      }
+    };
+
+    syncPermissions();
+  }, []);
 
   React.useEffect(() => {
     if (!isDesktop) {

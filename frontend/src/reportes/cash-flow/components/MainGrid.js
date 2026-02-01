@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Box, Typography, Paper, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Typography, Paper, useTheme, useMediaQuery, Snackbar, Alert } from '@mui/material';
 import Filtros from './Filtros';
 import TablaDetalle from './TablaDetalle';
 import ExportadorSimple from '../../../shared-components/ExportadorSimple';
@@ -23,6 +23,7 @@ export default function MainGrid() {
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
     const [currency, setCurrency] = usePreferredCurrency("ARS");
 
@@ -232,7 +233,7 @@ export default function MainGrid() {
     const handleExportPdf = async () => {
         const chartElement = chartRef.current;
         if (!chartElement) {
-            alert("No se encontró el grafico para exportar.");
+            setSnackbar({ open: true, message: "No se encontró el gráfico para exportar.", severity: "warning" });
             return;
         }
 
@@ -271,7 +272,7 @@ export default function MainGrid() {
             });
         } catch (e) {
             console.error("Error al exportar PDF de cash flow:", e);
-            alert("No se pudo generar el PDF. Intente nuevamente.");
+            setSnackbar({ open: true, message: "No se pudo generar el PDF. Intente nuevamente.", severity: "error" });
         } finally {
             setExportingPdf(false);
         }
@@ -345,6 +346,22 @@ export default function MainGrid() {
                     </ResponsiveContainer>
                 </Paper>
             </div>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: "100%", borderRadius: 2 }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
 
         </Box>
     );

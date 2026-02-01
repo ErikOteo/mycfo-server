@@ -9,7 +9,16 @@ import {
   Alert,
   CircularProgress,
   Paper,
-  Chip
+  Chip,
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  useTheme,
+  Pagination,
+  useMediaQuery,
+  Tooltip
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -25,6 +34,7 @@ import { organizacionService } from "../../shared-services/organizacionService";
 import InvitarColaboradores from "../invitaciones/InvitarColaboradores";
 import API_CONFIG from "../../config/api-config";
 import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
+import usePermisos from "../../hooks/usePermisos";
 
 export default function Organizacion() {
   const [empresa, setEmpresa] = useState(null);
@@ -36,25 +46,41 @@ export default function Organizacion() {
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [empresaEditada, setEmpresaEditada] = useState({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [empleadoToDelete, setEmpleadoToDelete] = useState(null);
+  const { esAdminTotal } = usePermisos();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 3;
+
+  const totalPages = Math.ceil(empleados.length / ITEMS_PER_PAGE);
+  const paginatedEmployees = empleados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const chatbotContext = React.useMemo(
     () => ({
       screen: "organizacion",
       empresa: empresa
         ? {
-            nombre: empresa.nombre,
-            cuit: empresa.cuit,
-            condicionIVA: empresa.condicionIVA,
-            domicilio: empresa.domicilio,
-          }
+          nombre: empresa.nombre,
+          cuit: empresa.cuit,
+          condicionIVA: empresa.condicionIVA,
+          domicilio: empresa.domicilio,
+        }
         : null,
       empleadosTotal: empleados.length,
-      empleados: empleados.slice(0, 5).map((empleado) => ({
+      empleados: paginatedEmployees.map((empleado) => ({
         nombre: empleado.nombre,
         email: empleado.email,
         rol: empleado.rol,
         activo: empleado.activo,
       })),
+      paginacion: {
+        paginaActual: page,
+        totalPaginas: totalPages,
+        totalEmpleados: empleados.length,
+        itemsPorPagina: ITEMS_PER_PAGE
+      },
       usuarioRol,
       editandoEmpresa,
       editandoEmpleado: Boolean(editandoEmpleado),
@@ -75,10 +101,16 @@ export default function Organizacion() {
   const sub = sessionStorage.getItem("sub");
   const organizacionId = sessionStorage.getItem("organizacionId");
 
-  // Cargar datos al montar el componente
   useEffect(() => {
     cargarDatosEmpresaYEmpleados();
   }, []);
+
+  // Ajustar página si la lista cambia (ej. al eliminar)
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) {
+      setPage(totalPages);
+    }
+  }, [empleados.length, totalPages, page]);
 
   const cargarDatosEmpresaYEmpleados = async () => {
     setLoading(true);
@@ -154,11 +186,18 @@ export default function Organizacion() {
     }
   };
 
-  // Eliminar empleado
-  const handleEliminarEmpleado = async (empleadoSub) => {
-    if (!window.confirm("¿Estás seguro de que deseas eliminar este empleado?")) {
-      return;
-    }
+  // Eliminar empleado - Abrir diálogo
+  const handleEliminarEmpleado = (empleado) => {
+    setEmpleadoToDelete(empleado);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirmar eliminación en el diálogo
+  const handleConfirmarEliminar = async () => {
+    if (!empleadoToDelete) return;
+
+    const empleadoSub = empleadoToDelete.sub;
+    setDeleteDialogOpen(false);
 
     try {
       await organizacionService.eliminarEmpleado(empleadoSub);
@@ -183,6 +222,8 @@ export default function Organizacion() {
       }
 
       setMensaje({ tipo: 'error', texto: mensajeError });
+    } finally {
+      setEmpleadoToDelete(null);
     }
   };
 
@@ -221,7 +262,15 @@ export default function Organizacion() {
     }
   };
 
-  const esAdministrador = usuarioRol === "ADMINISTRADOR";
+  const getRolFormateado = (rolRaw) => {
+    if (!rolRaw) return "Colaborador";
+    const base = rolRaw.split('|')[0].toUpperCase();
+    if (base.startsWith("PROPIETARIO")) return "Propietario";
+    if (base.startsWith("ADMINISTRADOR")) return "Administrador";
+    return "Colaborador";
+  };
+
+  const esAdministrador = esAdminTotal();
 
   if (loading) {
     return (
@@ -247,7 +296,7 @@ export default function Organizacion() {
       </Typography>
 
       {/* Información de la Empresa */}
-      <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+      <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, mb: 4 }}>
         {empresa ? (
           <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -255,14 +304,14 @@ export default function Organizacion() {
                 Información de la Empresa
               </Typography>
               {esAdministrador && !editandoEmpresa && (
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  onClick={handleAbrirEdicionEmpresa}
-                  color="primary"
-                >
-                  Editar
-                </Button>
+                <Tooltip title="Editar">
+                  <IconButton
+                    onClick={handleAbrirEdicionEmpresa}
+                    color="primary"
+                  >
+                    <EditIcon />
+                  </IconButton>
+                </Tooltip>
               )}
             </Box>
 
@@ -372,6 +421,7 @@ export default function Organizacion() {
                     startIcon={<SaveIcon />}
                     onClick={handleGuardarEmpresa}
                     color="primary"
+                    sx={{ lineHeight: 1.2 }}
                   >
                     Guardar
                   </Button>
@@ -379,6 +429,7 @@ export default function Organizacion() {
                     variant="outlined"
                     onClick={handleCerrarEdicionEmpresa}
                     color="secondary"
+                    sx={{ lineHeight: 1.2 }}
                   >
                     Cancelar
                   </Button>
@@ -394,10 +445,30 @@ export default function Organizacion() {
       </Paper>
 
       {/* Empleados de la Organización */}
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-          Empleados de la Organización ({empleados.length})
-        </Typography>
+      <Paper elevation={2} sx={{ p: isMobile ? 2 : 3 }}>
+        <Box sx={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          gap: 2,
+          mb: 3
+        }}>
+          <Typography variant="h5" sx={{ mb: 0 }}>
+            {isMobile ? "Empleados" : `Empleados de la Organización (${empleados.length})`}
+          </Typography>
+          {esAdministrador && (
+            <Button
+              variant="contained"
+              onClick={() => window.location.hash = '/roles'}
+              startIcon={<AdminIcon />}
+              fullWidth={isMobile}
+              sx={{ borderRadius: 2, lineHeight: 1.2 }}
+            >
+              Gestionar Roles
+            </Button>
+          )}
+        </Box>
 
         {empleados.length === 0 ? (
           <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
@@ -405,34 +476,62 @@ export default function Organizacion() {
           </Typography>
         ) : (
           <Box>
-            {empleados.map((empleado, index) => (
+            {paginatedEmployees.map((empleado, index) => (
               <Box key={empleado.sub}>
                 <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="h6">
+                  <Box sx={{
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'flex-start' : 'center',
+                    justifyContent: 'space-between',
+                    gap: 1
+                  }}>
+                    <Box sx={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 1,
+                      width: '100%'
+                    }}>
+                      <Typography variant="h6" sx={{ mr: 1 }}>
                         {editandoEmpleado === empleado.sub ? empleadoEditado.nombre : empleado.nombre}
                       </Typography>
-                      {(editandoEmpleado === empleado.sub ? empleadoEditado.rol : empleado.rol) === "ADMINISTRADOR" && (
-                        <Chip
-                          icon={<AdminIcon />}
-                          label="Admin"
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
-                      )}
-                      {empleado.sub === sub && (
-                        <Chip
-                          label="Tú"
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                      )}
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {((editandoEmpleado === empleado.sub ? empleadoEditado.rol : empleado.rol) || "").toUpperCase().includes("ADMINISTRADOR") && (
+                          <Chip
+                            icon={<AdminIcon />}
+                            label="Admin"
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        )}
+                        {((editandoEmpleado === empleado.sub ? empleadoEditado.rol : empleado.rol) || "").toUpperCase().includes("PROPIETARIO") && (
+                          <Chip
+                            icon={<BusinessIcon />}
+                            label="Dueño"
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        )}
+                        {empleado.sub === sub && (
+                          <Chip
+                            label="Tú"
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
                     </Box>
                     {esAdministrador && (
-                      <Box>
+                      <Box sx={{
+                        display: 'flex',
+                        mt: isMobile ? 1 : 0,
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'flex-end' : 'flex-start'
+                      }}>
                         {editandoEmpleado === empleado.sub ? (
                           <Box sx={{ display: 'flex', gap: 1 }}>
                             <Button
@@ -441,6 +540,7 @@ export default function Organizacion() {
                               onClick={handleGuardarEmpleado}
                               size="small"
                               color="primary"
+                              sx={{ lineHeight: 1.2 }}
                             >
                               Guardar
                             </Button>
@@ -449,29 +549,33 @@ export default function Organizacion() {
                               onClick={handleCerrarEdicionEmpleado}
                               size="small"
                               color="secondary"
+                              sx={{ lineHeight: 1.2 }}
                             >
                               Cancelar
                             </Button>
                           </Box>
                         ) : (
-                          <Box>
-                            <IconButton
-                              aria-label="editar"
-                              onClick={() => handleAbrirEdicionEmpleado(empleado)}
-                              sx={{ mr: 1 }}
-                              color="primary"
-                            >
-                              <EditIcon />
-                            </IconButton>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            <Tooltip title="Editar">
+                              <IconButton
+                                aria-label="editar"
+                                onClick={() => handleAbrirEdicionEmpleado(empleado)}
+                                color="primary"
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
                             {/* Solo mostrar botón eliminar si no es el propio usuario */}
                             {empleado.sub !== sub && (
-                              <IconButton
-                                aria-label="eliminar"
-                                onClick={() => handleEliminarEmpleado(empleado.sub)}
-                                color="error"
-                              >
-                                <DeleteIcon />
-                              </IconButton>
+                              <Tooltip title="Eliminar">
+                                <IconButton
+                                  aria-label="eliminar"
+                                  onClick={() => handleEliminarEmpleado(empleado)}
+                                  color="error"
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Tooltip>
                             )}
                           </Box>
                         )}
@@ -562,7 +666,7 @@ export default function Organizacion() {
                         Rol
                       </Typography>
                       <Typography variant="body1">
-                        {empleado.rol}
+                        {getRolFormateado(empleado.rol)}
                       </Typography>
                     </Box>
 
@@ -577,9 +681,20 @@ export default function Organizacion() {
                   </Box>
                 )}
 
-                {index < empleados.length - 1 && <Divider sx={{ my: 2 }} />}
+                {index < paginatedEmployees.length - 1 && <Divider sx={{ my: 2 }} />}
               </Box>
             ))}
+
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 1 }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={(e, v) => setPage(v)}
+                  color="primary"
+                />
+              </Box>
+            )}
           </Box>
         )}
 
@@ -590,11 +705,72 @@ export default function Organizacion() {
         )}
       </Paper>
 
-      {/* Invitar Colaboradores */}
-      <InvitarColaboradores
-        empresaNombre={empresa?.nombre}
-        esAdministrador={esAdministrador}
-      />
+      {/* Gestión de Miembros e Invitaciones - Acceso rápido */}
+      <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, mt: 4, bgcolor: 'action.hover', border: '1px dashed', borderColor: 'primary.main' }}>
+        <Stack
+          direction={isMobile ? "column" : "row"}
+          spacing={2}
+          alignItems={isMobile ? "stretch" : "center"}
+          justifyContent="space-between"
+        >
+          <Box>
+            <Typography variant="h6">¿Necesitas sumar a alguien más?</Typography>
+            <Typography variant="body2" color="text.primary" sx={{ mb: isMobile ? 1 : 0 }}>
+              Gestiona invitaciones y permisos desde la nueva sección.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            onClick={() => window.location.hash = '/invitaciones'}
+            startIcon={<PersonAddIcon />}
+            fullWidth={isMobile}
+            sx={{ borderRadius: 2, lineHeight: 1.2 }}
+          >
+            Ir a Invitaciones
+          </Button>
+        </Stack>
+      </Paper>
+
+      {/* Diálogo de Confirmación de Eliminación */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>⚠️ Confirmar Eliminación</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            ¿Estás seguro que deseas eliminar a este empleado?
+          </Alert>
+          {empleadoToDelete && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body2">
+                <strong>Nombre:</strong> {empleadoToDelete.nombre}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Email:</strong> {empleadoToDelete.email}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Rol:</strong> {getRolFormateado(empleadoToDelete.rol)}
+              </Typography>
+            </Box>
+          )}
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Esta acción es definitiva y no se puede deshacer.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteDialogOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmarEliminar}
+            color="error"
+            variant="contained"
+          >
+            Eliminar permanentemente
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
   );

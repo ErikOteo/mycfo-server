@@ -45,6 +45,7 @@ import CurrencyTabs, { usePreferredCurrency } from "../../../shared-components/C
 import { matchesCurrencyFilter } from "../utils/currencyTag";
 import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 import CustomNoRowsOverlay from "../../../shared-components/CustomNoRowsOverlay";
+import usePermisos from "../../../hooks/usePermisos";
 
 const tableRowStyle = {
   backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -203,6 +204,8 @@ export default function MainGrid() {
   const retentionDays = React.useMemo(() => parseRetentionDays(), []);
   const [statusFilter, setStatusFilter] = React.useState("active");
   const [pageIndex, setPageIndex] = React.useState(0);
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('pres', 'edit');
   const [presupuestosPage, setPresupuestosPage] =
     React.useState(createEmptyPage);
   const [hasActiveSearch, setHasActiveSearch] = React.useState(false);
@@ -927,6 +930,7 @@ export default function MainGrid() {
               size="small"
               startIcon={<RestoreFromTrashIcon />}
               onClick={() => handleRestore(p)}
+              disabled={!canEdit}
             >
               Restaurar
             </Button>
@@ -943,7 +947,7 @@ export default function MainGrid() {
             >
               Ver detalle
             </Button>
-            {esAdmin && (
+            {canEdit && (
               <Tooltip title="Más acciones">
                 <IconButton
                   size="small"
@@ -1218,14 +1222,16 @@ export default function MainGrid() {
         </Box>
       )}
 
-      <Box mt={3}>
-        <Button
-          variant="contained"
-          onClick={() => navigate("/presupuestos/nuevo")}
-        >
-          Crear nuevo presupuesto
-        </Button>
-      </Box>
+      {canEdit && (
+        <Box mt={3}>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/presupuestos/nuevo")}
+          >
+            Crear nuevo presupuesto
+          </Button>
+        </Box>
+      )}
 
       {/* --- Dialogs & Menus (Same as before) --- */}
       <Menu

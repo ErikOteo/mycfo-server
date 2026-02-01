@@ -61,7 +61,14 @@ public class UsuarioController {
             UsuarioDTO actualizado = usuarioService.actualizarEmpleado(sub, dto, subUsuarioActual);
             return ResponseEntity.ok(actualizado);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).body(null);
+            String message = e.getMessage();
+            if (message != null
+                    && (message.contains("Solo los administradores") || message.contains("Solo un administrador"))) {
+                return ResponseEntity.status(403).body(null);
+            }
+            // Para otros errores (como truncado de datos o DB), devolver 500 para facilitar
+            // diagnóstico
+            return ResponseEntity.status(500).body(null);
         }
     }
 

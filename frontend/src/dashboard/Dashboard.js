@@ -38,6 +38,7 @@ import CurrencyTabs, {
   usePreferredCurrency,
 } from "../shared-components/CurrencyTabs";
 import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
+import usePermisos from "../hooks/usePermisos";
 
 const mockKpis = {
   totalIncomes: 820000,
@@ -393,6 +394,7 @@ const getRecentPeriods = (count = 6) =>
 const Dashboard = React.memo(() => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { tienePermiso, esAdminTotal } = usePermisos();
   const { resolvedMode, paletteVars, primaryTextColor } =
     useResolvedColorTokens();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -678,11 +680,11 @@ const Dashboard = React.memo(() => {
           : Math.max(total - conciliados, 0);
       const porcentaje =
         response.porcentajeConciliados !== undefined &&
-        response.porcentajeConciliados !== null
+          response.porcentajeConciliados !== null
           ? Number(response.porcentajeConciliados)
           : total > 0
-          ? (conciliados * 100) / total
-          : 0;
+            ? (conciliados * 100) / total
+            : 0;
 
       const periodo = String(response.periodo ?? "");
       let periodLabel = periodo || "Periodo actual";
@@ -789,52 +791,52 @@ const Dashboard = React.memo(() => {
 
         const salesTrendState = composite.ingresosMensuales
           ? {
-              loading: false,
-              error: null,
-              data: mapTrendResponse(composite.ingresosMensuales, {
-                title: "Ingresos durante el período",
-                emptyMessage: "No hay ingresos registrados en este periodo.",
-                subheader:
-                  "Serie mensual de ingresos registrados en los ultimos 12 meses.",
-              }),
-            }
+            loading: false,
+            error: null,
+            data: mapTrendResponse(composite.ingresosMensuales, {
+              title: "Ingresos durante el período",
+              emptyMessage: "No hay ingresos registrados en este periodo.",
+              subheader:
+                "Serie mensual de ingresos registrados en los ultimos 12 meses.",
+            }),
+          }
           : { loading: false, error: null, data: null };
 
         const expensesTrendState = composite.egresosMensuales
           ? {
-              loading: false,
-              error: null,
-              data: mapTrendResponse(composite.egresosMensuales, {
-                title: "Egresos durante el período",
-                emptyMessage: "No hay egresos registrados en este periodo.",
-                subheader:
-                  "Serie mensual de egresos registrados en los ultimos 12 meses.",
-              }),
-            }
+            loading: false,
+            error: null,
+            data: mapTrendResponse(composite.egresosMensuales, {
+              title: "Egresos durante el período",
+              emptyMessage: "No hay egresos registrados en este periodo.",
+              subheader:
+                "Serie mensual de egresos registrados en los ultimos 12 meses.",
+            }),
+          }
           : { loading: false, error: null, data: null };
 
         const salesByCategoryState = composite.ingresosPorCategoria
           ? {
-              loading: false,
-              error: null,
-              data: mapCategoryResponse(composite.ingresosPorCategoria),
-            }
+            loading: false,
+            error: null,
+            data: mapCategoryResponse(composite.ingresosPorCategoria),
+          }
           : { loading: false, error: null, data: null };
 
         const expensesByCategoryState = composite.egresosPorCategoria
           ? {
-              loading: false,
-              error: null,
-              data: mapCategoryResponse(composite.egresosPorCategoria),
-            }
+            loading: false,
+            error: null,
+            data: mapCategoryResponse(composite.egresosPorCategoria),
+          }
           : { loading: false, error: null, data: null };
 
         const reconciliationState = composite.conciliacion
           ? {
-              loading: false,
-              error: null,
-              data: mapConciliationResponse(composite.conciliacion),
-            }
+            loading: false,
+            error: null,
+            data: mapConciliationResponse(composite.conciliacion),
+          }
           : { loading: false, error: null, data: null };
 
         applyResult({
@@ -933,45 +935,52 @@ const Dashboard = React.memo(() => {
         label: "Cargar movimiento",
         icon: <AddCircleOutlineRoundedIcon />,
         action: () => handleNavigate("/carga"),
+        visible: tienePermiso('movs', 'edit'),
       },
       {
         id: "excel",
         label: "Importar Excel",
         icon: <UploadFileRoundedIcon />,
         action: () => handleNavigate("/carga-movimientos"),
+        visible: tienePermiso('banco', 'edit'),
       },
       {
         id: "mp",
         label: "Mercado Pago",
         icon: <AccountBalanceWalletRoundedIcon />,
         action: () => handleNavigate("/mercado-pago"),
+        visible: tienePermiso('banco', 'edit'),
       },
       {
         id: "reconcile",
         label: "Conciliar",
         icon: <PublishedWithChangesRoundedIcon />,
         action: () => handleNavigate("/conciliacion"),
+        visible: tienePermiso('concil', 'edit'),
       },
       {
         id: "invoice",
         label: "Cargar factura",
         icon: <ReceiptLongRoundedIcon />,
         action: () => handleNavigate("/carga/factura"),
+        visible: tienePermiso('facts', 'edit'),
       },
       {
         id: "budget",
         label: "Nuevo presupuesto",
         icon: <AssessmentRoundedIcon />,
         action: () => handleNavigate("/presupuestos/nuevo"),
+        visible: tienePermiso('pres', 'edit'),
       },
       {
         id: "reminder",
         label: "Recordatorio",
         icon: <NotificationsActiveRoundedIcon />,
         action: () => handleNavigate("/recordatorios"),
+        visible: true, // Notificaciones son libres
       },
-    ],
-    [handleNavigate]
+    ].filter(a => a.visible),
+    [handleNavigate, tienePermiso]
   );
 
   const handleQuickAction = (action) => {
@@ -996,6 +1005,9 @@ const Dashboard = React.memo(() => {
 
   const kpiCards = React.useMemo(() => {
     const data = state.kpis.data;
+    const canSeeFinances = tienePermiso('movs', 'view') || tienePermiso('facts', 'view');
+
+    if (!canSeeFinances) return [];
 
     return [
       {
@@ -1026,41 +1038,8 @@ const Dashboard = React.memo(() => {
         formatter: formatCurrency,
         trend: [],
       },
-      // {
-      //   id: "cashBalance",
-      //   title: "Saldo de caja",
-      //   value: data.cashBalance,
-      //   formatter: formatCurrencyAR,
-      //   trend: mockKpiTrends.cashBalance,
-      //   trendColor: theme.palette.info.main,
-      //   secondaryLabel: "Dias de cobertura",
-      //   secondaryValue: data.cashRunwayDays,
-      //   secondaryFormatter: formatDays,
-      // },
-      // {
-      //   id: "pendingReceivables",
-      //   title: "Cobros pendientes (30 dias)",
-      //   value: data.pendingReceivables,
-      //   formatter: formatCurrencyAR,
-      //   trend: mockKpiTrends.pendingReceivables,
-      //   trendColor: theme.palette.primary.main,
-      //   secondaryLabel: "Por vencer 7d",
-      //   secondaryValue: data.receivablesDueSoon,
-      //   secondaryFormatter: formatCurrencyAR,
-      // },
-      // {
-      //   id: "pendingPayables",
-      //   title: "Pagos pendientes (30 dias)",
-      //   value: data.pendingPayables,
-      //   formatter: formatCurrencyAR,
-      //   trend: mockKpiTrends.pendingPayables,
-      //   trendColor: theme.palette.warning.main,
-      //   secondaryLabel: "Vencidos",
-      //   secondaryValue: data.payablesOverdue,
-      //   secondaryFormatter: formatCurrencyAR,
-      // },
     ];
-  }, [state.kpis.data, formatCurrency]);
+  }, [state.kpis.data, formatCurrency, tienePermiso]);
 
   const quickActionsLoading = state.kpis.loading && !state.kpis.data;
 
@@ -1167,89 +1146,93 @@ const Dashboard = React.memo(() => {
           ))}
         </Grid>
 
-        <Grid
-          container
-          spacing={3}
-          justifyContent="center"
-          sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesTrendWidget
-                data={
-                  state.salesTrend.data ?? {
-                    title: "Ingresos durante el período",
-                    points: [],
-                    average: 0,
-                    max: { value: 0, label: "--" },
-                    min: { value: 0, label: "--" },
+        {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
+          <Grid
+            container
+            spacing={3}
+            justifyContent="center"
+            sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+          >
+            <Grid>
+              <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                <SalesTrendWidget
+                  data={
+                    state.salesTrend.data ?? {
+                      title: "Ingresos durante el período",
+                      points: [],
+                      average: 0,
+                      max: { value: 0, label: "--" },
+                      min: { value: 0, label: "--" },
+                    }
                   }
-                }
-                loading={state.salesTrend.loading && !state.salesTrend.data}
-                error={state.salesTrend.error}
-                onNavigate={() => handleNavigate("/reportes/ventas")}
-                currency={currency}
-              />
-            </Box>
+                  loading={state.salesTrend.loading && !state.salesTrend.data}
+                  error={state.salesTrend.error}
+                  onNavigate={() => handleNavigate("/reportes/ventas")}
+                  currency={currency}
+                />
+              </Box>
+            </Grid>
+            <Grid>
+              <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                <SalesByCategoryWidget
+                  data={state.salesByCategory.data ?? []}
+                  loading={
+                    state.salesByCategory.loading && !state.salesByCategory.data
+                  }
+                  error={state.salesByCategory.error}
+                  currency={currency}
+                />
+              </Box>
+            </Grid>
           </Grid>
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesByCategoryWidget
-                data={state.salesByCategory.data ?? []}
-                loading={
-                  state.salesByCategory.loading && !state.salesByCategory.data
-                }
-                error={state.salesByCategory.error}
-                currency={currency}
-              />
-            </Box>
-          </Grid>
-        </Grid>
+        )}
 
-        <Grid
-          container
-          spacing={3}
-          justifyContent="center"
-          sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesTrendWidget
-                data={
-                  state.expensesTrend.data ?? {
-                    title: "Egresos durante el período",
-                    points: [],
-                    average: 0,
-                    max: { value: 0, label: "--" },
-                    min: { value: 0, label: "--" },
+        {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
+          <Grid
+            container
+            spacing={3}
+            justifyContent="center"
+            sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+          >
+            <Grid>
+              <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                <SalesTrendWidget
+                  data={
+                    state.expensesTrend.data ?? {
+                      title: "Egresos durante el período",
+                      points: [],
+                      average: 0,
+                      max: { value: 0, label: "--" },
+                      min: { value: 0, label: "--" },
+                    }
                   }
-                }
-                loading={
-                  state.expensesTrend.loading && !state.expensesTrend.data
-                }
-                error={state.expensesTrend.error}
-                emptyMessage="No hay egresos registrados en este periodo."
-                currency={currency}
-              />
-            </Box>
+                  loading={
+                    state.expensesTrend.loading && !state.expensesTrend.data
+                  }
+                  error={state.expensesTrend.error}
+                  emptyMessage="No hay egresos registrados en este periodo."
+                  currency={currency}
+                />
+              </Box>
+            </Grid>
+            <Grid>
+              <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                <SalesByCategoryWidget
+                  data={state.expensesByCategory.data ?? []}
+                  loading={
+                    state.expensesByCategory.loading &&
+                    !state.expensesByCategory.data
+                  }
+                  error={state.expensesByCategory.error}
+                  emptyMessage="No hay egresos por categoria en este periodo."
+                  title="Egresos por categorias"
+                  subtitle="Distribucion anual por segmento"
+                  currency={currency}
+                />
+              </Box>
+            </Grid>
           </Grid>
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesByCategoryWidget
-                data={state.expensesByCategory.data ?? []}
-                loading={
-                  state.expensesByCategory.loading &&
-                  !state.expensesByCategory.data
-                }
-                error={state.expensesByCategory.error}
-                emptyMessage="No hay egresos por categoria en este periodo."
-                title="Egresos por categorias"
-                subtitle="Distribucion anual por segmento"
-                currency={currency}
-              />
-            </Box>
-          </Grid>
-        </Grid>
+        )}
 
         <Grid
           container
@@ -1257,38 +1240,43 @@ const Dashboard = React.memo(() => {
           justifyContent="center"
           sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          <Grid size={{ xs: 12, md: 4 }}>
-            <BudgetWidget
-              companyId={company}
-              period={period}
-              data={state.budget.data}
-              loading={state.budget.loading && !state.budget.data}
-              error={state.budget.error}
-              onRetry={loadDashboardData}
-              currency={currency}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
-            {/* Sección comparativa Caja vs Devengado del último mes */}
-            <LiquidityGapWidget currency={currency} />
-          </Grid>
-          <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
-            <ReconciliationWidget
-              data={state.reconciliation.data}
-              loading={
-                state.reconciliation.loading && !state.reconciliation.data
-              }
-              error={state.reconciliation.error}
-              onRetry={loadDashboardData}
-              currency={currency}
-              onNavigate={(account) =>
-                handleNavigate(
-                  "/conciliacion",
-                  account ? { cuenta: account } : undefined
-                )
-              }
-            />
-          </Grid>
+          {tienePermiso('pres', 'view') && (
+            <Grid size={{ xs: 12, md: 4 }}>
+              <BudgetWidget
+                companyId={company}
+                period={period}
+                data={state.budget.data}
+                loading={state.budget.loading && !state.budget.data}
+                error={state.budget.error}
+                onRetry={loadDashboardData}
+                currency={currency}
+              />
+            </Grid>
+          )}
+          {tienePermiso('movs', 'view') && (
+            <Grid size={{ xs: 12, md: 4 }}>
+              <LiquidityGapWidget currency={currency} />
+            </Grid>
+          )}
+          {tienePermiso('concil', 'view') && (
+            <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
+              <ReconciliationWidget
+                data={state.reconciliation.data}
+                loading={
+                  state.reconciliation.loading && !state.reconciliation.data
+                }
+                error={state.reconciliation.error}
+                onRetry={loadDashboardData}
+                currency={currency}
+                onNavigate={(account) =>
+                  handleNavigate(
+                    "/conciliacion",
+                    account ? { cuenta: account } : undefined
+                  )
+                }
+              />
+            </Grid>
+          )}
         </Grid>
 
         {/* Bloque de IA / insights a lo ancho al final */}
@@ -1304,24 +1292,28 @@ const Dashboard = React.memo(() => {
             display: { xs: "none", md: "flex" },
           }}
         >
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RecentMovementsWidget
-              data={state.movements.data}
-              loading={state.movements.loading && !state.movements.data}
-              error={state.movements.error}
-              onRetry={loadDashboardData}
-              onNavigate={() => handleNavigate("/ver-movimientos")}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RecentInvoicesWidget
-              data={state.invoices?.data ?? null}
-              loading={state.invoices?.loading && !state.invoices?.data}
-              error={state.invoices?.error ?? null}
-              onRetry={loadDashboardData}
-              onNavigate={() => handleNavigate("/ver-facturas")}
-            />
-          </Grid>
+          {tienePermiso('movs', 'view') && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <RecentMovementsWidget
+                data={state.movements.data}
+                loading={state.movements.loading && !state.movements.data}
+                error={state.movements.error}
+                onRetry={loadDashboardData}
+                onNavigate={() => handleNavigate("/ver-movimientos")}
+              />
+            </Grid>
+          )}
+          {tienePermiso('facts', 'view') && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <RecentInvoicesWidget
+                data={state.invoices?.data ?? null}
+                loading={state.invoices?.loading && !state.invoices?.data}
+                error={state.invoices?.error ?? null}
+                onRetry={loadDashboardData}
+                onNavigate={() => handleNavigate("/ver-facturas")}
+              />
+            </Grid>
+          )}
         </Grid>
 
         <Grid
@@ -1330,17 +1322,19 @@ const Dashboard = React.memo(() => {
           justifyContent="center"
           sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          <Grid size={{ xs: 12, md: 10 }}>
-            <Box sx={{ width: "100%", mx: "auto" }}>
-              <InsightsWidget />
-            </Box>
-          </Grid>
+          {esAdminTotal() && (
+            <Grid size={{ xs: 12, md: 10 }}>
+              <Box sx={{ width: "100%", mx: "auto" }}>
+                <InsightsWidget />
+              </Box>
+            </Grid>
+          )}
         </Grid>
 
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button 
-            variant="text" 
-            size="small" 
+          <Button
+            variant="text"
+            size="small"
             onClick={loadDashboardData}
             disabled={isRefreshing}
           >

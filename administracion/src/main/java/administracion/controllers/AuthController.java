@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import administracion.dtos.*;
 import administracion.models.Empresa;
-import administracion.models.Rol;
 import administracion.models.Usuario;
 import administracion.repositories.EmpresaRepository;
 import administracion.repositories.UsuarioRepository;
@@ -78,9 +77,11 @@ public class AuthController {
             boolean esInvitacion = dto.getEsInvitacion() != null && dto.getEsInvitacion();
 
             if (esPrimerUsuario && !esInvitacion) {
-                usuario.setRol(Rol.ADMINISTRADOR); // Primer usuario de empresa nueva es administrador
+                usuario.setRol("ADMINISTRADOR"); // Primer usuario de empresa nueva es administrador
+                usuario.setEsPropietario(true); // El creador es el dueño absoluto
             } else {
-                usuario.setRol(Rol.NORMAL); // Usuarios invitados siempre son NORMAL
+                usuario.setRol("NORMAL"); // Usuarios invitados siempre son NORMAL
+                usuario.setEsPropietario(false);
             }
 
             usuario.setActivo(true);

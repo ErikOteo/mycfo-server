@@ -39,22 +39,22 @@ export const organizacionService = {
           'X-Usuario-Sub': sub
         }
       });
-      
+
       console.log('🔍 [ORGANIZACION-SERVICE] Perfil response:', response.data);
       console.log('🔍 [ORGANIZACION-SERVICE] EmpresaId:', response.data?.empresaId);
-      
+
       if (response.data && response.data.empresaId) {
         console.log('🔍 [ORGANIZACION-SERVICE] Obteniendo datos de empresa con ID:', response.data.empresaId);
-        
+
         // Obtener datos completos de la empresa
         const empresaResponse = await axios.get(`${API_BASE_URL}/api/empresas/${response.data.empresaId}`, {
           headers: {
             'X-Usuario-Sub': sub
           }
         });
-        
+
         console.log('🔍 [ORGANIZACION-SERVICE] Empresa response:', empresaResponse.data);
-        
+
         const empresaData = {
           id: response.data.empresaId,
           nombre: empresaResponse.data.nombre || response.data.empresaNombre,
@@ -63,11 +63,11 @@ export const organizacionService = {
           condicionIVA: empresaResponse.data.condicionIVA,
           domicilio: empresaResponse.data.domicilio
         };
-        
+
         console.log('🔍 [ORGANIZACION-SERVICE] Empresa data final:', empresaData);
         return empresaData;
       }
-      
+
       console.log('⚠️ [ORGANIZACION-SERVICE] No se encontró empresaId en el perfil');
       return null;
     } catch (error) {
@@ -90,7 +90,7 @@ export const organizacionService = {
           'X-Usuario-Sub': sub
         }
       });
-      
+
       if (perfilResponse.data && perfilResponse.data.empresaId) {
         // Obtener empleados de la organización
         const empleadosResponse = await axios.get(`${API_BASE_URL}/api/usuarios/empresa/${perfilResponse.data.empresaId}`, {
@@ -98,7 +98,7 @@ export const organizacionService = {
             'X-Usuario-Sub': sub
           }
         });
-        
+
         return empleadosResponse.data;
       }
       return [];
@@ -122,14 +122,14 @@ export const organizacionService = {
           'X-Usuario-Sub': sub
         }
       });
-      
+
       if (perfilResponse.data && perfilResponse.data.empresaId) {
         const response = await axios.put(`${API_BASE_URL}/api/empresas/${perfilResponse.data.empresaId}`, datosOrganizacion, {
           headers: {
             'X-Usuario-Sub': sub
           }
         });
-        
+
         return response.data;
       }
       throw new Error('No se encontró la organización del usuario');
@@ -152,7 +152,7 @@ export const organizacionService = {
           'X-Usuario-Sub': sub
         }
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Error al actualizar empleado:', error);
@@ -173,7 +173,7 @@ export const organizacionService = {
           'X-Usuario-Sub': sub
         }
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Error al eliminar empleado:', error);

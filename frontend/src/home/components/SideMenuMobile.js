@@ -16,16 +16,18 @@ import { Box } from '@mui/material';
 import LogoutButton from './LogoutButton';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../../shared-components/Logo';
+import usePermisos from '../../hooks/usePermisos';
 
 function SideMenuMobile({ open, toggleDrawer }) {
   const navigate = useNavigate();
+  const { tienePermiso } = usePermisos();
 
   // 🔹 Datos de usuario obtenidos de sessionStorage (desde la BD)
   const [userData, setUserData] = React.useState({
     nombre: '',
     email: '',
   });
-  const [avatarColor, setAvatarColor] = React.useState(localStorage.getItem('avatarColor') || '#008375');
+  const [avatarColor, setAvatarColor] = React.useState(sessionStorage.getItem('avatarColor') || localStorage.getItem('avatarColor') || '#008375');
 
   React.useEffect(() => {
     const loadData = () => {
@@ -33,6 +35,9 @@ function SideMenuMobile({ open, toggleDrawer }) {
         nombre: sessionStorage.getItem('nombre') || '',
         email: sessionStorage.getItem('email') || '',
       });
+      // Sincronizar color al cargar si no está en el estado inicial
+      const syncedColor = sessionStorage.getItem('avatarColor');
+      if (syncedColor) setAvatarColor(syncedColor);
     };
 
     loadData(); // lectura inicial
@@ -41,7 +46,7 @@ function SideMenuMobile({ open, toggleDrawer }) {
     window.addEventListener('storage', onStorageChange);
 
     const handleAvatarUpdate = () => {
-      const newColor = localStorage.getItem('avatarColor');
+      const newColor = sessionStorage.getItem('avatarColor') || localStorage.getItem('avatarColor');
       if (newColor) {
         setAvatarColor(newColor);
       }
@@ -94,18 +99,20 @@ function SideMenuMobile({ open, toggleDrawer }) {
           </Stack>
 
           {/* Botón Empresa */}
-          <Tooltip title="Organización">
-            <IconButton
-              size="small"
-              color="primary"
-              onClick={() => {
-                navigate('/organizacion');
-                toggleDrawer(false)(); // Cerrar el menú después de navegar
-              }}
-            >
-              <ApartmentIcon />
-            </IconButton>
-          </Tooltip>
+          {tienePermiso('admin', 'view') && (
+            <Tooltip title="Organización">
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={() => {
+                  navigate('/organizacion');
+                  toggleDrawer(false)(); // Cerrar el menú después de navegar
+                }}
+              >
+                <ApartmentIcon />
+              </IconButton>
+            </Tooltip>
+          )}
 
           {/* Botón Perfil */}
           <Tooltip title="Perfil">

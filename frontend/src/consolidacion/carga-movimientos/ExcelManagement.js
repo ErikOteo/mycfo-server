@@ -7,10 +7,11 @@ import {
   Tab,
   Button,
   Stack,
-  Alert,
   useTheme,
   useMediaQuery,
+  Snackbar,
 } from "@mui/material";
+import Alert from "@mui/material/Alert";
 import HistoryIcon from "@mui/icons-material/History";
 import UploadIcon from "@mui/icons-material/Upload";
 import CargaMovimientos from "./CargaMovimientos";
@@ -25,6 +26,7 @@ export default function ExcelManagement() {
   const [historialLoading, setHistorialLoading] = React.useState(false);
   const [historialPage, setHistorialPage] = React.useState(0);
   const [historialPageSize, setHistorialPageSize] = React.useState(20);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -48,7 +50,7 @@ export default function ExcelManagement() {
     try {
       const usuarioSub = sessionStorage.getItem("sub");
       if (!usuarioSub) {
-        alert("No se encontró la sesión del usuario. Volvé a iniciar sesión.");
+        setSnackbar({ open: true, message: "No se encontró la sesión del usuario. Volvé a iniciar sesión.", severity: "error" });
         setHistorialLoading(false);
         return;
       }
@@ -183,6 +185,21 @@ export default function ExcelManagement() {
           </Box>
         </Paper>
       )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
