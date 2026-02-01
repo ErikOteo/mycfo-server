@@ -48,12 +48,11 @@ public class ChatbotVertexService {
     private static final Pattern FENCE_PATTERN = Pattern.compile("```[a-zA-Z]*");
     private static final String KNOWLEDGE_PDF_CLASSPATH = "knowledge/base.pdf";
     private static final Pattern OUT_OF_SCOPE_PATTERN = Pattern.compile(
-            "(?i)\b(" +
+            "(?i)\\b(" +
                     "calcula|calcular|recalcula|recalcular|sumar|suma|restar|resta|" +
                     "multiplicar|multiplica|dividir|divide|porcentaje|promedio|tasa|" +
-                    "variacion|crecimiento|proyeccion|proyecta|pronostica|pronostico|" +
-                    "escenario|simulacion|simula|estima|estimacion|presupuestar" +
-                    ")\b");
+                    "variacion|crecimiento|escenario|simulacion|simula|estima|estimacion|presupuestar" +
+                    ")\\b");
     private static final Pattern SCOPE_QUESTION_PATTERN = Pattern.compile(
             "(?i)\\b(que podes hacer|que puedes hacer|cual es tu alcance|cu[aá]l es tu alcance|" +
                     "para que servis|para que serv[íi]s|para qu[eé] serv[íi]s|ayuda|que haces)\\b");
@@ -62,8 +61,9 @@ public class ChatbotVertexService {
                     ".*\\b(aca|aqui|aquí|esta pantalla|este modulo|este módulo|esta seccion|esta sección|este lugar)\\b");
     private static final Pattern LOCATION_QUESTION_PATTERN = Pattern.compile(
             "(?i)\\b(donde estoy|en que modulo estoy|en qué modulo estoy|que modulo es este|" +
-                    "que m[oó]dulo es este|que pantalla es|que estoy viendo|que veo|que veo aca|que veo aquí|" +
-                    "que es esto que veo|donde estoy parado)\\b");
+                    "que m[oó]dulo es este|que pantalla es|en que pantalla estoy|en qué pantalla estoy|" +
+                    "que pantalla estoy viendo|que pantalla estoy|pantalla actual|que estoy viendo|que veo|" +
+                    "que veo aca|que veo aquí|que es esto que veo|donde estoy parado)\\b");
     private static final Pattern GREETING_ONLY_PATTERN = Pattern.compile(
             "(?i)^\\s*(hola|buenas|buenos dias|buen d[ií]a|buen dia|buenas tardes|buenas noches|hello|hey)\\s*[!.?]*\\s*$");
     private static final Pattern INTERPRETATION_PATTERN = Pattern.compile(
@@ -76,18 +76,29 @@ public class ChatbotVertexService {
     private static final Pattern PHONE_QUESTION_PATTERN = Pattern.compile("(?i)\\b(tel[ée]fono|telefono|celular|celu|m[oó]vil|movil)\\b");
     private static final Pattern NAME_QUESTION_PATTERN = Pattern.compile("(?i)\\b(nombre|usuario)\\b");
     private static final Pattern DATE_QUESTION_PATTERN = Pattern.compile(
-            "(?i)\\b(qu[eé] fecha es|qu[eé] d[ií]a es|qu[eé] d[ií]a|fecha|d[ií]a|hoy|" +
-                    "en qu[eé] d[ií]a estamos|en qu[eé] fecha estamos|qu[eé] hora es|hora)\\b");
+            "(?i)\\b(que fecha es|que dia es|que dia|fecha|dia|en que dia estamos|en que fecha estamos|que hora es|hora)\\b");
+    private static final Pattern EXPLICIT_DATE_TIME_PATTERN = Pattern.compile(
+            "(?i)\\b(que fecha es|que dia es|en que dia estamos|en que fecha estamos|que hora es|hora actual|fecha actual|fecha de hoy|dia de hoy|hoy es)\\b");
+    private static final Pattern DATE_ONLY_PATTERN = Pattern.compile(
+            "(?i)^\\s*(fecha|dia|hora|que fecha|que dia|que hora)\\s*[?.!]*\\s*$");
+    private static final Pattern TEMPORAL_WORD_PATTERN = Pattern.compile(
+            "(?i)\\b(hoy|ahora|en este momento|en este instante|actualmente|reciente|recientes)\\b");
+    private static final Pattern AMBIGUOUS_TEMPORAL_PATTERN = Pattern.compile(
+            "(?i)^\\s*(hoy|ahora|en este momento|en este instante|actualmente|lo de hoy|lo de ahora|lo de este momento)\\s*[?.!]*\\s*$");
+    private static final Pattern RELATIVE_PERIOD_PATTERN = Pattern.compile(
+            "(?i)\\b(ultimo mes|mes pasado|trimestre pasado|semana pasada|ano pasado|anio pasado|ultimo trimestre|ultima semana)\\b");
     private static final Pattern TIME_QUESTION_PATTERN = Pattern.compile("(?i)\\bhora\\b");
     private static final Pattern DATA_REQUEST_PATTERN = Pattern.compile(
-            "(?i)\\b(cuanto|cuantos|monto|importe|total|saldo|balance|resultado|ingresos|egresos|" +
+            "(?i)\\b(cuanto|cuantos|monto|importe|total|saldo|balance|caja|plata|dinero|efectivo|resultado|ingresos|egresos|" +
                     "cash ?flow|flujo de caja|p&l|pyl|presupuesto|presupuestos|factura|facturas|" +
                     "cobro|cobros|pago|pagos|movimiento|movimientos|reporte|reportes|estado de resultados|" +
-                    "deuda|deudas|acreencia|acreencias|kpi|indicador|indicadores|numero|numeros)\\b");
+                    "deuda|deudas|acreencia|acreencias|kpi|indicador|indicadores|numero|numeros|" +
+                    "pendiente|pendientes|recordatorio|recordatorios|notificacion|notificaciones|" +
+                    "pronostico|pronosticos|forecast)\\b");
     private static final Pattern HOW_TO_PATTERN = Pattern.compile(
-            "(?i)\\b(c[oó]mo|d[oó]nde|pasos|procedimiento|instrucciones|gu[ií]a|tutorial|ayuda|" +
-                    "c[oó]mo hago|c[oó]mo puedo|dime c[oó]mo|dime d[oó]nde|qu[eé] hace|para qu[eé] sirve|" +
-                    "d[oó]nde encuentro|d[oó]nde esta|d[oó]nde está|configurar|activar|desactivar|crear|" +
+            "(?i)\\b(pasos|procedimiento|instrucciones|guia|tutorial|ayuda|" +
+                    "como hago|como puedo|dime como|dime donde|que hace|para que sirve|" +
+                    "donde encuentro|donde esta|configurar|activar|desactivar|crear|" +
                     "editar|cargar|importar|conciliar|generar)\\b");
     private static final Pattern BUDGET_PATTERN = Pattern.compile("(?i)\\bpresupuesto(s)?\\b");
     private static final Pattern BUDGET_EXISTENCE_PATTERN = Pattern.compile(
@@ -99,8 +110,17 @@ public class ChatbotVertexService {
     private static final Pattern LIST_PREFIX_PATTERN = Pattern.compile("^\\s*([\\-*+•·]|\\d+\\.)\\s+");
     private static final Pattern HEADING_PREFIX_PATTERN = Pattern.compile("^\\s*#{1,6}\\s+");
     private static final Pattern QUOTE_PREFIX_PATTERN = Pattern.compile("^\\s*>\\s+");
-    private static final Pattern MANUAL_REFERENCE_PATTERN = Pattern.compile("(?i)\\b(manual|pdf|documento adjunto|base de conocimiento)\\b");
-    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile("@@CALL_TOOL:([A-Z_]+)(?:\\s*(\\{.*?\\}))?@@", Pattern.DOTALL);
+    private static final Pattern MANUAL_REFERENCE_PATTERN = Pattern.compile(
+            "(?i)\\b(manual|manual de usuario|pdf|base de conocimiento|guia de usuario|documento de usuario|" +
+                    "documento que describe|documento del sistema|documento adjunto)\\b");
+    private static final Pattern UNKNOWN_RESPONSE_PATTERN = Pattern.compile(
+            "(?i)\\b(no tengo acceso|no tengo informacion|no dispongo|no cuento|no puedo|no se|no encuentro|no logro|no estoy seguro|no estoy segura)\\b");
+    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile(
+            "@@CALL[_ ]?TOOL:([A-Za-z_]+)(?:\\s*(\\{.*?\\}))?@@",
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+    private static final Pattern TOOL_CALL_LOOSE_PATTERN = Pattern.compile(
+            "CALL[_ ]?TOOL\\s*:?\\s*([A-Za-z_]+)(?:\\s*(\\{.*?\\}))?",
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Set<String> CONTEXT_IGNORE_KEYS = Set.of(
@@ -157,6 +177,14 @@ public class ChatbotVertexService {
             forceManual = true;
         }
 
+        if (isAmbiguousTemporal(trimmedMessage) && !isDataRequest(trimmedMessage)) {
+            return new ChatbotResult(ChatbotPolicy.AMBIGUOUS_TEMPORAL_RESPONSE, "");
+        }
+
+        if (needsPeriodClarification(trimmedMessage)) {
+            return new ChatbotResult(ChatbotPolicy.AMBIGUOUS_PERIOD_RESPONSE, "");
+        }
+
         if (isDateQuestion(trimmedMessage)) {
             return new ChatbotResult(buildDateResponse(trimmedMessage), "");
         }
@@ -165,9 +193,17 @@ public class ChatbotVertexService {
             return new ChatbotResult(ChatbotPolicy.OUT_OF_SCOPE_RESPONSE, "");
         }
 
+        if (isHowToQuestion(trimmedMessage) && !isLocalActionQuestion(trimmedMessage)) {
+            String override = buildHowToOverride(trimmedMessage);
+            if (StringUtils.hasText(override)) {
+                return new ChatbotResult(override, "");
+            }
+        }
+
         String targetHint = resolveTargetScreenHint(trimmedMessage);
         boolean dataRequest = isDataRequest(trimmedMessage) && !isHowToQuestion(trimmedMessage);
-        ToolExecution autoTool = dataRequest
+        boolean multiIntent = hasMultipleDataIntents(trimmedMessage);
+        ToolExecution autoTool = dataRequest && !multiIntent
                 ? maybeAutoTool(trimmedMessage, context, userSub, authorization)
                 : null;
         if (autoTool != null && !autoTool.ok() && "missing_params".equals(autoTool.error())) {
@@ -180,6 +216,13 @@ public class ChatbotVertexService {
         }
         boolean externalFetchOk = externalFetch != null && externalFetch.isOk();
         if (autoTool != null && autoTool.ok()) {
+            if (!hasToolData(autoTool)) {
+                String hint = resolveMissingDataHintForMessage(trimmedMessage);
+                if (StringUtils.hasText(hint)) {
+                    return new ChatbotResult(buildMissingDataResponse(hint), "");
+                }
+                return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, "");
+            }
             promptMessage = buildToolFollowupMessage(promptMessage, autoTool);
         }
 
@@ -221,6 +264,14 @@ public class ChatbotVertexService {
         }
 
         if (isHowToQuestion(trimmedMessage) && !isLocalActionQuestion(trimmedMessage)) {
+            String screenLabel = resolveScreenLabel(context);
+            String route = extractRoute(context);
+            if (StringUtils.hasText(screenLabel)) {
+                promptMessage = "Pantalla actual: " + screenLabel + ".\n" + promptMessage;
+            }
+            if (StringUtils.hasText(route)) {
+                promptMessage = "Ruta actual: " + route + ".\n" + promptMessage;
+            }
             if (StringUtils.hasText(targetHint)) {
                 promptMessage = "Pantalla solicitada: " + targetHint + ".\n" + promptMessage;
             }
@@ -232,16 +283,68 @@ public class ChatbotVertexService {
         boolean includeManual = forceManual || shouldAttachManual(promptMessage);
 
         VertexResponse first = callVertex(resolvedModule, promptMessage, context, includeManual);
-        ToolCall toolCall = parseToolCall(first.cleaned());
-        if (toolCall != null) {
-            ToolExecution execution = executeTool(toolCall.name(), toolCall.params(), userSub, authorization);
-            String toolPromptMessage = buildToolFollowupMessage(promptMessage, execution);
+        List<ToolCall> toolCalls = parseToolCalls(first.raw());
+        if (toolCalls.isEmpty()) {
+            toolCalls = parseToolCalls(first.cleaned());
+        }
+        if (forceManual && isLocationQuestion(trimmedMessage)
+                && (looksLikeManualLeak(first.cleaned()) || isUnanswerableResponse(first.cleaned()))) {
+            return new ChatbotResult(buildLocationResponse(resolvedModule, context), first.raw());
+        }
+        if (!toolCalls.isEmpty()) {
+            if (toolCalls.size() == 1) {
+                ToolCall toolCall = toolCalls.get(0);
+                ToolExecution execution = executeTool(toolCall.name(), toolCall.params(), userSub, authorization);
+                if (!execution.ok() && "missing_params".equals(execution.error())) {
+                    return new ChatbotResult(buildMissingParamsResponse(execution), first.raw());
+                }
+                if (!execution.ok()) {
+                    return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, first.raw());
+                }
+                String toolPromptMessage = buildToolFollowupMessage(promptMessage, execution);
+                VertexResponse second = callVertex(resolvedModule, toolPromptMessage, context, includeManual);
+                List<ToolCall> secondCalls = parseToolCalls(second.raw());
+                if (secondCalls.isEmpty()) {
+                    secondCalls = parseToolCalls(second.cleaned());
+                }
+                if (!secondCalls.isEmpty()) {
+                    return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, second.raw());
+                }
+                if (containsToolCall(second.cleaned())) {
+                    return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, second.raw());
+                }
+                return new ChatbotResult(second.cleaned(), second.raw());
+            }
+            List<ToolExecution> executions = toolCalls.stream()
+                    .map(call -> executeTool(call.name(), call.params(), userSub, authorization))
+                    .collect(Collectors.toList());
+            ToolExecution missing = executions.stream()
+                    .filter(exec -> !exec.ok() && "missing_params".equals(exec.error()))
+                    .findFirst()
+                    .orElse(null);
+            if (missing != null) {
+                return new ChatbotResult(buildMissingParamsResponse(missing), first.raw());
+            }
+            boolean anyError = executions.stream().anyMatch(exec -> !exec.ok());
+            if (anyError) {
+                return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, first.raw());
+            }
+            String toolPromptMessage = buildMultiToolFollowupMessage(promptMessage, executions);
             VertexResponse second = callVertex(resolvedModule, toolPromptMessage, context, includeManual);
-            ToolCall secondCall = parseToolCall(second.cleaned());
-            if (secondCall != null) {
+            List<ToolCall> secondCalls = parseToolCalls(second.raw());
+            if (secondCalls.isEmpty()) {
+                secondCalls = parseToolCalls(second.cleaned());
+            }
+            if (!secondCalls.isEmpty()) {
+                return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, second.raw());
+            }
+            if (containsToolCall(second.cleaned())) {
                 return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, second.raw());
             }
             return new ChatbotResult(second.cleaned(), second.raw());
+        }
+        if (containsToolCall(first.cleaned())) {
+            return new ChatbotResult(ChatbotPolicy.NO_DATA_RESPONSE, first.raw());
         }
         return new ChatbotResult(first.cleaned(), first.raw());
     }
@@ -435,24 +538,133 @@ public class ChatbotVertexService {
                 .map(line -> LIST_PREFIX_PATTERN.matcher(line).replaceAll(""))
                 .map(line -> HEADING_PREFIX_PATTERN.matcher(line).replaceAll(""))
                 .map(line -> QUOTE_PREFIX_PATTERN.matcher(line).replaceAll(""))
-                .filter(line -> !MANUAL_REFERENCE_PATTERN.matcher(line).find())
+                .filter(line -> !isManualLeakLine(line))
                 .collect(Collectors.toList());
 
         return String.join("\n", lines);
     }
 
-    private ToolCall parseToolCall(String text) {
+    private boolean isManualLeakLine(String line) {
+        if (!StringUtils.hasText(line)) {
+            return false;
+        }
+        if (MANUAL_REFERENCE_PATTERN.matcher(line).find()) {
+            return true;
+        }
+        String normalized = normalizeKey(line);
+        return normalized.contains("documento")
+                && (normalized.contains("funcionalidad") || normalized.contains("usuario") || normalized.contains("manual"));
+    }
+
+    private boolean containsToolCall(String text) {
         if (!StringUtils.hasText(text)) {
-            return null;
+            return false;
         }
-        Matcher matcher = TOOL_CALL_PATTERN.matcher(text);
-        if (!matcher.find()) {
-            return null;
+        return TOOL_CALL_PATTERN.matcher(text).find() || TOOL_CALL_LOOSE_PATTERN.matcher(text).find();
+    }
+
+    private boolean isUnanswerableResponse(String response) {
+        if (!StringUtils.hasText(response)) {
+            return true;
         }
-        String name = matcher.group(1);
-        String json = matcher.group(2);
-        Map<String, Object> params = parseToolParams(json);
-        return new ToolCall(name, params);
+        String trimmed = response.trim();
+        if (trimmed.equals(ChatbotPolicy.OUT_OF_SCOPE_RESPONSE)
+                || trimmed.equals(ChatbotPolicy.NO_DATA_RESPONSE)
+                || trimmed.equals(ChatbotPolicy.NO_BUDGETS_RESPONSE)
+                || trimmed.equals(ChatbotPolicy.NO_PROFILE_RESPONSE)) {
+            return false;
+        }
+        return UNKNOWN_RESPONSE_PATTERN.matcher(trimmed).find();
+    }
+
+    private boolean looksLikeManualLeak(String response) {
+        if (!StringUtils.hasText(response)) {
+            return false;
+        }
+        String normalized = normalizeKey(response);
+        if (MANUAL_REFERENCE_PATTERN.matcher(response).find()) {
+            return true;
+        }
+        return normalized.contains("documento")
+                && (normalized.contains("funcionalidad") || normalized.contains("usuario") || normalized.contains("manual"));
+    }
+
+    private boolean hasToolData(ToolExecution execution) {
+        if (execution == null || !execution.ok()) {
+            return false;
+        }
+        return hasMeaningfulData(execution.data());
+    }
+
+    private boolean hasMeaningfulData(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (map.isEmpty()) {
+                return false;
+            }
+            for (Object entryValue : map.values()) {
+                if (hasMeaningfulData(entryValue)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (value instanceof java.util.Collection<?> collection) {
+            return !collection.isEmpty();
+        }
+        if (value instanceof String text) {
+            return StringUtils.hasText(text);
+        }
+        return true;
+    }
+
+    private List<ToolCall> parseToolCalls(String text) {
+        if (!StringUtils.hasText(text)) {
+            return List.of();
+        }
+        String raw = stripCodeFences(text);
+        List<ToolCall> calls = new java.util.ArrayList<>();
+        Matcher matcher = TOOL_CALL_PATTERN.matcher(raw);
+        while (matcher.find()) {
+            String name = normalizeToolName(matcher.group(1));
+            String json = matcher.group(2);
+            calls.add(new ToolCall(name, parseToolParams(json)));
+        }
+        if (!calls.isEmpty()) {
+            return calls;
+        }
+        Matcher loose = TOOL_CALL_LOOSE_PATTERN.matcher(raw);
+        while (loose.find()) {
+            String name = normalizeToolName(loose.group(1));
+            String json = loose.group(2);
+            calls.add(new ToolCall(name, parseToolParams(json)));
+        }
+        return calls;
+    }
+
+    private ToolCall parseToolCall(String text) {
+        List<ToolCall> calls = parseToolCalls(text);
+        return calls.isEmpty() ? null : calls.get(0);
+    }
+
+    private static String normalizeToolName(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        String upper = value.trim().toUpperCase();
+        if (upper.contains("_")) {
+            return upper;
+        }
+        String compact = upper.replaceAll("[^A-Z]", "");
+        return switch (compact) {
+            case "GETBALANCE" -> "GET_BALANCE";
+            case "SEARCHMOVEMENTS" -> "SEARCH_MOVEMENTS";
+            case "GETPENDINGTASKS" -> "GET_PENDING_TASKS";
+            case "GETSCREENDATA" -> "GET_SCREEN_DATA";
+            default -> upper;
+        };
     }
 
     private Map<String, Object> parseToolParams(String json) {
@@ -523,6 +735,21 @@ public class ChatbotVertexService {
                 base,
                 "Resultado herramienta " + execution.tool() + ": " + payload,
                 "Si ok es false o hay error, indica que no tenes acceso a esos datos.",
+                "Si ok es true, responde solo a lo preguntado y no menciones faltantes.",
+                "Responde solo con estos datos reales."
+        );
+    }
+
+    private String buildMultiToolFollowupMessage(String promptMessage, List<ToolExecution> executions) {
+        String base = StringUtils.hasText(promptMessage) ? promptMessage.trim() : "Consulta del usuario.";
+        String results = executions.stream()
+                .map(execution -> "Resultado herramienta " + execution.tool() + ": " + safeWriteJson(execution.toPayload()))
+                .collect(Collectors.joining("\n"));
+        return String.join(
+                "\n",
+                base,
+                results,
+                "Responde solo a lo preguntado y no menciones faltantes.",
                 "Responde solo con estos datos reales."
         );
     }
@@ -547,13 +774,25 @@ public class ChatbotVertexService {
         if (!StringUtils.hasText(normalizedMessage)) {
             return null;
         }
-        if (matchesAny(normalizedMessage, "saldo", "balance", "caja", "saldo total")) {
+        boolean hasRange = params != null && (params.containsKey("fechaDesde") || params.containsKey("fechaHasta"));
+        if (hasRange && matchesAny(normalizedMessage, "ingreso", "ingresos", "egreso", "egresos", "movimiento", "movimientos")) {
+            return ToolName.SEARCH_MOVEMENTS;
+        }
+        if (matchesAny(normalizedMessage, "saldo", "balance", "caja", "saldo total", "plata", "dinero", "efectivo")) {
             return ToolName.GET_BALANCE;
         }
-        if (matchesAny(normalizedMessage, "conciliacion", "conciliar", "pendiente", "pendientes")) {
+        String screenKey = stringValue(params.get("screen"));
+        if ("conciliacion".equals(screenKey)) {
+            if (matchesAny(normalizedMessage, "pendiente", "pendientes") && params.containsKey("fecha")) {
+                return ToolName.GET_PENDING_TASKS;
+            }
+            return ToolName.GET_SCREEN_DATA;
+        }
+        boolean isReminderQuery = matchesAny(normalizedMessage, "recordatorio", "recordatorios", "notificacion", "notificaciones");
+        if (!isReminderQuery
+                && matchesAny(normalizedMessage, "conciliacion", "conciliar", "pendiente", "pendientes", "sin conciliar")) {
             return ToolName.GET_PENDING_TASKS;
         }
-        String screenKey = stringValue(params.get("screen"));
         if (StringUtils.hasText(screenKey)) {
             return ToolName.GET_SCREEN_DATA;
         }
@@ -565,7 +804,14 @@ public class ChatbotVertexService {
 
     private Map<String, Object> buildAutoToolParams(String message, Map<String, Object> context) {
         Map<String, Object> params = new LinkedHashMap<>();
+        String normalized = normalizeKey(message);
         String screenKey = resolveTargetScreenKey(message);
+        if (isConciliationQuery(message)) {
+            screenKey = "conciliacion";
+        }
+        if (isDueDateQuery(message)) {
+            screenKey = "ver-facturas";
+        }
         if (!StringUtils.hasText(screenKey)) {
             screenKey = resolveCurrentScreenKey(context);
         }
@@ -576,11 +822,198 @@ public class ChatbotVertexService {
         Integer month = extractMonthFromMessage(message);
         if (year != null) params.put("anio", year);
         if (month != null) params.put("mes", month);
+        DateRange range = resolveTemporalRange(message);
+        if (range != null) {
+            params.put("fechaDesde", range.from());
+            params.put("fechaHasta", range.to());
+            if ((isConciliationQuery(message)
+                    || ("conciliacion".equals(screenKey) && matchesAny(normalized, "pendiente", "pendientes")))
+                    && range.from() != null && range.to() != null
+                    && range.from().isEqual(range.to())) {
+                params.put("fecha", range.from());
+            }
+        }
+        if (range != null && year == null && "flujo-de-caja".equals(screenKey)) {
+            params.put("anio", range.from().getYear());
+        }
+        if (range != null && year == null && "estado-de-resultados".equals(screenKey)) {
+            params.put("anio", range.from().getYear());
+        }
+        if (matchesAny(normalized, "ingreso", "ingresos") && !matchesAny(normalized, "egreso", "egresos")) {
+            params.put("tipo", "Ingreso");
+        } else if (matchesAny(normalized, "egreso", "egresos") && !matchesAny(normalized, "ingreso", "ingresos")) {
+            params.put("tipo", "Egreso");
+        }
         String currency = extractCurrencyFromContext(context);
         if (StringUtils.hasText(currency)) params.put("moneda", currency);
         Integer userId = extractUserIdFromContext(context);
         if (userId != null) params.put("userId", userId);
         return params;
+    }
+
+    private boolean isConciliationQuery(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+        String normalized = normalizeKey(message);
+        if (matchesAny(normalized, "recordatorio", "recordatorios", "notificacion", "notificaciones")) {
+            return false;
+        }
+        boolean hasConciliation = matchesAny(normalized, "conciliacion", "conciliar", "sin conciliar", "conciliado", "conciliados");
+        boolean hasPending = matchesAny(normalized, "pendiente", "pendientes");
+        boolean hasPayment = matchesAny(normalized, "pago", "pagos", "cobro", "cobros", "factura", "facturas",
+                "movimiento", "movimientos");
+        return hasConciliation || (hasPending && hasPayment);
+    }
+
+    private boolean isDueDateQuery(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+        String normalized = normalizeKey(message);
+        if (!normalized.contains("venc")) {
+            return false;
+        }
+        return matchesAny(normalized, "factura", "facturas", "pago", "pagos", "cobro", "cobros");
+    }
+
+    private DateRange resolveTemporalRange(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        String normalized = normalizeKey(message);
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        if (matchesAny(normalized, "hoy", "ahora", "en este momento", "en este instante", "actualmente", "reciente", "recientes")) {
+            return new DateRange(today, today);
+        }
+        if (normalized.contains("esta semana")) {
+            LocalDate start = today.with(java.time.DayOfWeek.MONDAY);
+            LocalDate end = today.with(java.time.DayOfWeek.SUNDAY);
+            return new DateRange(start, end);
+        }
+        if (normalized.contains("este mes")) {
+            LocalDate start = today.withDayOfMonth(1);
+            LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
+            return new DateRange(start, end);
+        }
+        return null;
+    }
+
+    private boolean isAmbiguousTemporal(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+        if (AMBIGUOUS_TEMPORAL_PATTERN.matcher(message.trim()).matches()) {
+            return true;
+        }
+        String normalized = normalizeKey(message);
+        if (matchesAny(normalized, "lo de hoy", "lo de ahora", "lo de este momento")) {
+            return true;
+        }
+        if (TEMPORAL_WORD_PATTERN.matcher(normalized).find()
+                && !isDataRequest(message)
+                && !EXPLICIT_DATE_TIME_PATTERN.matcher(normalized).find()) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean needsPeriodClarification(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+        String normalized = normalizeKey(message);
+        if (matchesAny(normalized, "ultimo mes", "mes pasado", "trimestre pasado", "semana pasada",
+                "ano pasado", "anio pasado", "ultimo trimestre", "ultima semana")) {
+            return true;
+        }
+        if (normalized.contains("trimestre")) {
+            return true;
+        }
+        if (normalized.contains("mes") && !normalized.contains("este mes")) {
+            Integer month = extractMonthFromMessage(message);
+            Integer year = extractYearFromMessage(message);
+            return month == null && year == null;
+        }
+        return false;
+    }
+
+    private boolean hasMultipleDataIntents(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+        String normalized = normalizeKey(message);
+        boolean hasConjunction = normalized.contains(" y ")
+                || normalized.contains("ademas")
+                || normalized.contains("tambien")
+                || normalized.contains("junto con");
+        if (!hasConjunction) {
+            return false;
+        }
+        boolean hasCashflow = matchesAny(normalized, "flujo de caja", "cashflow", "cash flow");
+        boolean hasBalance = matchesAny(normalized, "saldo", "balance", "caja", "plata", "dinero", "efectivo");
+        boolean hasMovements = matchesAny(normalized, "movimiento", "movimientos");
+        boolean hasBudgets = matchesAny(normalized, "presupuesto", "presupuestos");
+        boolean hasInvoices = matchesAny(normalized, "factura", "facturas");
+        boolean hasConciliation = isConciliationQuery(message);
+        boolean hasReport = matchesAny(normalized, "ingreso", "ingresos", "egreso", "egresos",
+                "reporte", "estado de resultados", "resultado", "pyl", "p&l");
+        int intents = 0;
+        if (hasCashflow) {
+            intents++;
+        } else if (hasBalance) {
+            intents++;
+        }
+        if (hasConciliation) {
+            intents++;
+        } else if (hasMovements) {
+            intents++;
+        }
+        if (hasBudgets) intents++;
+        if (hasInvoices) intents++;
+        if (!hasCashflow && hasReport) intents++;
+        return intents >= 2;
+    }
+
+    private String resolveMissingDataHintForMessage(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        String normalized = normalizeKey(message);
+        if (matchesAny(normalized, "movimiento", "movimientos")) {
+            return "Registro > Movimientos";
+        }
+        if (isDueDateQuery(message) || matchesAny(normalized, "factura", "facturas")) {
+            return "Registro > Facturas";
+        }
+        if (isConciliationQuery(message) || matchesAny(normalized, "conciliacion", "conciliar", "pendiente", "pendientes")) {
+            return "Conciliacion";
+        }
+        if (matchesAny(normalized, "presupuesto", "presupuestos")) {
+            return "Pronostico > Presupuestos";
+        }
+        if (matchesAny(normalized, "pronostico continuo", "pronostico continuo", "rolling")) {
+            return "Pronostico > Pronostico continuo";
+        }
+        if (matchesAny(normalized, "pronostico fijo")) {
+            return "Pronostico > Pronostico fijo";
+        }
+        if (matchesAny(normalized, "recordatorio", "recordatorios")) {
+            return "Notificaciones > Recordatorios";
+        }
+        if (matchesAny(normalized, "notificacion", "notificaciones", "alerta", "alertas")) {
+            return "Notificaciones > Centro de notificaciones";
+        }
+        if (matchesAny(normalized, "flujo de caja")) {
+            return "Reportes > Flujo de caja";
+        }
+        if (matchesAny(normalized, "estado de resultados", "estado de resultado", "resultado")) {
+            return "Reportes > Estado de resultados";
+        }
+        if (matchesAny(normalized, "reporte", "ingreso", "egreso")) {
+            return "Reporte mensual";
+        }
+        return null;
     }
 
     private String resolveCurrentScreenKey(Map<String, Object> context) {
@@ -609,10 +1042,13 @@ public class ChatbotVertexService {
         if (matchesAny(lower, "reporte mensual", "resumen mensual")) {
             return "reporte-mensual";
         }
+        if (matchesAny(lower, "ingreso", "ingresos", "egreso", "egresos", "resultado mensual")) {
+            return "reporte-mensual";
+        }
         if (matchesAny(lower, "flujo de caja", "cashflow", "cash flow")) {
             return "flujo-de-caja";
         }
-        if (matchesAny(lower, "estado de resultados", "estado de resultado", "p l", "p&l", "pyl")) {
+        if (matchesAny(lower, "estado de resultados", "estado de resultado", "resultado del ano", "resultado del a\u00f1o", "resultado anual", "resultado", "p l", "p&l", "pyl")) {
             return "estado-de-resultados";
         }
         if (matchesAny(lower, "presupuesto", "presupuestos")) {
@@ -639,7 +1075,7 @@ public class ChatbotVertexService {
         if (matchesAny(lower, "mercado pago", "mercado-pago")) {
             return "mercado-pago";
         }
-        if (matchesAny(lower, "recordatorios")) {
+        if (matchesAny(lower, "recordatorios", "recordatorio")) {
             return "recordatorios";
         }
         if (matchesAny(lower, "configuracion notificaciones", "configuracion de notificaciones")) {
@@ -733,6 +1169,35 @@ public class ChatbotVertexService {
         return ChatbotPolicy.NO_DATA_RESPONSE;
     }
 
+    private String buildHowToOverride(String message) {
+        if (!StringUtils.hasText(message)) {
+            return null;
+        }
+        String normalized = normalizeKey(message);
+        if (matchesAny(normalized, "cargar ingreso", "carga de ingreso", "registrar ingreso")) {
+            return String.join(
+                    "\n",
+                    "Entra a Carga de datos > Ingresos.",
+                    "Elegi el metodo (formulario, documento, foto o audio), completa los campos y guarda."
+            );
+        }
+        if (matchesAny(normalized, "cargar egreso", "carga de egreso", "registrar egreso")) {
+            return String.join(
+                    "\n",
+                    "Entra a Carga de datos > Egresos.",
+                    "Elegi el metodo (formulario, documento, foto o audio), completa los campos y guarda."
+            );
+        }
+        if (matchesAny(normalized, "cargar factura", "carga de factura", "registrar factura")) {
+            return String.join(
+                    "\n",
+                    "Entra a Carga de datos > Facturas.",
+                    "Elegi el metodo (formulario, documento, foto o audio), completa los datos y guarda."
+            );
+        }
+        return null;
+    }
+
     private String safeWriteJson(Map<String, Object> payload) {
         if (payload == null) {
             return "{}";
@@ -821,21 +1286,54 @@ public class ChatbotVertexService {
         if (isLocationQuestion(message)) {
             return false;
         }
-        return DATE_QUESTION_PATTERN.matcher(message).find();
+        String trimmed = message.trim();
+        if (AMBIGUOUS_TEMPORAL_PATTERN.matcher(trimmed).matches()) {
+            return false;
+        }
+        if (DATE_ONLY_PATTERN.matcher(trimmed).matches()) {
+            return true;
+        }
+        if (isDataRequest(message) || isHowToQuestion(message) || isInterpretationRequest(message)) {
+            return false;
+        }
+        if (EXPLICIT_DATE_TIME_PATTERN.matcher(trimmed).find()) {
+            return true;
+        }
+        String normalized = normalizeKey(message);
+        if (StringUtils.hasText(normalized)) {
+            if (matchesAny(normalized,
+                    "que fecha es", "que dia es", "que hora es",
+                    "en que fecha estamos", "en que dia estamos",
+                    "fecha actual", "fecha de hoy", "dia de hoy", "hora actual")) {
+                return true;
+            }
+            if (DATE_QUESTION_PATTERN.matcher(normalized).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isDataRequest(String message) {
         if (message == null) {
             return false;
         }
-        return DATA_REQUEST_PATTERN.matcher(message).find();
+        if (DATA_REQUEST_PATTERN.matcher(message).find()) {
+            return true;
+        }
+        String normalized = normalizeKey(message);
+        return StringUtils.hasText(normalized) && DATA_REQUEST_PATTERN.matcher(normalized).find();
     }
 
     private boolean isHowToQuestion(String message) {
         if (message == null) {
             return false;
         }
-        return HOW_TO_PATTERN.matcher(message).find();
+        if (HOW_TO_PATTERN.matcher(message).find()) {
+            return true;
+        }
+        String normalized = normalizeKey(message);
+        return StringUtils.hasText(normalized) && HOW_TO_PATTERN.matcher(normalized).find();
     }
 
     private boolean isBudgetQuestion(String message) {
@@ -1655,13 +2153,8 @@ public class ChatbotVertexService {
         if (value == null) {
             return "";
         }
-        String normalized = value.toLowerCase()
-                .replace("Ã¡", "a")
-                .replace("Ã©", "e")
-                .replace("Ã­", "i")
-                .replace("Ã³", "o")
-                .replace("Ãº", "u")
-                .replace("Ã±", "n");
+        String normalized = java.text.Normalizer.normalize(value.toLowerCase(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
         normalized = normalized.replaceAll("[^a-z0-9 ]", " ").trim();
         return normalized.replaceAll("\\s+", " ");
     }
@@ -1743,7 +2236,7 @@ public class ChatbotVertexService {
             return "";
         }
         return switch (key.trim().toLowerCase()) {
-            case "anio", "aÃ±o", "year" -> "el anio";
+            case "anio", "aÃ±o", "year" -> "el a\u00f1o";
             case "mes", "month" -> "el mes";
             default -> key;
         };
@@ -1798,7 +2291,7 @@ public class ChatbotVertexService {
                 return null;
             }
             try {
-                return ToolName.valueOf(value.trim().toUpperCase());
+                return ToolName.valueOf(normalizeToolName(value));
             } catch (IllegalArgumentException ex) {
                 return null;
             }
@@ -1806,6 +2299,9 @@ public class ChatbotVertexService {
     }
 
     private record ToolCall(String name, Map<String, Object> params) {
+    }
+
+    private record DateRange(LocalDate from, LocalDate to) {
     }
 
     private record ToolExecution(String tool, boolean ok, Map<String, Object> data, String error, List<String> missing) {

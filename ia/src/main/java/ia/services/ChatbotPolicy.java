@@ -29,6 +29,24 @@ public final class ChatbotPolicy {
 
     public static final String NO_DATA_RESPONSE = "No tengo acceso a esos datos en este momento.";
 
+    public static final String AMBIGUOUS_TEMPORAL_RESPONSE = String.join(
+            "\n",
+            "No estoy seguro a que te referis con eso.",
+            "Decime si queres la fecha actual o un dato puntual del sistema."
+    );
+
+    public static final String AMBIGUOUS_PERIOD_RESPONSE = String.join(
+            "\n",
+            "Para responder necesito el periodo exacto.",
+            "Decime el mes y el a\u00f1o."
+    );
+
+    public static final String MULTI_REQUEST_RESPONSE = String.join(
+            "\n",
+            "Detecte mas de un pedido en la misma pregunta.",
+            "Decime un dato puntual para poder ayudarte."
+    );
+
     public static final String GREETING_RESPONSE = String.join(
             "\n",
             "Hola. Soy tu asistente de MyCFO.",
@@ -46,9 +64,12 @@ public final class ChatbotPolicy {
             "Fuentes de datos reales (orden estricto): datos del sistema y backend, base de datos, contexto de sesion del usuario autenticado.",
             "Si el usuario pregunta por montos, presupuestos, numeros, reportes, identidad o fechas, responde solo con datos reales del contexto.",
             "Si esos datos no estan disponibles en el contexto, usa herramientas. Si aun asi faltan datos, respondes con las frases indicadas abajo y no inventes datos.",
+            "Si el usuario pregunta solo 'hoy' o 'ahora' sin un dato puntual, pedi aclaracion con el mensaje indicado abajo.",
+            "Si el usuario pide un periodo ambiguo como 'el mes pasado' o 'el trimestre pasado', pedi mes y a\u00f1o.",
+            "Si el usuario menciona hoy/ahora dentro de una consulta de datos, responde con datos del sistema, no con la fecha.",
             "Herramientas disponibles para obtener datos reales cuando el contexto no alcanza:",
             "GET_BALANCE: saldo total actual de caja.",
-            "SEARCH_MOVEMENTS: buscar movimientos con filtros opcionales (anio, mes, fechaDesde, fechaHasta, tipo, moneda, search, limite).",
+            "SEARCH_MOVEMENTS: buscar movimientos con filtros opcionales (a\u00f1o, mes, fechaDesde, fechaHasta, tipo, moneda, search, limite).",
             "GET_PENDING_TASKS: resumen de conciliaciones o pendientes.",
             "GET_SCREEN_DATA: obtener datos de una pantalla o modulo (screen) del sistema.",
             "Uso de herramientas: si necesitas datos frescos que no estan en el contexto, responde SOLO con el formato:",
