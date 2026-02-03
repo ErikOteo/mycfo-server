@@ -2,8 +2,8 @@
 -- PRESUPUESTO AUTOMÁTICO 2024 (Basado en movimientos reales)
 -- ============================================================
 -- Ajustar estos valores antes de ejecutar si es necesario
-SET @ORGANIZACION_ID := 2;
-SET @USUARIO_ID   := '73fc2afa-c031-705e-2ed0-cad82d5e5619';
+SET @ORGANIZACION_ID := 1;
+SET @USUARIO_ID   := '335c7a9a-d021-704f-ba63-9c18f37959f8';
 
 USE pronostico_db;
 
