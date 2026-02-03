@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Acceso - MyCFO</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #008476;
+            margin-bottom: 10px;
+        }
+
+        .title {
+            font-size: 20px;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+
+        .content {
+            margin-bottom: 30px;
+        }
+
+        .button {
+            display: inline-block;
+            background-color: #008476;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none !important;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+            text-align: center;
+        }
+
+        .highlight {
+            background-color: #f0fdfa;
+            border-left: 4px solid #008476;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://mycfo.com.ar/logo192.png" alt="MyCFO Logo"
+                style="width: 64px; height: 64px; margin-bottom: 10px;">
+            <div class="logo">MyCFO</div>
+            <h1 class="title">Solicitud de Acceso Detectada</h1>
+        </div>
+
+        <div class="content">
+            <p>Hola,</p>
+
+            <p>Un nuevo colaborador se ha unido a tu organización en MyCFO y está esperando que le asignes permisos para
+                comenzar a trabajar.</p>
+
+            <div class="highlight">
+                <strong>Detalles del colaborador:</strong><br />
+                Nombre: <span th:text="${colaboradorNombre}">Nombre del Colaborador</span><br />
+                Email: <span th:text="${colaboradorEmail}">email@ejemplo.com</span>
+            </div>
+
+            <p>Para asignar los permisos correspondientes, accede al panel de Gestión de Permisos en la plataforma:</p>
+
+            <div style="text-align: center;">
+                <a th:href="${adminLink}" class="button"
+                    style="color: #ffffff !important; text-decoration: none !important;">Gestionar Permisos</a>
+            </div>
+
+            <p>Una vez que le asignes los permisos, el colaborador podrá acceder automáticamente al dashboard
+                financiero.</p>
+        </div>
+
+        <div class="footer">
+            <p>Este es un mensaje automático de MyCFO</p>
+            <p>© 2026 MyCFO - Gestión Financiera Inteligente</p>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -31,7 +31,7 @@ public class EmpresaService {
         empresa.setCuit(empresaDTO.getCuit());
         empresa.setCondicionIVA(empresaDTO.getCondicionIVA());
         empresa.setDomicilio(empresaDTO.getDomicilio());
-        
+
         Empresa guardada = empresaRepository.save(empresa);
         return convertirADTO(guardada);
     }
@@ -39,13 +39,13 @@ public class EmpresaService {
     public EmpresaDTO actualizarEmpresa(Long id, EmpresaDTO empresaDTO) {
         Empresa empresa = empresaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
-        
+
         empresa.setNombre(empresaDTO.getNombre());
         empresa.setDescripcion(empresaDTO.getDescripcion());
         empresa.setCuit(empresaDTO.getCuit());
         empresa.setCondicionIVA(empresaDTO.getCondicionIVA());
         empresa.setDomicilio(empresaDTO.getDomicilio());
-        
+
         Empresa actualizada = empresaRepository.save(empresa);
         return convertirADTO(actualizada);
     }
@@ -63,11 +63,11 @@ public class EmpresaService {
     public EmpresaDTO obtenerEmpresaPorUsuarioSub(String sub) {
         Usuario usuario = usuarioRepository.findBySub(sub)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con sub: " + sub));
-        
+
         if (usuario.getEmpresa() == null) {
             throw new RuntimeException("El usuario no tiene una empresa asociada");
         }
-        
+
         return convertirADTO(usuario.getEmpresa());
     }
 
@@ -77,21 +77,23 @@ public class EmpresaService {
      */
     public Long obtenerEmpresaIdPorUsuarioSub(String sub) {
         System.out.println("🔍 [EMPRESA-SERVICE] Buscando usuario con sub: " + sub);
-        
+
         Usuario usuario = usuarioRepository.findBySub(sub)
                 .orElseThrow(() -> {
                     System.out.println("❌ [EMPRESA-SERVICE] Usuario no encontrado con sub: " + sub);
                     return new RuntimeException("Usuario no encontrado con sub: " + sub);
                 });
-        
-        System.out.println("✅ [EMPRESA-SERVICE] Usuario encontrado: " + usuario.getNombre() + " (" + usuario.getEmail() + ")");
-        
+
+        System.out.println(
+                "✅ [EMPRESA-SERVICE] Usuario encontrado: " + usuario.getNombre() + " (" + usuario.getEmail() + ")");
+
         if (usuario.getEmpresa() == null) {
             System.out.println("❌ [EMPRESA-SERVICE] Usuario sin empresa asociada: " + sub);
             throw new RuntimeException("El usuario no tiene una empresa asociada");
         }
-        
-        System.out.println("✅ [EMPRESA-SERVICE] Empresa encontrada: " + usuario.getEmpresa().getNombre() + " (ID: " + usuario.getEmpresa().getId() + ")");
+
+        System.out.println("✅ [EMPRESA-SERVICE] Empresa encontrada: " + usuario.getEmpresa().getNombre() + " (ID: "
+                + usuario.getEmpresa().getId() + ")");
         return usuario.getEmpresa().getId();
     }
 
@@ -102,12 +104,29 @@ public class EmpresaService {
     public String obtenerNombreEmpresaPorUsuario(String sub) {
         Usuario usuario = usuarioRepository.findBySub(sub)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con sub: " + sub));
-        
+
         if (usuario.getEmpresa() == null) {
             throw new RuntimeException("El usuario no tiene una empresa asociada");
         }
-        
+
         return usuario.getEmpresa().getNombre();
+    }
+
+    /**
+     * Obtiene el email del propietario de la empresa a la que pertenece un usuario
+     */
+    public String obtenerEmailPropietarioPorUsuarioSub(String sub) {
+        Usuario usuario = usuarioRepository.findBySub(sub)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con sub: " + sub));
+
+        if (usuario.getEmpresa() == null) {
+            throw new RuntimeException("El usuario no tiene una empresa asociada");
+        }
+
+        Usuario propietario = usuarioRepository.findByEmpresaIdAndEsPropietarioTrue(usuario.getEmpresa().getId())
+                .orElseThrow(() -> new RuntimeException("No se encontró un propietario para esta empresa"));
+
+        return propietario.getEmail();
     }
 
     public List<Usuario> listarTodosLosUsuarios() {

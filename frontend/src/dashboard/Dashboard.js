@@ -30,6 +30,7 @@ import ReconciliationWidget from "./components/ReconciliationWidget";
 import SalesTrendWidget from "./components/SalesTrendWidget";
 import SalesByCategoryWidget from "./components/SalesByCategoryWidget";
 import InsightsWidget from "./components/InsightsWidget";
+import DashboardEmptyState from "./components/DashboardEmptyState";
 // import BillingWidget from "./components/BillingWidget";
 import { fetchDashboardSummary } from "./services/dashboardSummaryService";
 import useResolvedColorTokens from "./useResolvedColorTokens";
@@ -39,6 +40,8 @@ import CurrencyTabs, {
 } from "../shared-components/CurrencyTabs";
 import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
 import usePermisos from "../hooks/usePermisos";
+import http from "../api/http";
+import API_CONFIG from "../config/api-config";
 
 const mockKpis = {
   totalIncomes: 820000,
@@ -497,9 +500,35 @@ const Dashboard = React.memo(() => {
     return "Usuario";
   }, []);
 
-  const loadDashboardData = React.useCallback(() => {
+  const tieneAlgunPermiso = React.useCallback(() => {
+    if (esAdminTotal()) return true;
+    const modulos = ['carga', 'movs', 'banco', 'facts', 'concil', 'reps', 'pron', 'pres', 'admin'];
+    return modulos.some(m => tienePermiso(m, 'view'));
+  }, [tienePermiso, esAdminTotal]);
+
+  const loadDashboardData = React.useCallback(async () => {
     console.log("🔄 Recargando datos del dashboard...");
     setIsRefreshing(true);
+
+    // 1. Intentar refrescar los permisos desde el servidor
+    try {
+      const { data: profile } = await http.get(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`);
+      if (profile && profile.rol) {
+        console.log("🔑 Permisos actualizados desde el servidor:", profile.rol);
+        sessionStorage.setItem('rol', profile.rol);
+        if (profile.rol.includes('|PERM:')) {
+          const jsonPart = profile.rol.split('|PERM:')[1];
+          sessionStorage.setItem('permisos', jsonPart);
+        } else {
+          sessionStorage.removeItem('permisos');
+        }
+        // Avisar al hook usePermisos que los datos cambiaron
+        window.dispatchEvent(new Event('userDataUpdated'));
+      }
+    } catch (err) {
+      console.warn("⚠️ No se pudieron refrescar los permisos:", err);
+    }
+
     setState((prev) => {
       const next = {};
       Object.entries(prev).forEach(([key, value]) => {
@@ -1065,271 +1094,250 @@ const Dashboard = React.memo(() => {
       }}
     >
       <Stack spacing={3} sx={{ width: "100%" }}>
-        <CurrencyTabs value={currency} onChange={setCurrency} />
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={2}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", md: "center" }}
-          sx={{ width: "100%" }}
-        >
-          <Box>
-            <Typography variant="h4" fontWeight={600}>
-              Hola, {userDisplayName}
-            </Typography>
-            <Typography variant="body2" sx={{ color: primaryTextColor }}>
-              Todo lo importante de tu cuenta, en un solo lugar.
-            </Typography>
-          </Box>
-          {/* <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <TextField
-              select
-              label="Empresa"
-              value={company}
-              onChange={(event) => setCompany(event.target.value)}
-              size="small"
-              sx={{ minWidth: { xs: "100%", sm: 200 } }}
-            >
-              {companiesMock.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="Período"
-              value={period}
-              onChange={(event) => setPeriod(event.target.value)}
-              size="small"
-              sx={{ minWidth: { xs: "100%", sm: 200 } }}
-            >
-              {periodOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack> */}
-        </Stack>
 
-        <Box sx={quickActionsSx}>
-          <QuickActions
-            actions={quickActions}
-            loading={quickActionsLoading}
-            onAction={handleQuickAction}
+        {!tieneAlgunPermiso() ? (
+          <DashboardEmptyState
+            userDisplayName={userDisplayName}
+            onRetry={loadDashboardData}
           />
-        </Box>
-
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ maxWidth: { xs: "100%", md: 1600 }, mx: "auto" }}
-        >
-          {kpiCards.map((card) => (
-            <Grid size={{ xs: 12, sm: 12, md: 3 }} key={card.id}>
-              <KpiCard
-                title={card.title}
-                value={card.value}
-                formatter={card.formatter}
-                secondaryLabel={card.secondaryLabel}
-                secondaryValue={card.secondaryValue}
-                secondaryFormatter={card.secondaryFormatter}
-                trend={card.trend}
-                trendColor={card.trendColor}
-                loading={state.kpis.loading && !state.kpis.data}
-                error={state.kpis.error}
-                onRetry={loadDashboardData}
+        ) : (
+          <>
+            <CurrencyTabs value={currency} onChange={setCurrency} />
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              sx={{ width: "100%" }}
+            >
+              <Box>
+                <Typography variant="h4" fontWeight={600}>
+                  Hola, {userDisplayName}
+                </Typography>
+                <Typography variant="body2" sx={{ color: primaryTextColor }}>
+                  Todo lo importante de tu cuenta, en un solo lugar.
+                </Typography>
+              </Box>
+            </Stack>
+            <Box sx={quickActionsSx}>
+              <QuickActions
+                actions={quickActions}
+                loading={quickActionsLoading}
+                onAction={handleQuickAction}
               />
-            </Grid>
-          ))}
-        </Grid>
+            </Box>
 
-        {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
-          <Grid
-            container
-            spacing={3}
-            justifyContent="center"
-            sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-          >
-            <Grid>
-              <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                <SalesTrendWidget
-                  data={
-                    state.salesTrend.data ?? {
-                      title: "Ingresos durante el período",
-                      points: [],
-                      average: 0,
-                      max: { value: 0, label: "--" },
-                      min: { value: 0, label: "--" },
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{ maxWidth: { xs: "100%", md: 1600 }, mx: "auto" }}
+            >
+              {kpiCards.map((card) => (
+                <Grid size={{ xs: 12, sm: 12, md: 3 }} key={card.id}>
+                  <KpiCard
+                    title={card.title}
+                    value={card.value}
+                    formatter={card.formatter}
+                    secondaryLabel={card.secondaryLabel}
+                    secondaryValue={card.secondaryValue}
+                    secondaryFormatter={card.secondaryFormatter}
+                    trend={card.trend}
+                    trendColor={card.trendColor}
+                    loading={state.kpis.loading && !state.kpis.data}
+                    error={state.kpis.error}
+                    onRetry={loadDashboardData}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+
+            {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
+              <Grid
+                container
+                spacing={3}
+                justifyContent="center"
+                sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+              >
+                <Grid>
+                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                    <SalesTrendWidget
+                      data={
+                        state.salesTrend.data ?? {
+                          title: "Ingresos durante el período",
+                          points: [],
+                          average: 0,
+                          max: { value: 0, label: "--" },
+                          min: { value: 0, label: "--" },
+                        }
+                      }
+                      loading={state.salesTrend.loading && !state.salesTrend.data}
+                      error={state.salesTrend.error}
+                      onNavigate={() => handleNavigate("/reportes/ventas")}
+                      currency={currency}
+                    />
+                  </Box>
+                </Grid>
+                <Grid>
+                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                    <SalesByCategoryWidget
+                      data={state.salesByCategory.data ?? []}
+                      loading={
+                        state.salesByCategory.loading && !state.salesByCategory.data
+                      }
+                      error={state.salesByCategory.error}
+                      currency={currency}
+                    />
+                  </Box>
+                </Grid>
+              </Grid>
+            )}
+
+            {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
+              <Grid
+                container
+                spacing={3}
+                justifyContent="center"
+                sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+              >
+                <Grid>
+                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                    <SalesTrendWidget
+                      data={
+                        state.expensesTrend.data ?? {
+                          title: "Egresos durante el período",
+                          points: [],
+                          average: 0,
+                          max: { value: 0, label: "--" },
+                          min: { value: 0, label: "--" },
+                        }
+                      }
+                      loading={
+                        state.expensesTrend.loading && !state.expensesTrend.data
+                      }
+                      error={state.expensesTrend.error}
+                      emptyMessage="No hay egresos registrados en este periodo."
+                      currency={currency}
+                    />
+                  </Box>
+                </Grid>
+                <Grid>
+                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                    <SalesByCategoryWidget
+                      data={state.expensesByCategory.data ?? []}
+                      loading={
+                        state.expensesByCategory.loading &&
+                        !state.expensesByCategory.data
+                      }
+                      error={state.expensesByCategory.error}
+                      emptyMessage="No hay egresos por categoria en este periodo."
+                      title="Egresos por categorias"
+                      subtitle="Distribucion anual por segmento"
+                      currency={currency}
+                    />
+                  </Box>
+                </Grid>
+              </Grid>
+            )}
+
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
+            >
+              {tienePermiso('pres', 'view') && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <BudgetWidget
+                    companyId={company}
+                    period={period}
+                    data={state.budget.data}
+                    loading={state.budget.loading && !state.budget.data}
+                    error={state.budget.error}
+                    onRetry={loadDashboardData}
+                    currency={currency}
+                  />
+                </Grid>
+              )}
+              {tienePermiso('movs', 'view') && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <LiquidityGapWidget currency={currency} />
+                </Grid>
+              )}
+              {tienePermiso('concil', 'view') && (
+                <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
+                  <ReconciliationWidget
+                    data={state.reconciliation.data}
+                    loading={
+                      state.reconciliation.loading && !state.reconciliation.data
                     }
-                  }
-                  loading={state.salesTrend.loading && !state.salesTrend.data}
-                  error={state.salesTrend.error}
-                  onNavigate={() => handleNavigate("/reportes/ventas")}
-                  currency={currency}
-                />
-              </Box>
-            </Grid>
-            <Grid>
-              <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                <SalesByCategoryWidget
-                  data={state.salesByCategory.data ?? []}
-                  loading={
-                    state.salesByCategory.loading && !state.salesByCategory.data
-                  }
-                  error={state.salesByCategory.error}
-                  currency={currency}
-                />
-              </Box>
-            </Grid>
-          </Grid>
-        )}
-
-        {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
-          <Grid
-            container
-            spacing={3}
-            justifyContent="center"
-            sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-          >
-            <Grid>
-              <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                <SalesTrendWidget
-                  data={
-                    state.expensesTrend.data ?? {
-                      title: "Egresos durante el período",
-                      points: [],
-                      average: 0,
-                      max: { value: 0, label: "--" },
-                      min: { value: 0, label: "--" },
+                    error={state.reconciliation.error}
+                    onRetry={loadDashboardData}
+                    currency={currency}
+                    onNavigate={(account) =>
+                      handleNavigate(
+                        "/conciliacion",
+                        account ? { cuenta: account } : undefined
+                      )
                     }
-                  }
-                  loading={
-                    state.expensesTrend.loading && !state.expensesTrend.data
-                  }
-                  error={state.expensesTrend.error}
-                  emptyMessage="No hay egresos registrados en este periodo."
-                  currency={currency}
-                />
-              </Box>
+                  />
+                </Grid>
+              )}
             </Grid>
-            <Grid>
-              <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                <SalesByCategoryWidget
-                  data={state.expensesByCategory.data ?? []}
-                  loading={
-                    state.expensesByCategory.loading &&
-                    !state.expensesByCategory.data
-                  }
-                  error={state.expensesByCategory.error}
-                  emptyMessage="No hay egresos por categoria en este periodo."
-                  title="Egresos por categorias"
-                  subtitle="Distribucion anual por segmento"
-                  currency={currency}
-                />
-              </Box>
+
+            {/* Bloque de IA / insights a lo ancho al final */}
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{
+                mt: 1,
+                width: "100%",
+                maxWidth: 1600,
+                mx: "auto",
+                display: { xs: "none", md: "flex" },
+              }}
+            >
+              {tienePermiso('movs', 'view') && (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <RecentMovementsWidget
+                    data={state.movements.data}
+                    loading={state.movements.loading && !state.movements.data}
+                    error={state.movements.error}
+                    onRetry={loadDashboardData}
+                    onNavigate={() => handleNavigate("/ver-movimientos")}
+                  />
+                </Grid>
+              )}
+              {tienePermiso('facts', 'view') && (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <RecentInvoicesWidget
+                    data={state.invoices?.data ?? null}
+                    loading={state.invoices?.loading && !state.invoices?.data}
+                    error={state.invoices?.error ?? null}
+                    onRetry={loadDashboardData}
+                    onNavigate={() => handleNavigate("/ver-facturas")}
+                  />
+                </Grid>
+              )}
             </Grid>
-          </Grid>
+
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
+            >
+              {esAdminTotal() && (
+                <Grid size={{ xs: 12, md: 10 }}>
+                  <Box sx={{ width: "100%", mx: "auto" }}>
+                    <InsightsWidget />
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+          </>
         )}
-
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          {tienePermiso('pres', 'view') && (
-            <Grid size={{ xs: 12, md: 4 }}>
-              <BudgetWidget
-                companyId={company}
-                period={period}
-                data={state.budget.data}
-                loading={state.budget.loading && !state.budget.data}
-                error={state.budget.error}
-                onRetry={loadDashboardData}
-                currency={currency}
-              />
-            </Grid>
-          )}
-          {tienePermiso('movs', 'view') && (
-            <Grid size={{ xs: 12, md: 4 }}>
-              <LiquidityGapWidget currency={currency} />
-            </Grid>
-          )}
-          {tienePermiso('concil', 'view') && (
-            <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
-              <ReconciliationWidget
-                data={state.reconciliation.data}
-                loading={
-                  state.reconciliation.loading && !state.reconciliation.data
-                }
-                error={state.reconciliation.error}
-                onRetry={loadDashboardData}
-                currency={currency}
-                onNavigate={(account) =>
-                  handleNavigate(
-                    "/conciliacion",
-                    account ? { cuenta: account } : undefined
-                  )
-                }
-              />
-            </Grid>
-          )}
-        </Grid>
-
-        {/* Bloque de IA / insights a lo ancho al final */}
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{
-            mt: 1,
-            width: "100%",
-            maxWidth: 1600,
-            mx: "auto",
-            display: { xs: "none", md: "flex" },
-          }}
-        >
-          {tienePermiso('movs', 'view') && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <RecentMovementsWidget
-                data={state.movements.data}
-                loading={state.movements.loading && !state.movements.data}
-                error={state.movements.error}
-                onRetry={loadDashboardData}
-                onNavigate={() => handleNavigate("/ver-movimientos")}
-              />
-            </Grid>
-          )}
-          {tienePermiso('facts', 'view') && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <RecentInvoicesWidget
-                data={state.invoices?.data ?? null}
-                loading={state.invoices?.loading && !state.invoices?.data}
-                error={state.invoices?.error ?? null}
-                onRetry={loadDashboardData}
-                onNavigate={() => handleNavigate("/ver-facturas")}
-              />
-            </Grid>
-          )}
-        </Grid>
-
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          {esAdminTotal() && (
-            <Grid size={{ xs: 12, md: 10 }}>
-              <Box sx={{ width: "100%", mx: "auto" }}>
-                <InsightsWidget />
-              </Box>
-            </Grid>
-          )}
-        </Grid>
 
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <Button

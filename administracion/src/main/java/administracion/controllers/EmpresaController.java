@@ -130,4 +130,14 @@ public class EmpresaController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    @GetMapping("/owner-email-por-usuario/{subUsuario}")
+    public ResponseEntity<Map<String, String>> obtenerEmailPropietarioPorUsuario(@PathVariable String subUsuario) {
+        try {
+            String emailOwner = empresaService.obtenerEmailPropietarioPorUsuarioSub(subUsuario);
+            return ResponseEntity.ok(Map.of("emailOwner", emailOwner));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
