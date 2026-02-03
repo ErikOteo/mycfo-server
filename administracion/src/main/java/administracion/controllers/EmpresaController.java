@@ -16,10 +16,21 @@ import java.util.Map;
 public class EmpresaController {
 
     private final EmpresaService empresaService;
+    private final administracion.services.PermissionService permissionService;
 
     @GetMapping("/{id}")
-    public ResponseEntity<EmpresaDTO> obtenerEmpresa(@PathVariable Long id) {
+    public ResponseEntity<EmpresaDTO> obtenerEmpresa(
+            @RequestHeader(value = "X-Usuario-Sub", required = false) String subActual,
+            @PathVariable Long id) {
         try {
+            // Si hay sub, verificar que pertenezca a la empresa
+            if (subActual != null && !permissionService.esAdministrador(subActual)) {
+                // Si no es admin puro, verificar si tiene permiso view en admin
+                if (!permissionService.tienePermiso(subActual, "admin", "view")) {
+                    return ResponseEntity.status(403).build();
+                }
+            }
+
             EmpresaDTO empresa = empresaService.obtenerEmpresa(id);
             return ResponseEntity.ok(empresa);
         } catch (Exception e) {
@@ -28,8 +39,11 @@ public class EmpresaController {
     }
 
     @GetMapping("/")
-    public ResponseEntity<List<EmpresaDTO>> listarEmpresas() {
+    public ResponseEntity<List<EmpresaDTO>> listarEmpresas(@RequestHeader(value = "X-Usuario-Sub") String subActual) {
         try {
+            if (!permissionService.esAdministrador(subActual)) {
+                return ResponseEntity.status(403).build();
+            }
             List<EmpresaDTO> empresas = empresaService.listarEmpresas();
             return ResponseEntity.ok(empresas);
         } catch (Exception e) {
@@ -60,7 +74,8 @@ public class EmpresaController {
     @GetMapping("/usuario/{subUsuario}/id")
     public ResponseEntity<Long> obtenerEmpresaIdPorUsuario(@PathVariable String subUsuario) {
         try {
-            System.out.println("🔍 [EMPRESA-CONTROLLER] Request recibida para obtener empresa ID del usuario: " + subUsuario);
+            System.out.println(
+                    "🔍 [EMPRESA-CONTROLLER] Request recibida para obtener empresa ID del usuario: " + subUsuario);
             Long empresaId = empresaService.obtenerEmpresaIdPorUsuarioSub(subUsuario);
             System.out.println("✅ [EMPRESA-CONTROLLER] Empresa ID devuelta: " + empresaId);
             return ResponseEntity.ok(empresaId);
@@ -71,12 +86,15 @@ public class EmpresaController {
     }
 
     @GetMapping("/debug/usuarios")
-    public ResponseEntity<Map<String, Object>> debugUsuarios() {
+    public ResponseEntity<Map<String, Object>> debugUsuarios(@RequestHeader(value = "X-Usuario-Sub") String subActual) {
         try {
+            if (!permissionService.esAdministrador(subActual)) {
+                return ResponseEntity.status(403).build();
+            }
             System.out.println("🔍 [DEBUG] Listando todos los usuarios en la base de datos...");
-            
+
             List<administracion.models.Usuario> usuarios = empresaService.listarTodosLosUsuarios();
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("totalUsuarios", usuarios.size());
             response.put("usuarios", usuarios.stream().map(u -> {
@@ -90,7 +108,7 @@ public class EmpresaController {
                 userInfo.put("empresaNombre", u.getEmpresa() != null ? u.getEmpresa().getNombre() : null);
                 return userInfo;
             }).collect(java.util.stream.Collectors.toList()));
-            
+
             System.out.println("✅ [DEBUG] Usuarios encontrados: " + usuarios.size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {

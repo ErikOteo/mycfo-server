@@ -22,6 +22,7 @@ import {
   useMediaQuery,
   Divider
 } from '@mui/material';
+import { Navigate } from 'react-router-dom';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
@@ -32,6 +33,7 @@ import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 import { organizacionService } from "../../shared-services/organizacionService";
+import usePermisos from '../../hooks/usePermisos';
 
 const PANTALLAS = [
   { id: 'carga', name: 'Carga de Datos' },
@@ -45,6 +47,9 @@ const PANTALLAS = [
 ];
 
 export default function Roles(props) {
+  const { tienePermiso } = usePermisos();
+
+
   const [empleados, setEmpleados] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
@@ -409,6 +414,11 @@ export default function Roles(props) {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  // Bloqueo de seguridad: Si no tiene permiso admin, redirigir al Dashboard
+  if (!tienePermiso('admin', 'view')) {
+    return <Navigate to="/" replace />;
+  }
 
   if (loading) {
     return (

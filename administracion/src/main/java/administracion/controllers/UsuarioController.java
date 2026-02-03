@@ -46,7 +46,14 @@ public class UsuarioController {
     }
 
     @GetMapping("/empresa/{empresaId}")
-    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleados(@PathVariable Long empresaId) {
+    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleados(
+            @RequestHeader(value = "X-Usuario-Sub") String subActual,
+            @PathVariable Long empresaId) {
+
+        if (!permissionService.tienePermiso(subActual, "admin", "view")) {
+            return ResponseEntity.status(403).build();
+        }
+
         List<UsuarioDTO> empleados = usuarioService.obtenerEmpleadosPorEmpresa(empresaId);
         return ResponseEntity.ok(empleados);
     }

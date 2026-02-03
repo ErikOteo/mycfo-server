@@ -111,8 +111,8 @@ const App = React.memo(() => {
           </Route>
         </Route>
 
-        {/* Catch-all: redirigir a signin */}
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        {/* Catch-all: redirigir a raíz (RequireAuth se encargará de signin si es necesario) */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
