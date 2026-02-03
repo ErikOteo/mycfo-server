@@ -290,16 +290,25 @@ const routeConfig = [
     path: "/organizacion",
     element: <Organizacion />,
     hidden: true,
+    modulo: "admin",
+  },
+  {
+    path: "/historial-cambios",
+    element: <HistorialCambios />,
+    hidden: true,
+    modulo: "admin",
   },
   {
     path: "/roles",
     element: <Roles />,
     hidden: true,
+    modulo: "admin",
   },
   {
     path: "/invitaciones",
     element: <Invitaciones />,
     hidden: true,
+    modulo: "admin",
   },
   {
     path: "/perfil",

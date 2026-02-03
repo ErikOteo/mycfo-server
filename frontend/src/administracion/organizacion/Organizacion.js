@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Navigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -37,6 +38,8 @@ import { useChatbotScreenContext } from "../../shared-components/useChatbotScree
 import usePermisos from "../../hooks/usePermisos";
 
 export default function Organizacion() {
+  const { tienePermiso, esAdminTotal } = usePermisos();
+
   const [empresa, setEmpresa] = useState(null);
   const [empleados, setEmpleados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,6 @@ export default function Organizacion() {
   const [empresaEditada, setEmpresaEditada] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [empleadoToDelete, setEmpleadoToDelete] = useState(null);
-  const { esAdminTotal } = usePermisos();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [page, setPage] = useState(1);
@@ -111,6 +113,11 @@ export default function Organizacion() {
       setPage(totalPages);
     }
   }, [empleados.length, totalPages, page]);
+
+  // Bloqueo de seguridad: Si no tiene permiso admin, redirigir al Dashboard
+  if (!tienePermiso('admin', 'view')) {
+    return <Navigate to="/" replace />;
+  }
 
   const cargarDatosEmpresaYEmpleados = async () => {
     setLoading(true);

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -17,10 +18,14 @@ import ListAltRoundedIcon from '@mui/icons-material/ListAltRounded';
 import MarkEmailReadRoundedIcon from '@mui/icons-material/MarkEmailReadRounded';
 import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 import InvitarColaboradores from "./InvitarColaboradores";
+import usePermisos from '../../hooks/usePermisos';
 
 export default function Invitaciones(props) {
+  const { tienePermiso, esAdminTotal } = usePermisos();
+
+
   const [empresaNombre, setEmpresaNombre] = React.useState(sessionStorage.getItem('empresaNombre') || 'Tu Organización');
-  const [esAdministrador, setEsAdministrador] = React.useState(true); // TODO: Obtener del contexto de auth
+  const esAdministrador = esAdminTotal();
 
   const chatbotContext = React.useMemo(
     () => ({
@@ -32,6 +37,11 @@ export default function Invitaciones(props) {
   );
 
   useChatbotScreenContext(chatbotContext);
+
+  // Bloqueo de seguridad: Si no tiene permiso admin, redirigir al Dashboard
+  if (!tienePermiso('admin', 'view')) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
