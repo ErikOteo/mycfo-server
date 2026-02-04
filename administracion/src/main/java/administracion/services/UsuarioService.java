@@ -69,7 +69,7 @@ public class UsuarioService {
         if (usuarioDTO.getRol() != null) {
             usuario.setRol(usuarioDTO.getRol());
         } else {
-            usuario.setRol("NORMAL"); // Rol por defecto para usuarios nuevos
+            usuario.setRol("COLABORADOR"); // Rol por defecto para usuarios nuevos
         }
 
         usuario.setActivo(true);
@@ -136,6 +136,22 @@ public class UsuarioService {
     }
 
     @Transactional
+    public void vincularUsuarioAEmpresa(String sub, Long empresaId, String rol) {
+        Usuario usuario = usuarioRepository.findBySub(sub)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        Empresa empresa = empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+
+        usuario.setEmpresa(empresa);
+        // Validar rol básico
+        usuario.setRol(rol != null ? rol : "COLABORADOR");
+
+        usuarioRepository.save(usuario);
+        // Opcional: Actualizar en Cognito si el rol se guarda ahí
+    }
+
+    @Transactional
     public UsuarioDTO actualizarEmpleado(String subEmpleado, ActualizarUsuarioDTO dto, String subUsuarioActual) {
         Usuario usuario = usuarioRepository.findBySub(subEmpleado)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
@@ -186,17 +202,19 @@ public class UsuarioService {
 
     @Transactional
     public void eliminarEmpleado(String subEmpleado, String subUsuarioActual) {
-        // Verificar que no se está eliminando a sí mismo
+        // Verificar que no se está desvinculando a sí mismo
         if (subEmpleado.equals(subUsuarioActual)) {
-            throw new RuntimeException("No puedes eliminar tu propia cuenta. Debe hacerlo otro administrador.");
+            throw new RuntimeException(
+                    "No puedes quitarte a ti mismo de la organización. Debe hacerlo otro administrador.");
         }
 
         Usuario usuario = usuarioRepository.findBySub(subEmpleado)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // 🛡️ Protección de Propietario: Nadie puede eliminar al dueño
+        // 🛡️ Protección de Propietario: Nadie puede desvincular al dueño
         if (Boolean.TRUE.equals(usuario.getEsPropietario())) {
-            throw new RuntimeException("No se puede eliminar la cuenta del Propietario de la empresa.");
+            throw new RuntimeException(
+                    "No se puede desvincular al Propietario de la empresa. Primero debe ceder su rol de propietario.");
         }
 
         // Verificar que el usuario actual es administrador
@@ -204,13 +222,34 @@ public class UsuarioService {
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
 
         if (usuarioActual.getRol() == null || !usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
-            throw new RuntimeException("Solo los administradores pueden eliminar empleados");
+            throw new RuntimeException("Solo los administradores pueden quitar miembros de la organización");
         }
 
-        if (usuario != null) {
-            usuarioRepository.delete(usuario);
-        }
-        cognitoService.eliminarUsuarioEnCognito(subEmpleado);
+        // DESVINCULACIÓN: En lugar de borrar, limpiamos los datos de pertenencia
+        usuario.setEmpresa(null);
+        usuario.setRol("COLABORADOR");
+        usuario.setEsPropietario(false);
+
+        usuarioRepository.save(usuario);
+        // NO se borra de Cognito para que el usuario pueda seguir usando su cuenta en
+        // MyCFO
+    }
+
+    @Transactional
+    public void abandonarEmpresa(String subUsuario) {
+        Usuario usuario = usuarioRepository.findBySub(subUsuario)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // DESVINCULACIÓN (Permitido para propietarios también, dejando la empresa
+        // acéfala si era el único)
+        // La validación de negocio se hace en el Frontend o se asume riesgo aceptado
+
+        // DESVINCULACIÓN
+        usuario.setEmpresa(null);
+        usuario.setRol("COLABORADOR");
+        usuario.setEsPropietario(false);
+
+        usuarioRepository.save(usuario);
     }
 
     @Transactional

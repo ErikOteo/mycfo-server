@@ -93,9 +93,15 @@ const Home = React.memo(function Home(props) {
 
         const userData = response.data;
         if (userData && userData.rol) {
-          // Actualizar Rol y Propietario
+          // Actualizar Rol, Propietario e ID de Organización
           sessionStorage.setItem("rol", userData.rol);
           sessionStorage.setItem("esPropietario", userData.esPropietario ? "true" : "false");
+
+          if (userData.empresaId) {
+            sessionStorage.setItem("organizacionId", userData.empresaId);
+          } else {
+            sessionStorage.removeItem("organizacionId");
+          }
 
           if (userData.nombre) sessionStorage.setItem("nombre", userData.nombre);
           let permisos = null;

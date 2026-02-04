@@ -1,11 +1,14 @@
 import * as React from 'react';
-import { Navigate } from 'react-router-dom';
+import MarkEmailReadRoundedIcon from '@mui/icons-material/MarkEmailReadRounded';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useNavigate, Navigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   Paper,
   Grid,
   Container,
+  Button,
   Stack,
   Divider,
   Card,
@@ -15,13 +18,14 @@ import {
 } from '@mui/material';
 import GroupAddRoundedIcon from '@mui/icons-material/GroupAddRounded';
 import ListAltRoundedIcon from '@mui/icons-material/ListAltRounded';
-import MarkEmailReadRoundedIcon from '@mui/icons-material/MarkEmailReadRounded';
+
 import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 import InvitarColaboradores from "./InvitarColaboradores";
 import usePermisos from '../../hooks/usePermisos';
 
 export default function Invitaciones(props) {
   const { tienePermiso, esAdminTotal } = usePermisos();
+  const navigate = useNavigate();
 
 
   const [empresaNombre, setEmpresaNombre] = React.useState(sessionStorage.getItem('empresaNombre') || 'Tu Organización');
@@ -45,13 +49,30 @@ export default function Invitaciones(props) {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-          Gestión de Invitaciones
-        </Typography>
-        <Typography variant="body1" color="text.primary">
-          Administra los accesos de nuevos colaboradores a {empresaNombre}.
-        </Typography>
+      <Box sx={{ mb: 4, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/organizacion')}
+          sx={{
+            position: { xs: 'relative', sm: 'absolute' },
+            left: { sm: 0 },
+            mb: { xs: 2, sm: 0 },
+            textTransform: 'none',
+            fontWeight: 600,
+            color: 'text.primary',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }
+          }}
+        >
+          Volver
+        </Button>
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 0 }}>
+            Gestión de Invitaciones
+          </Typography>
+          <Typography variant="body2" color="text.primary">
+            Administra los accesos de nuevos colaboradores a {empresaNombre}.
+          </Typography>
+        </Box>
       </Box>
 
       <Grid container justifyContent="center">

@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from "react";
-
-import { Box, Typography, CircularProgress, Stack, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Divider, Snackbar, Alert } from "@mui/material";
+import { organizacionService } from "../../shared-services/organizacionService";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Stack,
+  Avatar,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Divider,
+  Snackbar,
+  Alert
+} from "@mui/material";
+import { Logout as LogoutIcon, Business as BusinessIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import CampoEditable from "../../shared-components/CampoEditable";
 import BotonConsolidar from "../../shared-components/CustomButton";
@@ -19,6 +35,10 @@ export default function Perfil() {
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  const [empresa, setEmpresa] = useState(null); // Nuevo estado para empresa
+  const [openAbandonar, setOpenAbandonar] = useState(false); // Estado dialog abandonar
+  const [esPropietario, setEsPropietario] = useState(false); // Validacion real de API
+
   // Estado para el color del avatar
   const [avatarColor, setAvatarColor] = useState(localStorage.getItem('avatarColor') || '#008375');
   const colors = ['#008375', '#2e7d32', '#29B6F6', '#1976d2', '#7b1fa2', '#c2185b', '#d32f2f', '#ed6c02', '#fbc02d', '#757575'];
@@ -32,8 +52,8 @@ export default function Perfil() {
 
   // 🔹 Cargar datos desde la sesión al montar el componente
   useEffect(() => {
-    const cargarDatos = () => {
-      // Cargar datos del usuario desde sesión
+    const cargarDatos = async () => {
+      // Cargar datos del usuario desde sesión (inicial)
       const usuario = sessionService.getUsuario();
       setPerfil({
         nombre: usuario.nombre || "",
@@ -41,9 +61,39 @@ export default function Perfil() {
         email: usuario.email || "",
       });
 
-      // El color inicial viene de sessionStorage (sincronizado en Home.js)
       const cachedColor = sessionStorage.getItem('avatarColor');
       if (cachedColor) setAvatarColor(cachedColor);
+
+      // Cargar perfil completo (incluyendo esPropietario) y datos de empresa
+      try {
+        const sub = sessionStorage.getItem("sub");
+        if (sub) {
+          const response = await axios.get(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
+            headers: { "X-Usuario-Sub": sub }
+          });
+
+          if (response.data) {
+            // Actualizar si es propietario
+            if (response.data.esPropietario) {
+              sessionStorage.setItem("esPropietario", "true"); // Cachearlo por si acaso
+              setEsPropietario(true);
+            } else {
+              sessionStorage.removeItem("esPropietario");
+              setEsPropietario(false);
+            }
+
+            // Cargar empresa si existe
+            if (response.data.empresaId) {
+              // Podríamos llamar a organizacionService, pero ya tenemos los datos básicos aquí si el DTO los trae
+              // O usamos el servicio existente para la data completa de empresa
+              const empresaData = await organizacionService.obtenerOrganizacionUsuario();
+              if (empresaData) setEmpresa(empresaData);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error cargando perfil completo:", err);
+      }
 
       setLoading(false);
     };
@@ -54,6 +104,22 @@ export default function Perfil() {
   const handleChange = (campo, valor) => {
     setPerfil((prev) => ({ ...prev, [campo]: valor }));
     setEditados((prev) => ({ ...prev, [campo]: true }));
+  };
+
+  const handleAbandonarEmpresa = async () => {
+    try {
+      await organizacionService.abandonarEmpresa();
+      setOpenAbandonar(false);
+      setSnackbar({ open: true, message: "Has abandonado la organización correctamente", severity: "success" });
+      // Redirigir a home/login para refrescar estado
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
+    } catch (error) {
+      console.error("Error abandonando empresa:", error);
+      setSnackbar({ open: true, message: "Error al abandonar la organización", severity: "error" });
+      setOpenAbandonar(false);
+    }
   };
 
   const handleConsolidar = async () => {
@@ -176,8 +242,6 @@ export default function Perfil() {
     );
   }
 
-
-
   return (
     <Box sx={{ width: "100%", maxWidth: 1000, mx: "auto", mt: 4, p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -262,6 +326,49 @@ export default function Perfil() {
       </Box>
 
       <Divider sx={{ my: 4 }} />
+
+      {/* Mi Organización */}
+      {empresa && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" gutterBottom>Mi Organización</Typography>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <BusinessIcon color="action" />
+                <Typography variant="subtitle1" fontWeight="500">{empresa.nombre}</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.primary">
+                Estás vinculado a esta empresa.
+              </Typography>
+            </Box>
+
+            {/* Botón Salir: Solo para Colaboradores (No Propietarios y No Admins) */}
+            {!esPropietario && !(sessionStorage.getItem("rol") || "").includes("ADMINISTRADOR") && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<LogoutIcon />}
+                onClick={() => setOpenAbandonar(true)}
+                sx={{ lineHeight: 1.2 }}
+              >
+                Salir de la Organización
+              </Button>
+            )}
+
+            {/* Botón Gestionar: Para Administradores y Propietarios */}
+            {(esPropietario || (sessionStorage.getItem("rol") || "").includes("ADMINISTRADOR")) && (
+              <Button
+                variant="contained"
+                sx={{ lineHeight: 1.2 }}
+                onClick={() => navigate('/organizacion')}
+              >
+                Gestionar Organización
+              </Button>
+            )}
+          </Stack>
+          <Divider sx={{ mt: 4 }} />
+        </Box>
+      )}
 
       {/* Seguridad */}
       <Box sx={{ mb: 4 }}>
@@ -351,6 +458,23 @@ export default function Perfil() {
         <DialogActions>
           <Button onClick={() => setOpenPasswordDialog(false)}>Cancelar</Button>
           <Button variant="contained" onClick={handleChangePassword}>Actualizar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog Abandonar Organización */}
+      <Dialog open={openAbandonar} onClose={() => setOpenAbandonar(false)}>
+        <DialogTitle>¿Abandonar Organización?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Estás a punto de desvincularte de <strong>{empresa?.nombre}</strong>.
+            Perderás el acceso a la información y tendrás que ser invitado nuevamente para volver a entrar.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAbandonar(false)}>Cancelar</Button>
+          <Button onClick={handleAbandonarEmpresa} color="error" variant="contained">
+            Sí, Abandonar
+          </Button>
         </DialogActions>
       </Dialog>
 

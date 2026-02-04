@@ -81,16 +81,12 @@ const App = React.memo(() => {
             {/* Ruta por defecto - mostrar dashboard en la URL principal */}
             <Route index element={
               <Suspense fallback={<LoadingSpinner />}>
-                <ProtectedRoute modulo="dashboard">
-                  <Dashboard />
-                </ProtectedRoute>
+                <Dashboard />
               </Suspense>
             } />
             <Route path="dashboard" element={
               <Suspense fallback={<LoadingSpinner />}>
-                <ProtectedRoute modulo="dashboard">
-                  <Dashboard />
-                </ProtectedRoute>
+                <Dashboard />
               </Suspense>
             } />
 

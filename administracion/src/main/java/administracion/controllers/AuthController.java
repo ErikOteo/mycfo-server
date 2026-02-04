@@ -80,7 +80,7 @@ public class AuthController {
                 usuario.setRol("ADMINISTRADOR"); // Primer usuario de empresa nueva es administrador
                 usuario.setEsPropietario(true); // El creador es el dueño absoluto
             } else {
-                usuario.setRol("NORMAL"); // Usuarios invitados siempre son NORMAL
+                usuario.setRol("COLABORADOR"); // Usuarios invitados siempre son COLABORADOR
                 usuario.setEsPropietario(false);
             }
 

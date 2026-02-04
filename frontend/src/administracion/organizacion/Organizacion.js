@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import {
   Edit as EditIcon,
-  Delete as DeleteIcon,
+  PersonRemove as UnlinkIcon,
   Save as SaveIcon,
   PersonAdd as PersonAddIcon,
   Business as BusinessIcon,
@@ -36,6 +36,7 @@ import InvitarColaboradores from "../invitaciones/InvitarColaboradores";
 import API_CONFIG from "../../config/api-config";
 import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 import usePermisos from "../../hooks/usePermisos";
+import SolicitudesPendientes from "./SolicitudesPendientes";
 
 export default function Organizacion() {
   const { tienePermiso, esAdminTotal } = usePermisos();
@@ -43,10 +44,10 @@ export default function Organizacion() {
   const [empresa, setEmpresa] = useState(null);
   const [empleados, setEmpleados] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editandoEmpleado, setEditandoEmpleado] = useState(null);
-  const [empleadoEditado, setEmpleadoEditado] = useState({});
+
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
   const [usuarioRol, setUsuarioRol] = useState(null);
+  const [esPropietario, setEsPropietario] = useState(false);
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [empresaEditada, setEmpresaEditada] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -54,7 +55,9 @@ export default function Organizacion() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 3;
+  const ITEMS_PER_PAGE = 10;
+
+  const esAdministrador = esAdminTotal();
 
   const totalPages = Math.ceil(empleados.length / ITEMS_PER_PAGE);
   const paginatedEmployees = empleados.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -85,7 +88,7 @@ export default function Organizacion() {
       },
       usuarioRol,
       editandoEmpresa,
-      editandoEmpleado: Boolean(editandoEmpleado),
+
       loading,
     }),
     [
@@ -93,7 +96,7 @@ export default function Organizacion() {
       empleados,
       usuarioRol,
       editandoEmpresa,
-      editandoEmpleado,
+
       loading,
     ]
   );
@@ -130,6 +133,7 @@ export default function Organizacion() {
 
       if (info?.perfil) {
         setUsuarioRol(info.perfil.rol);
+        setEsPropietario(!!info.perfil.esPropietario);
       }
 
       if (info?.empresa) {
@@ -139,6 +143,7 @@ export default function Organizacion() {
       }
 
       if (Array.isArray(info?.empleados)) {
+        console.log('🔍 [DEBUG-FRONTEND] Empleados recibidos:', info.empleados);
         setEmpleados(info.empleados);
       } else {
         setEmpleados([]);
@@ -151,49 +156,8 @@ export default function Organizacion() {
     }
   };
 
-  // Abrir edición inline de empleado
-  const handleAbrirEdicionEmpleado = (empleado) => {
-    setEditandoEmpleado(empleado.sub);
-    setEmpleadoEditado({ ...empleado });
-  };
 
-  // Cerrar edición de empleado
-  const handleCerrarEdicionEmpleado = () => {
-    setEditandoEmpleado(null);
-    setEmpleadoEditado({});
-  };
 
-  // Guardar cambios del empleado
-  const handleGuardarEmpleado = async () => {
-    try {
-      await organizacionService.actualizarEmpleado(editandoEmpleado, {
-        nombre: empleadoEditado.nombre,
-        email: empleadoEditado.email,
-        telefono: empleadoEditado.telefono,
-        rol: empleadoEditado.rol
-      });
-
-      setMensaje({ tipo: 'success', texto: 'Cambios del empleado guardados exitosamente' });
-      handleCerrarEdicionEmpleado();
-
-      // Recargar lista de empleados
-      cargarDatosEmpresaYEmpleados();
-
-      setTimeout(() => setMensaje({ tipo: '', texto: '' }), 3000);
-    } catch (error) {
-      console.error("Error guardando empleado:", error);
-
-      // Mostrar mensaje específico según el tipo de error
-      let mensajeError = 'Error al guardar los cambios del empleado';
-      if (error.response?.status === 403) {
-        mensajeError = 'Solo los administradores pueden actualizar empleados.';
-      }
-
-      setMensaje({ tipo: 'error', texto: mensajeError });
-    }
-  };
-
-  // Eliminar empleado - Abrir diálogo
   const handleEliminarEmpleado = (empleado) => {
     setEmpleadoToDelete(empleado);
     setDeleteDialogOpen(true);
@@ -209,22 +173,22 @@ export default function Organizacion() {
     try {
       await organizacionService.eliminarEmpleado(empleadoSub);
 
-      setMensaje({ tipo: 'success', texto: 'Empleado eliminado exitosamente' });
+      setMensaje({ tipo: 'success', texto: 'Miembro quitado de la organización exitosamente' });
 
       // Recargar lista de empleados
       cargarDatosEmpresaYEmpleados();
 
       setTimeout(() => setMensaje({ tipo: '', texto: '' }), 3000);
     } catch (error) {
-      console.error("Error eliminando empleado:", error);
+      console.error("Error al desvincular miembro:", error);
 
       // Mostrar mensaje específico según el tipo de error
-      let mensajeError = 'Error al eliminar el empleado';
+      let mensajeError = 'Error al desvincular el miembro';
       if (error.response?.status === 403) {
         if (empleadoSub === sub) {
-          mensajeError = 'No puedes eliminar tu propia cuenta. Debe hacerlo otro administrador.';
+          mensajeError = 'No puedes quitarte a ti mismo de la organización. Debe hacerlo otro administrador.';
         } else {
-          mensajeError = 'Solo los administradores pueden eliminar empleados.';
+          mensajeError = 'Solo los administradores pueden desvincular miembros.';
         }
       }
 
@@ -234,10 +198,7 @@ export default function Organizacion() {
     }
   };
 
-  // Manejar cambios en el formulario de edición
-  const handleChangeEmpleado = (campo, valor) => {
-    setEmpleadoEditado(prev => ({ ...prev, [campo]: valor }));
-  };
+
 
   // Funciones para editar empresa
   const handleAbrirEdicionEmpresa = () => {
@@ -277,7 +238,7 @@ export default function Organizacion() {
     return "Colaborador";
   };
 
-  const esAdministrador = esAdminTotal();
+
 
   if (loading) {
     return (
@@ -295,12 +256,44 @@ export default function Organizacion() {
         </Alert>
       )}
 
-      <Typography variant="h4" gutterBottom>
-        Gestión de Organización
-      </Typography>
-      <Typography variant="subtitle1" sx={{ mb: 4, color: 'text.primary' }}>
-        Visualiza la información de tu empresa y empleados
-      </Typography>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 2 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom fontWeight="bold">
+            Gestión de Organización
+          </Typography>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>
+            Visualiza la información de tu empresa y equipo de trabajo
+          </Typography>
+        </Box>
+
+        {/* Chips informativos */}
+        <Stack direction="row" spacing={1}>
+          {esPropietario && (
+            <Chip
+              icon={<AdminIcon />}
+              label="Propietario"
+              color="primary"
+              variant="outlined"
+            />
+          )}
+          {usuarioRol && !esPropietario && (
+            <Chip
+              label={getRolFormateado(usuarioRol)}
+              variant="outlined"
+            />
+          )}
+        </Stack>
+      </Box>
+
+
+
+      {/* Solicitudes Pendientes (Solo Admin) */}
+      {esAdministrador && empresa && (
+        <SolicitudesPendientes
+          empresaId={empresa.id}
+          onSolicitudResuelta={cargarDatosEmpresaYEmpleados}
+        />
+      )}
 
       {/* Información de la Empresa */}
       <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, mb: 4 }}>
@@ -501,10 +494,10 @@ export default function Organizacion() {
                       width: '100%'
                     }}>
                       <Typography variant="h6" sx={{ mr: 1 }}>
-                        {editandoEmpleado === empleado.sub ? empleadoEditado.nombre : empleado.nombre}
+                        {empleado.nombre}
                       </Typography>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {((editandoEmpleado === empleado.sub ? empleadoEditado.rol : empleado.rol) || "").toUpperCase().includes("ADMINISTRADOR") && (
+                        {((empleado.rol) || "").toUpperCase().includes("ADMINISTRADOR") && (
                           <Chip
                             icon={<AdminIcon />}
                             label="Admin"
@@ -513,7 +506,7 @@ export default function Organizacion() {
                             variant="outlined"
                           />
                         )}
-                        {((editandoEmpleado === empleado.sub ? empleadoEditado.rol : empleado.rol) || "").toUpperCase().includes("PROPIETARIO") && (
+                        {((empleado.rol) || "").toUpperCase().includes("PROPIETARIO") && (
                           <Chip
                             icon={<BusinessIcon />}
                             label="Dueño"
@@ -539,154 +532,64 @@ export default function Organizacion() {
                         width: isMobile ? '100%' : 'auto',
                         justifyContent: isMobile ? 'flex-end' : 'flex-start'
                       }}>
-                        {editandoEmpleado === empleado.sub ? (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button
-                              variant="contained"
-                              startIcon={<SaveIcon />}
-                              onClick={handleGuardarEmpleado}
-                              size="small"
-                              color="primary"
-                              sx={{ lineHeight: 1.2 }}
-                            >
-                              Guardar
-                            </Button>
-                            <Button
-                              variant="outlined"
-                              onClick={handleCerrarEdicionEmpleado}
-                              size="small"
-                              color="secondary"
-                              sx={{ lineHeight: 1.2 }}
-                            >
-                              Cancelar
-                            </Button>
-                          </Box>
-                        ) : (
-                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <Tooltip title="Editar">
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          {/* Solo mostrar botón desvincular si no es el propio usuario */}
+                          {empleado.sub !== sub && (
+                            <Tooltip title="Quitar de la organización">
                               <IconButton
-                                aria-label="editar"
-                                onClick={() => handleAbrirEdicionEmpleado(empleado)}
-                                color="primary"
+                                aria-label="desvincular"
+                                onClick={() => handleEliminarEmpleado(empleado)}
+                                color="error"
                               >
-                                <EditIcon />
+                                <UnlinkIcon />
                               </IconButton>
                             </Tooltip>
-                            {/* Solo mostrar botón eliminar si no es el propio usuario */}
-                            {empleado.sub !== sub && (
-                              <Tooltip title="Eliminar">
-                                <IconButton
-                                  aria-label="eliminar"
-                                  onClick={() => handleEliminarEmpleado(empleado)}
-                                  color="error"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                          </Box>
-                        )}
+                          )}
+                        </Box>
                       </Box>
                     )}
                   </Box>
                 </Box>
 
-                {editandoEmpleado === empleado.sub ? (
-                  <Box>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.primary">
-                        Nombre
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={empleadoEditado.nombre || ''}
-                        onChange={(e) => handleChangeEmpleado('nombre', e.target.value)}
-                      />
-                    </Box>
+                <Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.primary">
+                      Email
+                    </Typography>
+                    <Typography variant="body1">
+                      {empleado.email}
+                    </Typography>
+                  </Box>
 
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.primary">
-                        Email
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={empleadoEditado.email || ''}
-                        onChange={(e) => handleChangeEmpleado('email', e.target.value)}
-                      />
-                    </Box>
-
+                  {empleado.telefono && (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" color="text.primary">
                         Teléfono
                       </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={empleadoEditado.telefono || ''}
-                        onChange={(e) => handleChangeEmpleado('telefono', e.target.value)}
-                      />
-                    </Box>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.primary">
-                        Rol
+                      <Typography variant="body1">
+                        {empleado.telefono}
                       </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        select
-                        SelectProps={{ native: true }}
-                        value={empleadoEditado.rol || ''}
-                        onChange={(e) => handleChangeEmpleado('rol', e.target.value)}
-                      >
-                        <option value="NORMAL">NORMAL</option>
-                        <option value="ADMINISTRADOR">ADMINISTRADOR</option>
-                      </TextField>
                     </Box>
+                  )}
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.primary">
+                      Rol
+                    </Typography>
+                    <Typography variant="body1">
+                      {getRolFormateado(empleado.rol)}
+                    </Typography>
                   </Box>
-                ) : (
-                  <Box>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.primary">
-                        Email
-                      </Typography>
-                      <Typography variant="body1">
-                        {empleado.email}
-                      </Typography>
-                    </Box>
 
-                    {empleado.telefono && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" color="text.primary">
-                          Teléfono
-                        </Typography>
-                        <Typography variant="body1">
-                          {empleado.telefono}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.primary">
-                        Rol
-                      </Typography>
-                      <Typography variant="body1">
-                        {getRolFormateado(empleado.rol)}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.primary">
-                        Estado
-                      </Typography>
-                      <Typography variant="body1">
-                        {empleado.activo ? "Activo" : "Inactivo"}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.primary">
+                      Estado
+                    </Typography>
+                    <Typography variant="body1">
+                      {empleado.activo ? "Activo" : "Inactivo"}
+                    </Typography>
                   </Box>
-                )}
+                </Box>
 
                 {index < paginatedEmployees.length - 1 && <Divider sx={{ my: 2 }} />}
               </Box>
@@ -738,15 +641,15 @@ export default function Organizacion() {
         </Stack>
       </Paper>
 
-      {/* Diálogo de Confirmación de Eliminación */}
+      {/* Diálogo de Confirmación de Desvinculación */}
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
       >
-        <DialogTitle>⚠️ Confirmar Eliminación</DialogTitle>
+        <DialogTitle>⚠️ Quitar miembro de la organización</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            ¿Estás seguro que deseas eliminar a este empleado?
+            ¿Estás seguro que deseas quitar a este miembro de la organización?
           </Alert>
           {empleadoToDelete && (
             <Box sx={{ mt: 1 }}>
@@ -756,14 +659,11 @@ export default function Organizacion() {
               <Typography variant="body2">
                 <strong>Email:</strong> {empleadoToDelete.email}
               </Typography>
-              <Typography variant="body2">
-                <strong>Rol:</strong> {getRolFormateado(empleadoToDelete.rol)}
-              </Typography>
             </Box>
           )}
-          <Alert severity="error" sx={{ mt: 2 }}>
-            Esta acción es definitiva y no se puede deshacer.
-          </Alert>
+          <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+            El usuario conservará su cuenta en MyCFO pero ya no tendrá acceso a los datos de esta empresa hasta que se le vuelva a invitar.
+          </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setDeleteDialogOpen(false)} color="inherit">
@@ -774,11 +674,166 @@ export default function Organizacion() {
             color="error"
             variant="contained"
           >
-            Eliminar permanentemente
+            Quitar Miembro
           </Button>
         </DialogActions>
       </Dialog>
 
+      <AccionesOrganizacion
+        esAdministrador={esAdministrador}
+        esPropietario={esPropietario}
+        empresaId={empresa?.id}
+      />
+
+    </Box>
+  );
+}
+
+// Componente separado para las acciones de Abandonar / Eliminar
+function AccionesOrganizacion({ esAdministrador, esPropietario, empresaId }) {
+  const [openAbandonar, setOpenAbandonar] = useState(false);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [confirmNombre, setConfirmNombre] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleAbandonar = async () => {
+    setLoading(true);
+    try {
+      await organizacionService.abandonarEmpresa();
+      // Forzar recarga completa para limpiar estado
+      window.location.href = '/';
+    } catch (e) {
+      console.error("Error abandonando:", e);
+      setLoading(false);
+    }
+  };
+
+  const handleEliminar = async () => {
+    setLoading(true);
+    try {
+      await organizacionService.eliminarEmpresa(empresaId);
+      window.location.href = '/';
+    } catch (e) {
+      console.error("Error eliminando empresa:", e);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box sx={{ mt: 6, mb: 4 }}>
+      <Divider sx={{ mb: 4 }} />
+
+      {/* Botón Unificado para Salir/Eliminar */}
+      <Box sx={{ textAlign: 'center' }}>
+        <Button
+          color="error"
+          onClick={() => setOpenAbandonar(true)}
+          startIcon={<UnlinkIcon />}
+        >
+          Abandonar Organización
+        </Button>
+        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+          {esPropietario
+            ? "Opciones de salida y eliminación de la empresa."
+            : "Perderás el acceso a los datos de esta empresa."
+          }
+        </Typography>
+      </Box>
+
+      {/* Dialog Abandonar (Inteligente según rol) */}
+      <Dialog open={openAbandonar} onClose={() => setOpenAbandonar(false)}>
+        <DialogTitle>
+          {esPropietario ? "¿Qué deseas hacer?" : "¿Abandonar Organización?"}
+        </DialogTitle>
+        <DialogContent>
+          {!esPropietario ? (
+            <Typography>
+              Estás a punto de salir de la organización. No podrás volver a entrar a menos que te inviten nuevamente.
+            </Typography>
+          ) : (
+            <Box>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Como propietario, tienes dos opciones:
+              </Alert>
+              <Typography paragraph>
+                <strong>1. Salir y mantener la organización:</strong> Dejas la empresa pero sigue existiendo.
+              </Typography>
+              <Typography paragraph>
+                <strong>2. Eliminar permanentemente:</strong> Borras la empresa y todos sus datos.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: esPropietario ? 'column' : 'row', gap: 1, p: 2 }}>
+
+          {/* Botones para Propietario */}
+          {esPropietario ? (
+            <>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="warning"
+                onClick={handleAbandonar}
+                disabled={loading}
+              >
+                {loading ? <CircularProgress size={20} /> : "Salir (Mantener Empresa)"}
+              </Button>
+
+              <Button
+                fullWidth
+                variant="contained"
+                color="error"
+                onClick={() => { setOpenAbandonar(false); setOpenEliminar(true); }}
+              >
+                Eliminar Organización...
+              </Button>
+
+              <Button fullWidth onClick={() => setOpenAbandonar(false)}>Cancelar</Button>
+            </>
+          ) : (
+            /* Botones standard */
+            <>
+              <Button onClick={() => setOpenAbandonar(false)}>Cancelar</Button>
+              <Button onClick={handleAbandonar} color="error" disabled={loading}>
+                {loading ? <CircularProgress size={20} /> : "Sí, abandonar"}
+              </Button>
+            </>
+          )}
+
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog Eliminar (Zona de Peligro real) */}
+      <Dialog open={openEliminar} onClose={() => setOpenEliminar(false)}>
+        <DialogTitle sx={{ color: 'error.main' }}>⚠️ Eliminar Organización Permanentemente</DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Esta acción ELIMINARÁ PERMANENTEMENTE la empresa y desvinculará a TODOS los miembros. Esto no se puede deshacer.
+          </Alert>
+          <Typography variant="body2" gutterBottom>
+            Por favor, escribe <strong>ELIMINAR</strong> para confirmar.
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="ELIMINAR"
+            value={confirmNombre}
+            onChange={(e) => setConfirmNombre(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEliminar(false)}>Cancelar</Button>
+          <Button
+            onClick={handleEliminar}
+            color="error"
+            variant="contained"
+            disabled={confirmNombre !== 'ELIMINAR' || loading}
+          >
+            {loading ? <CircularProgress size={20} color="inherit" /> : "Confirmar Eliminación"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
