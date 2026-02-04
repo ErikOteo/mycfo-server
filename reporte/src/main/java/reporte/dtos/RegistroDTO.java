@@ -9,28 +9,72 @@ public class RegistroDTO {
     private LocalDateTime fechaEmision;
     private String categoria;
     private String medioPago;
+    private String moneda;
     private DocumentoDTO documentoComercial;
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getTipo() { return tipo; }
-    public void setTipo(String tipo) { this.tipo = tipo; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public Double getMontoTotal() { return montoTotal; }
-    public void setMontoTotal(Double montoTotal) { this.montoTotal = montoTotal; }
+    public String getTipo() {
+        return tipo;
+    }
 
-    public LocalDateTime getFechaEmision() { return fechaEmision; }
-    public void setFechaEmision(LocalDateTime fechaEmision) { this.fechaEmision = fechaEmision; }
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
 
-    public String getCategoria() { return categoria; }
-    public void setCategoria(String categoria) { this.categoria = categoria; }
+    public Double getMontoTotal() {
+        return montoTotal;
+    }
 
-    public String getMedioPago() { return medioPago; }
-    public void setMedioPago(String medioPago) { this.medioPago = medioPago; }
+    public void setMontoTotal(Double montoTotal) {
+        this.montoTotal = montoTotal;
+    }
 
-    public DocumentoDTO getDocumentoComercial() { return documentoComercial; }
-    public void setDocumentoComercial(DocumentoDTO documentoComercial) { this.documentoComercial = documentoComercial; }
+    public LocalDateTime getFechaEmision() {
+        return fechaEmision;
+    }
+
+    public void setFechaEmision(LocalDateTime fechaEmision) {
+        this.fechaEmision = fechaEmision;
+    }
+
+    public String getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(String categoria) {
+        this.categoria = categoria;
+    }
+
+    public String getMedioPago() {
+        return medioPago;
+    }
+
+    public void setMedioPago(String medioPago) {
+        this.medioPago = medioPago;
+    }
+
+    public String getMoneda() {
+        return moneda;
+    }
+
+    public void setMoneda(String moneda) {
+        this.moneda = moneda;
+    }
+
+    public DocumentoDTO getDocumentoComercial() {
+        return documentoComercial;
+    }
+
+    public void setDocumentoComercial(DocumentoDTO documentoComercial) {
+        this.documentoComercial = documentoComercial;
+    }
 
     // Sub-DTO para mapear el documento comercial embebido en /movimientos
     public static class DocumentoDTO {
@@ -39,16 +83,36 @@ public class RegistroDTO {
         private String categoria;
         private LocalDateTime fechaEmision;
 
-        public Long getIdDocumento() { return idDocumento; }
-        public void setIdDocumento(Long idDocumento) { this.idDocumento = idDocumento; }
+        public Long getIdDocumento() {
+            return idDocumento;
+        }
 
-        public String getTipoDocumento() { return tipoDocumento; }
-        public void setTipoDocumento(String tipoDocumento) { this.tipoDocumento = tipoDocumento; }
+        public void setIdDocumento(Long idDocumento) {
+            this.idDocumento = idDocumento;
+        }
 
-        public String getCategoria() { return categoria; }
-        public void setCategoria(String categoria) { this.categoria = categoria; }
+        public String getTipoDocumento() {
+            return tipoDocumento;
+        }
 
-        public LocalDateTime getFechaEmision() { return fechaEmision; }
-        public void setFechaEmision(LocalDateTime fechaEmision) { this.fechaEmision = fechaEmision; }
+        public void setTipoDocumento(String tipoDocumento) {
+            this.tipoDocumento = tipoDocumento;
+        }
+
+        public String getCategoria() {
+            return categoria;
+        }
+
+        public void setCategoria(String categoria) {
+            this.categoria = categoria;
+        }
+
+        public LocalDateTime getFechaEmision() {
+            return fechaEmision;
+        }
+
+        public void setFechaEmision(LocalDateTime fechaEmision) {
+            this.fechaEmision = fechaEmision;
+        }
     }
 }

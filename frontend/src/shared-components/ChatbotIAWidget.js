@@ -245,17 +245,27 @@ const detectTargetScreen = (normalizedMessage) => {
 
 const extractYear = (normalizedMessage) => {
     if (!normalizedMessage) return null;
-    const match = normalizedMessage.match(/\\b(20\\d{2}|19\\d{2})\\b/);
-    return match ? Number(match[1]) : null;
+    const match = normalizedMessage.match(/\b(20\d{2}|19\d{2})\b/);
+    if (match) return Number(match[1]);
+
+    const normalized = normalizeText(normalizedMessage);
+    if (normalized.includes("este ano") || normalized.includes("ano actual") || normalized.includes("este ejercicio") || normalized.includes("actual")) {
+        return new Date().getFullYear();
+    }
+    return null;
 };
 
 const extractMonth = (normalizedMessage) => {
     if (!normalizedMessage) return null;
-    const slashMatch = normalizedMessage.match(/\\b(0?[1-9]|1[0-2])\\s*[/-]\\s*(20\\d{2}|19\\d{2})\\b/);
+    const slashMatch = normalizedMessage.match(/\b(0?[1-9]|1[0-2])\s*[/-]\s*(20\d{2}|19\d{2})\b/);
     if (slashMatch) {
         return Number(slashMatch[1]);
     }
-    const parts = normalizedMessage.split(" ");
+    const normalized = normalizeText(normalizedMessage);
+    if (normalized.includes("este mes") || normalized.includes("mes actual")) {
+        return new Date().getMonth() + 1;
+    }
+    const parts = normalized.split(" ");
     for (const part of parts) {
         if (MONTHS_MAP[part]) {
             return MONTHS_MAP[part];
@@ -321,32 +331,14 @@ const fetchCashflow = async ({ year, currency }) => {
     const params = new URLSearchParams();
     params.set("anio", Number(year));
     if (currency) params.set("moneda", currency);
-    const response = await fetch(`${API_CONFIG.REPORTE}/cashflow?${params.toString()}`, { headers: getAuthHeaders() });
+    const response = await fetch(`${API_CONFIG.REPORTE}/cashflow/resumen?${params.toString()}`, { headers: getAuthHeaders() });
     if (!response.ok) {
         throw new Error(`http_${response.status}`);
     }
     const json = await response.json();
-    const registros = Array.isArray(json) ? json : [];
-    const totalIngresosMensual = Array(12).fill(0);
-    const totalEgresosMensual = Array(12).fill(0);
-    registros.forEach((tx) => {
-        const monthIndex = tx?.fechaEmision ? new Date(tx.fechaEmision).getMonth() : null;
-        if (monthIndex == null || monthIndex < 0 || monthIndex > 11) return;
-        if (tx?.tipo === "Ingreso") {
-            totalIngresosMensual[monthIndex] += Number(tx?.montoTotal || 0);
-        } else if (tx?.tipo === "Egreso") {
-            totalEgresosMensual[monthIndex] += Math.abs(Number(tx?.montoTotal || 0));
-        }
-    });
-    const netosMensuales = totalIngresosMensual.map((v, i) => v - totalEgresosMensual[i]);
     return {
         screen: "flujo-de-caja",
-        year,
-        currency,
-        registros,
-        ingresosMensuales: totalIngresosMensual,
-        egresosMensuales: totalEgresosMensual,
-        netosMensuales,
+        ...json
     };
 };
 
