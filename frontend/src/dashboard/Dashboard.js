@@ -966,7 +966,7 @@ const Dashboard = React.memo(() => {
         label: "Cargar movimiento",
         icon: <AddCircleOutlineRoundedIcon />,
         action: () => handleNavigate("/carga"),
-        visible: tienePermiso('movs', 'edit'),
+        visible: tienePermiso('carga', 'edit'),
       },
       {
         id: "excel",
