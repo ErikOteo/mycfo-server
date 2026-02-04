@@ -44,8 +44,14 @@ public class OrganizacionController {
 
             // Solo incluimos la lista de empleados si el usuario tiene permiso admin.view
             List<UsuarioDTO> empleados = List.of();
-            if (permissionService.tienePermiso(sub, "admin", "view")) {
+            boolean tienePermisoAdmin = permissionService.tienePermiso(sub, "admin", "view");
+            System.out.println("🔍 [DEBUG-ORGANIZACION] Sub: " + sub);
+            System.out.println("🔍 [DEBUG-ORGANIZACION] EmpresaId: " + perfil.getEmpresaId());
+            System.out.println("🔍 [DEBUG-ORGANIZACION] Tiene permiso admin.view: " + tienePermisoAdmin);
+
+            if (tienePermisoAdmin) {
                 empleados = usuarioService.obtenerEmpleadosPorEmpresa(perfil.getEmpresaId());
+                System.out.println("🔍 [DEBUG-ORGANIZACION] Empleados encontrados: " + empleados.size());
             }
 
             OrganizacionInfoResponse respuesta = OrganizacionInfoResponse.builder()

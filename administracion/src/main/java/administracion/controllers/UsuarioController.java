@@ -118,6 +118,21 @@ public class UsuarioController {
         }
     }
 
+    @PostMapping("/abandonar")
+    public ResponseEntity<Void> abandonarEmpresa(
+            @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual) {
+        try {
+            usuarioService.abandonarEmpresa(subUsuarioActual);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            // Si el error es porque es propietario (400 Bad Request) o no encontrado (404)
+            if (e.getMessage().contains("Propietario")) {
+                return ResponseEntity.badRequest().build();
+            }
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PostMapping("/cambiar-password")
     public ResponseEntity<Void> cambiarPassword(
             @RequestHeader("Authorization") String token,

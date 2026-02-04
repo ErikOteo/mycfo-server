@@ -23,11 +23,18 @@ public class EmpresaController {
             @RequestHeader(value = "X-Usuario-Sub", required = false) String subActual,
             @PathVariable Long id) {
         try {
-            // Si hay sub, verificar que pertenezca a la empresa
-            if (subActual != null && !permissionService.esAdministrador(subActual)) {
-                // Si no es admin puro, verificar si tiene permiso view en admin
-                if (!permissionService.tienePermiso(subActual, "admin", "view")) {
-                    return ResponseEntity.status(403).build();
+            // Si hay sub, verificar permisos
+            if (subActual != null) {
+                // Si pertenece a la empresa, tiene acceso de lectura
+                boolean esMiembro = permissionService.perteneceAEmpresa(subActual, id);
+
+                if (!esMiembro) {
+                    // Si NO es miembro (ej. admin global o intento de acceso indebido),
+                    // requerimos permisos explícitos de admin
+                    if (!permissionService.esAdministrador(subActual) &&
+                            !permissionService.tienePermiso(subActual, "admin", "view")) {
+                        return ResponseEntity.status(403).build();
+                    }
                 }
             }
 
@@ -51,10 +58,34 @@ public class EmpresaController {
         }
     }
 
-    @PostMapping("/")
-    public ResponseEntity<EmpresaDTO> crearEmpresa(@RequestBody EmpresaDTO empresaDTO) {
+    @GetMapping("/buscar")
+    public ResponseEntity<List<EmpresaDTO>> buscarEmpresas(
+            @RequestParam String nombre,
+            @RequestHeader(value = "X-Usuario-Sub") String subActual) {
         try {
-            EmpresaDTO empresa = empresaService.crearEmpresa(empresaDTO);
+            if (nombre == null || nombre.length() < 3) {
+                return ResponseEntity.badRequest().build();
+            }
+            // Cualquiera autenticado puede buscar para unirse, verificamos que el sub
+            // exista idealmente
+            // Pero como mínimo requerimos el header
+            if (subActual == null)
+                return ResponseEntity.badRequest().build();
+
+            List<EmpresaDTO> empresas = empresaService.buscarEmpresasPorNombre(nombre);
+            return ResponseEntity.ok(empresas);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/")
+    public ResponseEntity<EmpresaDTO> crearEmpresa(
+            @RequestHeader(value = "X-Usuario-Sub") String subActual,
+            @RequestBody EmpresaDTO empresaDTO) {
+        try {
+            // Pasamos el sub del creador para asignarlo como dueño
+            EmpresaDTO empresa = empresaService.crearEmpresa(empresaDTO, subActual);
             return ResponseEntity.ok(empresa);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
@@ -138,6 +169,23 @@ public class EmpresaController {
             return ResponseEntity.ok(Map.of("emailOwner", emailOwner));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarEmpresa(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Usuario-Sub") String subActual) {
+        try {
+            empresaService.eliminarEmpresa(id, subActual);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            System.err.println("Error eliminando empresa: " + e.getMessage());
+            // Si el error es de permisos o validación
+            if (e.getMessage().contains("No perteneces") || e.getMessage().contains("Solo el propietario")) {
+                return ResponseEntity.status(403).build();
+            }
+            return ResponseEntity.status(500).build();
         }
     }
 }

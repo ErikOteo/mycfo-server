@@ -22,7 +22,8 @@ import {
   useMediaQuery,
   Divider
 } from '@mui/material';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
@@ -48,6 +49,7 @@ const PANTALLAS = [
 
 export default function Roles(props) {
   const { tienePermiso } = usePermisos();
+  const navigate = useNavigate();
 
 
   const [empleados, setEmpleados] = React.useState([]);
@@ -86,7 +88,7 @@ export default function Roles(props) {
 
       const combinedData = [...data].map(emp => {
         let color = emp.avatarColor;
-        let baseRol = 'NORMAL';
+        let baseRol = 'COLABORADOR';
 
         if (emp.rol) {
           const parts = emp.rol.split('|');
@@ -123,7 +125,7 @@ export default function Roles(props) {
         if (!currentPermisos[emp.sub]) {
           const initial = {};
           // Si el rol es mock o real, chequeamos si "empieza" con ADMIN por seguridad
-          const baseRol = emp.rol ? emp.rol.split('|')[0] : 'NORMAL';
+          const baseRol = emp.rol ? emp.rol.split('|')[0] : 'COLABORADOR';
           const isBaseAdmin = baseRol === 'ADMINISTRADOR';
 
           PANTALLAS.forEach(p => {
@@ -435,16 +437,31 @@ export default function Roles(props) {
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'flex-end',
+        alignItems: isMobile ? 'flex-start' : 'center',
         gap: isMobile ? 2 : 0
       }}>
-        <Box>
-          <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 700 }}>
-            Permisos de Miembros
-          </Typography>
-          <Typography variant="body2" color="text.primary">
-            Configura individualmente quién puede Ver y quién puede Editar cada sección.
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/organizacion')}
+            sx={{
+              mr: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'text.primary',
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }
+            }}
+          >
+            Volver
+          </Button>
+          <Box>
+            <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 700, mb: 0 }}>
+              Permisos de Miembros
+            </Typography>
+            <Typography variant="body2" color="text.primary">
+              Configura individualmente quién puede Ver y quién puede Editar cada sección.
+            </Typography>
+          </Box>
         </Box>
         <Stack direction="row" spacing={2} sx={{ width: isMobile ? '100%' : 'auto' }}>
           <IconButton onClick={cargarDatos} disabled={guardando}>

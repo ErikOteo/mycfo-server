@@ -31,6 +31,7 @@ import SalesTrendWidget from "./components/SalesTrendWidget";
 import SalesByCategoryWidget from "./components/SalesByCategoryWidget";
 import InsightsWidget from "./components/InsightsWidget";
 import DashboardEmptyState from "./components/DashboardEmptyState";
+import WelcomeChoice from "./components/WelcomeChoice";
 // import BillingWidget from "./components/BillingWidget";
 import { fetchDashboardSummary } from "./services/dashboardSummaryService";
 import useResolvedColorTokens from "./useResolvedColorTokens";
@@ -435,7 +436,7 @@ const Dashboard = React.memo(() => {
     []
   );
   const [snackbar, setSnackbar] = React.useState(null);
-  const [company, setCompany] = React.useState(companiesMock[0]);
+  const [company, setCompany] = React.useState(sessionStorage.getItem("organizacionId") || null);
   const periodOptions = React.useMemo(() => getRecentPeriods(6), []);
   const [period, setPeriod] = React.useState(periodOptions[0]?.value ?? "");
   const [currency, setCurrency] = usePreferredCurrency("ARS");
@@ -513,16 +514,30 @@ const Dashboard = React.memo(() => {
     // 1. Intentar refrescar los permisos desde el servidor
     try {
       const { data: profile } = await http.get(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`);
-      if (profile && profile.rol) {
-        console.log("🔑 Permisos actualizados desde el servidor:", profile.rol);
-        sessionStorage.setItem('rol', profile.rol);
-        if (profile.rol.includes('|PERM:')) {
-          const jsonPart = profile.rol.split('|PERM:')[1];
-          sessionStorage.setItem('permisos', jsonPart);
+      if (profile && (profile.rol || profile.empresaId !== undefined)) {
+        console.log("🔑 Perfil actualizado desde el servidor:", profile);
+
+        // 1. Sincronizar Empresa
+        if (profile.empresaId) {
+          sessionStorage.setItem('organizacionId', profile.empresaId);
+          setCompany(profile.empresaId);
         } else {
-          sessionStorage.removeItem('permisos');
+          sessionStorage.removeItem('organizacionId');
+          setCompany(null);
         }
-        // Avisar al hook usePermisos que los datos cambiaron
+
+        // 2. Sincronizar Rol y Permisos
+        if (profile.rol) {
+          sessionStorage.setItem('rol', profile.rol);
+          if (profile.rol.includes('|PERM:')) {
+            const jsonPart = profile.rol.split('|PERM:')[1];
+            sessionStorage.setItem('permisos', jsonPart);
+          } else {
+            sessionStorage.removeItem('permisos');
+          }
+        }
+
+        // 3. Notificar cambios
         window.dispatchEvent(new Event('userDataUpdated'));
       }
     } catch (err) {
@@ -545,7 +560,7 @@ const Dashboard = React.memo(() => {
         setIsRefreshing(false);
         console.log("✅ Datos del dashboard recargados (modo mock)");
       }, 700);
-      return;
+      return; // Exit early if using mocks
     }
 
     fetchTimeoutRef.current = undefined;
@@ -566,7 +581,7 @@ const Dashboard = React.memo(() => {
       if (activeRequestRef.current !== requestId) {
         return;
       }
-      const mockState = buildMockState();
+      const mockState = buildMockState(); // Use mock state as a base to ensure all keys are present
       mockState.movements = movementsState ?? mockState.movements;
       if (invoicesState) {
         mockState.invoices = invoicesState;
@@ -656,9 +671,6 @@ const Dashboard = React.memo(() => {
       });
 
       const values = pointsDetailed.map((point) => point.value);
-
-      // Promedio solo sobre los meses con movimiento distinto de cero,
-      // para que no se "licúe" cuando solo hubo pocos meses con actividad.
       const nonZeroValues = values.filter((val) => val !== 0);
       const average =
         nonZeroValues.length > 0
@@ -697,63 +709,32 @@ const Dashboard = React.memo(() => {
     };
 
     const mapConciliationResponse = (response) => {
-      if (!response) {
-        return null;
-      }
-
+      if (!response) return null;
       const total = Number(response.totalMovimientos ?? 0);
       const conciliados = Number(response.conciliados ?? 0);
-      const pendientes =
-        response.pendientes !== undefined
-          ? Number(response.pendientes ?? 0)
-          : Math.max(total - conciliados, 0);
-      const porcentaje =
-        response.porcentajeConciliados !== undefined &&
-          response.porcentajeConciliados !== null
-          ? Number(response.porcentajeConciliados)
-          : total > 0
-            ? (conciliados * 100) / total
-            : 0;
+      const pendientes = response.pendientes !== undefined
+        ? Number(response.pendientes ?? 0)
+        : Math.max(total - conciliados, 0);
+      const porcentaje = response.porcentajeConciliados !== undefined && response.porcentajeConciliados !== null
+        ? Number(response.porcentajeConciliados)
+        : total > 0 ? (conciliados * 100) / total : 0;
 
       const periodo = String(response.periodo ?? "");
       let periodLabel = periodo || "Periodo actual";
       const [yearStr, monthStr] = periodo.split("-");
       const monthIndex = Number(monthStr) - 1;
       const yearNum = Number(yearStr);
-      const monthNames = [
-        "enero",
-        "febrero",
-        "marzo",
-        "abril",
-        "mayo",
-        "junio",
-        "julio",
-        "agosto",
-        "septiembre",
-        "octubre",
-        "noviembre",
-        "diciembre",
-      ];
-      if (
-        monthIndex >= 0 &&
-        monthIndex < monthNames.length &&
-        Number.isFinite(yearNum)
-      ) {
+      const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+      if (monthIndex >= 0 && monthIndex < monthNames.length && Number.isFinite(yearNum)) {
         periodLabel = `${monthNames[monthIndex]} ${yearNum}`;
       }
 
-      const porTipoRaw = Array.isArray(response.porTipo)
-        ? response.porTipo
-        : [];
+      const porTipoRaw = Array.isArray(response.porTipo) ? response.porTipo : [];
       const porTipo = porTipoRaw.map((item) => {
         const totalTipo = Number(item?.total ?? 0);
         const conciliadosTipo = Number(item?.conciliados ?? 0);
-        const pendientesTipo =
-          item?.pendientes !== undefined
-            ? Number(item.pendientes ?? 0)
-            : Math.max(totalTipo - conciliadosTipo, 0);
-        const porcentajeTipo =
-          totalTipo > 0 ? (conciliadosTipo * 100) / totalTipo : 0;
+        const pendientesTipo = item?.pendientes !== undefined ? Number(item.pendientes ?? 0) : Math.max(totalTipo - conciliadosTipo, 0);
+        const porcentajeTipo = totalTipo > 0 ? (conciliadosTipo * 100) / totalTipo : 0;
         return {
           tipo: item?.tipo ?? "Sin tipo",
           total: totalTipo,
@@ -776,110 +757,111 @@ const Dashboard = React.memo(() => {
       };
     };
 
-    (async () => {
-      const applyCompositeResponse = (composite) => {
-        if (!composite) return;
+    const applyCompositeResponse = (composite) => {
+      if (!composite) return;
 
-        const movimientosBackend = Array.isArray(composite.movimientosRecientes)
-          ? composite.movimientosRecientes
-          : [];
-        const facturasBackend = Array.isArray(composite.facturasRecientes)
-          ? composite.facturasRecientes
-          : [];
+      const movimientosBackend = Array.isArray(composite.movimientosRecientes)
+        ? composite.movimientosRecientes
+        : [];
+      const facturasBackend = Array.isArray(composite.facturasRecientes)
+        ? composite.facturasRecientes
+        : [];
 
-        const movementsState = {
-          loading: false,
-          error: null,
-          data: movimientosBackend.map(mapMovementFromBackend),
-        };
-
-        const invoicesState = {
-          loading: false,
-          error: null,
-          data: facturasBackend.map(mapInvoiceFromBackend),
-        };
-
-        let kpisState = null;
-        const resumen = composite.resumenMensual;
-        const saldoTotal = composite.saldoTotal;
-        if (resumen) {
-          kpisState = {
-            loading: false,
-            error: null,
-            data: {
-              totalIncomes: resumen.ingresosTotales,
-              totalExpenses: resumen.egresosTotales,
-              netResult: resumen.resultadoNeto,
-              period: resumen.periodo,
-              periodLabel: resumen.periodo,
-              movementsCount: resumen.totalMovimientos,
-              totalBalance: saldoTotal?.saldoTotal ?? null,
-            },
-          };
-        }
-
-        const salesTrendState = composite.ingresosMensuales
-          ? {
-            loading: false,
-            error: null,
-            data: mapTrendResponse(composite.ingresosMensuales, {
-              title: "Ingresos durante el período",
-              emptyMessage: "No hay ingresos registrados en este periodo.",
-              subheader:
-                "Serie mensual de ingresos registrados en los ultimos 12 meses.",
-            }),
-          }
-          : { loading: false, error: null, data: null };
-
-        const expensesTrendState = composite.egresosMensuales
-          ? {
-            loading: false,
-            error: null,
-            data: mapTrendResponse(composite.egresosMensuales, {
-              title: "Egresos durante el período",
-              emptyMessage: "No hay egresos registrados en este periodo.",
-              subheader:
-                "Serie mensual de egresos registrados en los ultimos 12 meses.",
-            }),
-          }
-          : { loading: false, error: null, data: null };
-
-        const salesByCategoryState = composite.ingresosPorCategoria
-          ? {
-            loading: false,
-            error: null,
-            data: mapCategoryResponse(composite.ingresosPorCategoria),
-          }
-          : { loading: false, error: null, data: null };
-
-        const expensesByCategoryState = composite.egresosPorCategoria
-          ? {
-            loading: false,
-            error: null,
-            data: mapCategoryResponse(composite.egresosPorCategoria),
-          }
-          : { loading: false, error: null, data: null };
-
-        const reconciliationState = composite.conciliacion
-          ? {
-            loading: false,
-            error: null,
-            data: mapConciliationResponse(composite.conciliacion),
-          }
-          : { loading: false, error: null, data: null };
-
-        applyResult({
-          movements: movementsState,
-          invoices: invoicesState,
-          kpis: kpisState,
-          salesTrend: salesTrendState,
-          salesByCategory: salesByCategoryState,
-          expensesTrend: expensesTrendState,
-          expensesByCategory: expensesByCategoryState,
-          reconciliation: reconciliationState,
-        });
+      const movementsState = {
+        loading: false,
+        error: null,
+        data: movimientosBackend.map(mapMovementFromBackend),
       };
 
+      const invoicesState = {
+        loading: false,
+        error: null,
+        data: facturasBackend.map(mapInvoiceFromBackend),
+      };
+
+      let kpisState = null;
+      const resumen = composite.resumenMensual;
+      const saldoTotal = composite.saldoTotal;
+      if (resumen) {
+        kpisState = {
+          loading: false,
+          error: null,
+          data: {
+            totalIncomes: resumen.ingresosTotales,
+            totalExpenses: resumen.egresosTotales,
+            netResult: resumen.resultadoNeto,
+            period: resumen.periodo,
+            periodLabel: resumen.periodo,
+            movementsCount: resumen.totalMovimientos,
+            totalBalance: saldoTotal?.saldoTotal ?? null,
+          },
+        };
+      }
+
+      const salesTrendState = composite.ingresosMensuales
+        ? {
+          loading: false,
+          error: null,
+          data: mapTrendResponse(composite.ingresosMensuales, {
+            title: "Ingresos durante el período",
+            emptyMessage: "No hay ingresos registrados en este periodo.",
+            subheader:
+              "Serie mensual de ingresos registrados en los ultimos 12 meses.",
+          }),
+        }
+        : { loading: false, error: null, data: null };
+
+      const expensesTrendState = composite.egresosMensuales
+        ? {
+          loading: false,
+          error: null,
+          data: mapTrendResponse(composite.egresosMensuales, {
+            title: "Egresos durante el período",
+            emptyMessage: "No hay egresos registrados en este periodo.",
+            subheader:
+              "Serie mensual de egresos registrados en los ultimos 12 meses.",
+          }),
+        }
+        : { loading: false, error: null, data: null };
+
+      const salesByCategoryState = composite.ingresosPorCategoria
+        ? {
+          loading: false,
+          error: null,
+          data: mapCategoryResponse(composite.ingresosPorCategoria),
+        }
+        : { loading: false, error: null, data: null };
+
+      const expensesByCategoryState = composite.egresosPorCategoria
+        ? {
+          loading: false,
+          error: null,
+          data: mapCategoryResponse(composite.egresosPorCategoria),
+        }
+        : { loading: false, error: null, data: null };
+
+      const reconciliationState = composite.conciliacion
+        ? {
+          loading: false,
+          error: null,
+          data: mapConciliationResponse(composite.conciliacion),
+        }
+        : { loading: false, error: null, data: null };
+
+      applyResult({
+        movements: movementsState,
+        invoices: invoicesState,
+        kpis: kpisState,
+        salesTrend: salesTrendState,
+        salesByCategory: salesByCategoryState,
+        expensesTrend: expensesTrendState,
+        expensesByCategory: expensesByCategoryState,
+        reconciliation: reconciliationState,
+      });
+    };
+
+    // Actual data fetching logic
+    (async () => {
       // 1) Mostrar primero lo que haya en cache (si existe)
       if (typeof window !== "undefined") {
         try {
@@ -893,45 +875,64 @@ const Dashboard = React.memo(() => {
         }
       }
 
-      // 2) Hacer la llamada al endpoint compuesto
-      try {
-        const composite = await fetchDashboardSummary({
-          period,
-          months: 12,
-          limitMovements: 6,
-          limitInvoices: 6,
-          currency,
-        });
+      // 2) Hacer la llamada al endpoint compuesto (Solo si hay empresa)
+      if (company && company !== 'null') {
+        try {
+          const composite = await fetchDashboardSummary({
+            period,
+            months: 12,
+            limitMovements: 6,
+            limitInvoices: 6,
+            currency,
+            organizacionId: company,
+          });
 
-        // guardar en cache la respuesta cruda del backend
-        if (typeof window !== "undefined") {
-          try {
-            window.sessionStorage.setItem(
-              dashboardCacheKey,
-              JSON.stringify(composite)
-            );
-          } catch (err) {
-            // ignoramos errores de storage
+          // guardar en cache la respuesta cruda del backend
+          if (typeof window !== "undefined") {
+            try {
+              window.sessionStorage.setItem(
+                dashboardCacheKey,
+                JSON.stringify(composite)
+              );
+            } catch (err) {
+              // ignoramos errores de storage
+            }
           }
-        }
 
-        applyCompositeResponse(composite);
-      } catch (error) {
-        console.error("❌ Error recargando dashboard:", error);
+          applyCompositeResponse(composite);
+        } catch (error) {
+          console.error("❌ Error recargando dashboard:", error);
+          if (activeRequestRef.current !== requestId) {
+            return;
+          }
+          setIsRefreshing(false);
+          setState((prev) => ({
+            ...prev,
+            kpis: {
+              ...prev.kpis,
+              loading: false,
+              error:
+                error?.message ||
+                "No pudimos actualizar el resumen de dashboard.",
+            },
+          }));
+        }
+      } else {
         setIsRefreshing(false);
-        setState((prev) => ({
-          ...prev,
-          kpis: {
-            ...prev.kpis,
-            loading: false,
-            error:
-              error?.message ||
-              "No pudimos actualizar el resumen de dashboard.",
-          },
-        }));
+        console.log("⚠️ No hay empresa seleccionada, omitiendo carga de datos.");
       }
     })();
-  }, [buildMockState, currency, dashboardCacheKey, useMocks, period]);
+  }, [buildMockState, currency, dashboardCacheKey, useMocks, period, company]);
+
+  // Escuchar actualizaciones globales de usuario (ej: desde Home.js)
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      const currentOrgId = sessionStorage.getItem("organizacionId");
+      setCompany(currentOrgId || null);
+    };
+    window.addEventListener('userDataUpdated', handleUpdate);
+    return () => window.removeEventListener('userDataUpdated', handleUpdate);
+  }, []);
 
   React.useEffect(() => {
     loadDashboardData();
@@ -940,6 +941,7 @@ const Dashboard = React.memo(() => {
       activeRequestRef.current += 1;
     };
   }, [loadDashboardData]);
+
 
   const handleNavigate = React.useCallback(
     (path, params) => {
@@ -1028,60 +1030,26 @@ const Dashboard = React.memo(() => {
     setSnackbar(null);
   };
 
-  // const showMessage = React.useCallback((message, severity = "success") => {
-  //   setSnackbar({ message, severity });
-  // }, []);
-
   const kpiCards = React.useMemo(() => {
     const data = state.kpis.data;
     const canSeeFinances = tienePermiso('movs', 'view') || tienePermiso('facts', 'view');
-
     if (!canSeeFinances) return [];
-
     return [
-      {
-        id: "totalIncomes",
-        title: "Ingresos Totales Mensuales",
-        value: data?.totalIncomes ?? null,
-        formatter: formatCurrency,
-        trend: [],
-      },
-      {
-        id: "totalExpenses",
-        title: "Egresos Totales Mensuales",
-        value: data?.totalExpenses ?? null,
-        formatter: formatCurrency,
-        trend: [],
-      },
-      {
-        id: "netResult",
-        title: "Resultado Neto Mensuales",
-        value: data?.netResult ?? null,
-        formatter: formatCurrency,
-        trend: [],
-      },
-      {
-        id: "totalBalance",
-        title: "Dinero Total",
-        value: data?.totalBalance ?? null,
-        formatter: formatCurrency,
-        trend: [],
-      },
+      { id: "totalIncomes", title: "Ingresos Totales Mensuales", value: data?.totalIncomes ?? null, formatter: formatCurrency, trend: [] },
+      { id: "totalExpenses", title: "Egresos Totales Mensuales", value: data?.totalExpenses ?? null, formatter: formatCurrency, trend: [] },
+      { id: "netResult", title: "Resultado Neto Mensuales", value: data?.netResult ?? null, formatter: formatCurrency, trend: [] },
+      { id: "totalBalance", title: "Dinero Total", value: data?.totalBalance ?? null, formatter: formatCurrency, trend: [] },
     ];
   }, [state.kpis.data, formatCurrency, tienePermiso]);
 
   const quickActionsLoading = state.kpis.loading && !state.kpis.data;
-
-  const quickActionsSx = React.useMemo(
-    () => ({
-      position: { xs: "relative", md: "sticky" },
-      top: { md: theme.spacing(1) },
-      zIndex: theme.zIndex.appBar - 1,
-      display: "flex",
-      justifyContent: "center",
-    }),
-    [theme]
-  );
+  const quickActionsSx = React.useMemo(() => ({
+    position: { xs: "relative", md: "sticky" },
+    top: { md: theme.spacing(1) },
+    zIndex: theme.zIndex.appBar - 1,
+    display: "flex",
+    justifyContent: "center",
+  }), [theme]);
 
   return (
     <Box
@@ -1095,7 +1063,9 @@ const Dashboard = React.memo(() => {
     >
       <Stack spacing={3} sx={{ width: "100%" }}>
 
-        {!tieneAlgunPermiso() ? (
+        {(!company || company === 'null') ? (
+          <WelcomeChoice />
+        ) : !tieneAlgunPermiso() ? (
           <DashboardEmptyState
             userDisplayName={userDisplayName}
             onRetry={loadDashboardData}

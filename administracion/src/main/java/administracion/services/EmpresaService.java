@@ -24,7 +24,8 @@ public class EmpresaService {
         return convertirADTO(empresa);
     }
 
-    public EmpresaDTO crearEmpresa(EmpresaDTO empresaDTO) {
+    public EmpresaDTO crearEmpresa(EmpresaDTO empresaDTO, String creatorSub) {
+        // 1. Crear la empresa
         Empresa empresa = new Empresa();
         empresa.setNombre(empresaDTO.getNombre());
         empresa.setDescripcion(empresaDTO.getDescripcion());
@@ -33,7 +34,33 @@ public class EmpresaService {
         empresa.setDomicilio(empresaDTO.getDomicilio());
 
         Empresa guardada = empresaRepository.save(empresa);
+
+        // 2. Buscar al usuario creador y asignarlo como dueño
+        if (creatorSub != null && !creatorSub.isEmpty()) {
+            Usuario usuario = usuarioRepository.findBySub(creatorSub)
+                    .orElseThrow(() -> new RuntimeException("Usuario creador no encontrado: " + creatorSub));
+
+            usuario.setEmpresa(guardada);
+            usuario.setRol(
+                    "ADMINISTRADOR|PERM:{\"dashboard\":{\"view\":true,\"edit\":true},\"carga\":{\"view\":true,\"edit\":true},\"movs\":{\"view\":true,\"edit\":true},\"facts\":{\"view\":true,\"edit\":true},\"concil\":{\"view\":true,\"edit\":true},\"reps\":{\"view\":true,\"edit\":true},\"pron\":{\"view\":true,\"edit\":true},\"pres\":{\"view\":true,\"edit\":true},\"admin\":{\"view\":true,\"edit\":true},\"notif\":{\"view\":true,\"edit\":true}}|COLOR:#008375"); // Asignar
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // rol
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // de
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // administrador
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // completo
+            usuario.setEsPropietario(true);
+
+            usuarioRepository.save(usuario);
+            System.out.println("✅ [EMPRESA-SERVICE] Usuario " + usuario.getNombre() + " asignado como OWNER de "
+                    + guardada.getNombre());
+        }
+
         return convertirADTO(guardada);
+    }
+
+    // Sobrecarga para mantener compatibilidad si es necesario, aunque idealmente
+    // siempre debería usarse la versión con sub
+    public EmpresaDTO crearEmpresa(EmpresaDTO empresaDTO) {
+        return crearEmpresa(empresaDTO, null);
     }
 
     public EmpresaDTO actualizarEmpresa(Long id, EmpresaDTO empresaDTO) {
@@ -52,6 +79,12 @@ public class EmpresaService {
 
     public List<EmpresaDTO> listarEmpresas() {
         return empresaRepository.findAll().stream()
+                .map(this::convertirADTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<EmpresaDTO> buscarEmpresasPorNombre(String nombre) {
+        return empresaRepository.findByNombreContainingIgnoreCase(nombre).stream()
                 .map(this::convertirADTO)
                 .collect(Collectors.toList());
     }
@@ -142,5 +175,37 @@ public class EmpresaService {
         dto.setCondicionIVA(empresa.getCondicionIVA());
         dto.setDomicilio(empresa.getDomicilio());
         return dto;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void eliminarEmpresa(Long id, String ownerSub) {
+        // 1. Obtener la empresa
+        Empresa empresa = empresaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+
+        // 2. Verificar que el solicitante es el dueño legítimo
+        Usuario usuario = usuarioRepository.findBySub(ownerSub)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (usuario.getEmpresa() == null || !usuario.getEmpresa().getId().equals(id)) {
+            throw new RuntimeException("No perteneces a esta empresa");
+        }
+
+        if (!Boolean.TRUE.equals(usuario.getEsPropietario())) {
+            throw new RuntimeException("Solo el propietario puede eliminar la empresa");
+        }
+
+        // 3. Desvincular a TODOS los empleados de esta empresa
+        List<Usuario> empleados = usuarioRepository.findByEmpresaId(id);
+        for (Usuario emp : empleados) {
+            emp.setEmpresa(null);
+            emp.setRol("COLABORADOR");
+            emp.setEsPropietario(false);
+            usuarioRepository.save(emp); // Importante guardar cada cambio
+        }
+
+        // 4. Eliminar la empresa
+        empresaRepository.delete(empresa);
+        System.out.println("✅ [EMPRESA-SERVICE] Empresa eliminada: " + empresa.getNombre() + " por " + ownerSub);
     }
 }

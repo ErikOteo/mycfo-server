@@ -55,16 +55,21 @@ public class SolicitudAccesoEmailService {
         String url = administracionUrl + "/api/empresas/owner-email-por-usuario/" + subColaborador;
         System.out.println("🔗 [SOLICITUD-ACCESO-SERVICE] Llamando a administración: " + url);
         try {
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+            ResponseEntity<Map<String, Object>> response = restTemplate.getForEntity(url,
+                    (Class<Map<String, Object>>) (Class<?>) Map.class);
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                String email = (String) response.getBody().get("emailOwner");
-                if (email == null) {
-                    throw new RuntimeException("Administración respondió OK pero sin emailOwner");
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> body = response.getBody();
+                if (body != null) {
+                    String email = (String) body.get("emailOwner");
+                    if (email == null) {
+                        throw new RuntimeException("Administración respondió OK pero sin emailOwner");
+                    }
+                    return email;
                 }
-                return email;
             }
-            throw new RuntimeException("Administración respondió con status: " + response.getStatusCode());
+            throw new RuntimeException(
+                    "Administración respondió con status: " + response.getStatusCode() + " o body vacío");
         } catch (Exception e) {
             System.err.println("❌ [SOLICITUD-ACCESO-SERVICE] Error en endpoint de administración: " + e.getMessage());
             throw new RuntimeException(
