@@ -12,6 +12,7 @@ import Header from "./components/Header";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import ChatbotIaWidget from "../shared-components/ChatbotIAWidget"; // Corregido: ChatbotIAWidget con IA en mayúsculas
 import { ChatbotContextProvider } from "../shared-components/ChatbotContext";
+import BottomNavigationBar from "./components/BottomNavigationBar";
 import axios from "axios";
 import API_CONFIG from "../config/api-config";
 
@@ -234,7 +235,7 @@ const Home = React.memo(function Home(props) {
                 position: "relative",
                 zIndex: 1,
                 mx: 3,
-                pb: 5,
+                pb: { xs: 10, lg: 5 }, // Más padding en mobile para la barra inferior
                 minHeight: "100vh",
                 alignItems: "center",
               }}
@@ -256,6 +257,9 @@ const Home = React.memo(function Home(props) {
 
             {/* Chatbot Widget integrado globalmente en el layout autenticado */}
             <ChatbotIaWidget currentModule={currentModule} />
+
+            {/* Barra de navegación inferior para mobile */}
+            <BottomNavigationBar />
           </ChatbotContextProvider>
         </Box>
       </Box>

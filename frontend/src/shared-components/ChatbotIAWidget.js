@@ -945,7 +945,12 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     color="primary"
                     aria-label="chat"
                     onClick={() => setIsOpen(true)}
-                    sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}
+                    sx={{
+                        position: 'fixed',
+                        bottom: { xs: 84, lg: 20 }, // 84px en mobile para estar arriba de la barra (64px + 20px)
+                        right: 20,
+                        zIndex: 1000
+                    }}
                 >
                     <ChatIcon />
                 </Fab>
@@ -957,7 +962,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     elevation={12}
                     sx={(theme) => ({
                         position: 'fixed',
-                        bottom: 20,
+                        bottom: { xs: 84, lg: 20 }, // 84px en mobile para estar arriba de la barra
                         right: 20,
                         width: 350,
                         height: 500,
