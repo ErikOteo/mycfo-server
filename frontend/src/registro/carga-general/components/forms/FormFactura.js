@@ -51,7 +51,7 @@ export default function FormFactura({
   const autocompletarDatos = (version) => {
     console.log('Autocompletando datos para versión:', version);
     console.log('Datos de empresa disponibles:', datosEmpresa);
-    
+
     if (!datosEmpresa) {
       console.log('No hay datos de empresa disponibles');
       return;
@@ -142,7 +142,7 @@ export default function FormFactura({
       </Box>
 
       {/* 2️⃣ Versión + Tipo factura + Fecha emisión */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Versión *</FormLabel>
           <CustomSelect
@@ -196,7 +196,7 @@ export default function FormFactura({
       </Box>
 
       {/* 3️⃣ Monto Total + Moneda */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
           <OutlinedInput
@@ -264,7 +264,7 @@ export default function FormFactura({
 
 
       {/* 5️⃣ Datos Vendedor */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre vendedor *</FormLabel>
           <OutlinedInput
@@ -324,7 +324,7 @@ export default function FormFactura({
       </Box>
 
       {/* 6️⃣ Datos Comprador */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre comprador *</FormLabel>
           <OutlinedInput
