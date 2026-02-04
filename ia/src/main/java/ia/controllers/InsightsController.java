@@ -24,8 +24,16 @@ public class InsightsController {
             @RequestParam(required = false) Integer mes
     ) {
         log.info("Insights request: userSub={}, anio={}, mes={}", userSub, anio, mes);
-        var resp = insightsService.generarInsights(userSub, authorization, anio, mes);
-        log.info("Insights response ready: userSub={}, keys={}", userSub, resp != null ? resp.keySet() : "null");
-        return ResponseEntity.ok(resp);
+        try {
+            var resp = insightsService.generarInsights(userSub, authorization, anio, mes);
+            log.info("Insights response ready: userSub={}, keys={}", userSub, resp != null ? resp.keySet() : "null");
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            log.error("No se pudo generar el reporte IA para userSub={}: {}", userSub, e.getMessage(), e);
+            return ResponseEntity.status(502).body(Map.of(
+                    "error", "No se pudo generar el reporte en este momento. Por favor contacta a soporte.",
+                    "detalle", e.getMessage()
+            ));
+        }
     }
 }

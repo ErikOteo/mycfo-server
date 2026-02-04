@@ -3,17 +3,43 @@ import Card from "@mui/material/Card";
 import CardHeader from "@mui/material/CardHeader";
 import CardContent from "@mui/material/CardContent";
 import CardActions from "@mui/material/CardActions";
+import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
+import Box from "@mui/material/Box";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import FiberManualRecordRoundedIcon from "@mui/icons-material/FiberManualRecordRounded";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import API_CONFIG from "../../config/api-config";
 
 const InsightsWidget = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [data, setData] = React.useState(null);
+
+  const markdownRaw =
+    data && typeof data.reporte_markdown === "string"
+      ? data.reporte_markdown.trim()
+      : "";
+  const markdown = React.useMemo(() => {
+    if (!markdownRaw) return "";
+    return markdownRaw.replace(/```json[\s\S]*?```/gi, "").trim();
+  }, [markdownRaw]);
+
   const summaryLines =
     data && typeof data.diagnostico_corto === "string"
       ? data.diagnostico_corto
@@ -40,6 +66,116 @@ const InsightsWidget = () => {
       ? data.tips.filter(Boolean)
       : [];
 
+  const mdComponents = React.useMemo(
+    () => ({
+      h2: ({ node, ...props }) => (
+        <Typography
+          variant="h6"
+          sx={{ mt: 2, mb: 1, fontWeight: 700 }}
+          {...props}
+        />
+      ),
+      h3: ({ node, ...props }) => (
+        <Typography
+          variant="subtitle1"
+          sx={{ mt: 1.5, mb: 0.75, fontWeight: 700, textTransform: "uppercase" }}
+          {...props}
+        />
+      ),
+      p: ({ node, ...props }) => (
+        <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 1 }} {...props} />
+      ),
+      ul: ({ node, ordered, ...props }) => (
+        <List dense sx={{ pl: 2, mb: 1 }} {...props} />
+      ),
+      ol: ({ node, ordered, ...props }) => (
+        <List dense sx={{ pl: 2, mb: 1 }} component="ol" {...props} />
+      ),
+      li: ({ node, children, ordered, ...props }) => (
+        <ListItem
+          {...props}
+          sx={{ alignItems: "flex-start", py: 0, px: 0 }}
+          disableGutters
+        >
+          <ListItemIcon sx={{ minWidth: 20, mt: "4px" }}>
+            <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
+          </ListItemIcon>
+          <ListItemText
+            primaryTypographyProps={{ variant: "body2", lineHeight: 1.5 }}
+            primary={children}
+          />
+        </ListItem>
+      ),
+      table: ({ node, ...props }) => (
+        <TableContainer
+          sx={{
+            my: 1,
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            borderRadius: 1,
+            overflowX: "auto",
+          }}
+        >
+          <Table size="small" {...props} />
+        </TableContainer>
+      ),
+      thead: (props) => <TableHead {...props} />,
+      tbody: (props) => <TableBody {...props} />,
+      tr: (props) => <TableRow {...props} />,
+      th: ({ node, ...props }) => (
+        <TableCell
+          {...props}
+          sx={{ fontWeight: 700, bgcolor: (theme) => theme.palette.action.hover }}
+          component="th"
+        />
+      ),
+      td: (props) => <TableCell {...props} />,
+      code: ({ inline, className, children, ...props }) => {
+        const txt = String(children);
+        const isJson =
+          className?.includes("language-json") ||
+          (!inline && /^\s*[\[{][\s\S]*[\]}]\s*$/.test(txt));
+        if (!inline && isJson) return null;
+        const isShortPlain = txt.length <= 30 && /^[A-Za-z0-9_\-]+$/.test(txt);
+        if (inline || isShortPlain) {
+          return (
+            <Typography
+              component="span"
+              variant="body2"
+              sx={{ fontWeight: 600 }}
+              {...props}
+            >
+              {txt}
+            </Typography>
+          );
+        }
+        const isCompactBlock = txt.length <= 120 && !txt.includes("\n");
+        if (isCompactBlock) {
+          return (
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }} {...props}>
+              {txt}
+            </Typography>
+          );
+        }
+        return (
+          <Box
+            component="pre"
+            sx={{
+              bgcolor: (theme) => theme.palette.action.hover,
+              p: 1,
+              borderRadius: 1,
+              overflowX: "auto",
+            }}
+            {...props}
+          >
+            <Box component="code">{txt}</Box>
+          </Box>
+        );
+      },
+      hr: () => <Divider sx={{ my: 2 }} />,
+    }),
+    []
+  );
+
   const handleRun = async () => {
     setLoading(true);
     setError(null);
@@ -51,16 +187,21 @@ const InsightsWidget = () => {
       params.set("anio", now.getFullYear());
       params.set("mes", now.getMonth() + 1);
       const headers = { "Content-Type": "application/json" };
-      const sub = sessionStorage.getItem('sub');
-      const token = sessionStorage.getItem('accessToken');
-      if (sub) headers['X-Usuario-Sub'] = sub;
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const sub = sessionStorage.getItem("sub");
+      const token = sessionStorage.getItem("accessToken");
+      if (sub) headers["X-Usuario-Sub"] = sub;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(`${baseUrl}/ia/insights?${params.toString()}`, {
-        method: 'POST',
+        method: "POST",
         headers,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json) {
+        const message =
+          (json && (json.error || json.detalle || json.message)) ||
+          `HTTP ${res.status}`;
+        throw new Error(message);
+      }
       setData(json);
     } catch (e) {
       setError(String(e));
@@ -70,10 +211,14 @@ const InsightsWidget = () => {
   };
 
   return (
-    <Card variant="outlined" sx={{ height: "100%", display: 'flex', flexDirection: 'column' }}>
+    <Card
+      variant="outlined"
+      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
       <CardHeader
         title="Análisis IA"
         subheader="Diagnóstico automático de tu situación"
+        action={<Chip label="Reporte IA" color="info" size="small" />}
         subheaderTypographyProps={{
           sx: (theme) => ({
             color: theme.vars
@@ -84,72 +229,160 @@ const InsightsWidget = () => {
       />
       <CardContent sx={{ flexGrow: 1 }}>
         {loading ? (
-          <Skeleton variant="rectangular" height={180} />
+          <Stack spacing={1}>
+            <Skeleton variant="text" width="40%" />
+            <Skeleton variant="rectangular" height={14} />
+            <Skeleton variant="rectangular" height={14} />
+            <Skeleton variant="rectangular" height={14} width="70%" />
+          </Stack>
         ) : error ? (
           <Alert severity="error">{error}</Alert>
         ) : data ? (
-          <Stack spacing={1}>
+          <Stack spacing={1.25}>
             {data.alerta ? (
               <Alert severity="warning" variant="outlined">
-                Indicadores financieros en observacion.
+                Indicadores financieros en observación.
               </Alert>
             ) : null}
-            {summaryLines.length > 0 ? (
+            {markdown ? (
+              <Box
+                sx={(theme) => ({
+                  bgcolor: theme.palette.action.hover,
+                  borderRadius: 1.5,
+                  p: 2,
+                  border: `1px solid ${theme.palette.divider}`,
+                })}
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={mdComponents}
+                >
+                  {markdown}
+                </ReactMarkdown>
+              </Box>
+            ) : summaryLines.length > 0 ? (
               summaryLines.map((line, idx) => (
                 <Typography key={idx} variant="body2">
                   {line}
                 </Typography>
               ))
             ) : (
-              <Typography variant="body2">No hay resumen disponible.</Typography>
+              <Typography variant="body2">
+                No hay resumen disponible.
+              </Typography>
             )}
-            {detalleLines.length > 0 ? (
-              <Stack spacing={0.25}>
+            {!markdown && detalleLines.length > 0 ? (
+              <Box
+                sx={(theme) => ({
+                  bgcolor: theme.palette.action.hover,
+                  borderRadius: 1.5,
+                  p: 1.5,
+                  border: `1px solid ${theme.palette.divider}`,
+                })}
+              >
                 <Typography variant="caption" color="text.secondary">
                   Detalle del mes
                 </Typography>
-                {detalleLines.map((line, idx) => (
-                  <Typography key={`det-${idx}`} variant="body2">
-                    - {line}
-                  </Typography>
-                ))}
-              </Stack>
+                <List dense sx={{ pl: 1, mt: 0.5 }}>
+                  {detalleLines.map((line, idx) => (
+                    <ListItem key={`det-${idx}`} sx={{ py: 0.25 }}>
+                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primaryTypographyProps={{ variant: "body2" }}
+                        primary={line}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
             ) : null}
-            {senalesEntries.length > 0 ? (
-              <Stack spacing={0.25}>
+            {!markdown && senalesEntries.length > 0 ? (
+              <Box
+                sx={(theme) => ({
+                  bgcolor: theme.palette.action.hover,
+                  borderRadius: 1.5,
+                  p: 1.5,
+                  border: `1px solid ${theme.palette.divider}`,
+                })}
+              >
                 <Typography variant="caption" color="text.secondary">
                   Señales
                 </Typography>
-                {senalesEntries.map(([key, value]) => (
-                  <Typography key={key} variant="body2">
-                    <b>{key.charAt(0).toUpperCase() + key.slice(1)}:</b> {value}
-                  </Typography>
-                ))}
-              </Stack>
+                <List dense sx={{ pl: 1, mt: 0.5 }}>
+                  {senalesEntries.map(([key, value]) => (
+                    <ListItem key={key} sx={{ py: 0.25 }}>
+                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primaryTypographyProps={{ variant: "body2" }}
+                        primary={
+                          <span>
+                            <b>{key.charAt(0).toUpperCase() + key.slice(1)}: </b>
+                            {value}
+                          </span>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
             ) : null}
-            {riesgos.length > 0 ? (
-              <Stack spacing={0.25}>
+            {!markdown && riesgos.length > 0 ? (
+              <Box
+                sx={(theme) => ({
+                  bgcolor: theme.palette.action.hover,
+                  borderRadius: 1.5,
+                  p: 1.5,
+                  border: `1px solid ${theme.palette.divider}`,
+                })}
+              >
                 <Typography variant="caption" color="text.secondary">
                   Riesgos clave
                 </Typography>
-                {riesgos.map((item, idx) => (
-                  <Typography key={`risk-${idx}`} variant="body2">
-                    - {item}
-                  </Typography>
-                ))}
-              </Stack>
+                <List dense sx={{ pl: 1, mt: 0.5 }}>
+                  {riesgos.map((item, idx) => (
+                    <ListItem key={`risk-${idx}`} sx={{ py: 0.25 }}>
+                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primaryTypographyProps={{ variant: "body2" }}
+                        primary={item}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
             ) : null}
-            {tips.length > 0 ? (
-              <Stack spacing={0.25}>
+            {!markdown && tips.length > 0 ? (
+              <Box
+                sx={(theme) => ({
+                  bgcolor: theme.palette.action.hover,
+                  borderRadius: 1.5,
+                  p: 1.5,
+                  border: `1px solid ${theme.palette.divider}`,
+                })}
+              >
                 <Typography variant="caption" color="text.secondary">
                   Recomendaciones
                 </Typography>
-                {tips.slice(0, 4).map((item, idx) => (
-                  <Typography key={`tip-${idx}`} variant="body2">
-                    - {item}
-                  </Typography>
-                ))}
-              </Stack>
+                <List dense sx={{ pl: 1, mt: 0.5 }}>
+                  {tips.slice(0, 4).map((item, idx) => (
+                    <ListItem key={`tip-${idx}`} sx={{ py: 0.25 }}>
+                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primaryTypographyProps={{ variant: "body2" }}
+                        primary={item}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
             ) : null}
           </Stack>
         ) : (
@@ -165,7 +398,9 @@ const InsightsWidget = () => {
           </Typography>
         )}
       </CardContent>
-      <CardActions sx={{ px: 2, pb: 2, justifyContent: "flex-end", alignItems: "center" }}>
+      <CardActions
+        sx={{ px: 2, pb: 2, justifyContent: "flex-end", alignItems: "center" }}
+      >
         <Button variant="contained" onClick={handleRun} disabled={loading}>
           Interpretar situación
         </Button>
