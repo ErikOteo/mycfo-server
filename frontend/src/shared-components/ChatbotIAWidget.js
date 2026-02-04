@@ -947,7 +947,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     onClick={() => setIsOpen(true)}
                     sx={{
                         position: 'fixed',
-                        bottom: { xs: 96, lg: 20 }, // Elevado para evitar solapamiento con la nueva barra inferior más alta
+                        bottom: { xs: 'calc(78px + max(18px, env(safe-area-inset-bottom)))', lg: 20 }, // Dinámico para sincronizar con la altura de la barra inferior que usa el mismo env()
                         right: 20,
                         zIndex: 1000
                     }}
@@ -962,7 +962,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     elevation={12}
                     sx={(theme) => ({
                         position: 'fixed',
-                        bottom: { xs: 96, lg: 20 }, // Elevado para evitar solapamiento con la nueva barra inferior más alta
+                        bottom: { xs: 'calc(78px + max(18px, env(safe-area-inset-bottom)))', lg: 20 }, // Dinámico para sincronizar con la altura de la barra inferior
                         right: 20,
                         width: 350,
                         height: 500,
