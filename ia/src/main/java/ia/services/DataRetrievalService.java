@@ -156,7 +156,7 @@ public class DataRetrievalService {
                     yield missingParams(normalized, "anio");
                 }
                 UriComponentsBuilder builder = UriComponentsBuilder
-                        .fromHttpUrl(reporteUrl + "/cashflow")
+                        .fromHttpUrl(reporteUrl + "/cashflow/resumen")
                         .queryParam("anio", year);
                 if (currency != null)
                     builder.queryParam("moneda", currency);

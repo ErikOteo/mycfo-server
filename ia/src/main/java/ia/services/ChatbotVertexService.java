@@ -534,6 +534,9 @@ public class ChatbotVertexService {
             moduleHint = "Estas asistiendo en MyCFO. Responde con foco en la funcionalidad solicitada, aunque sea de otro modulo.";
         }
 
+        String todayHint = "Fecha actual del sistema: " + LocalDate.now(ZoneId.systemDefault()) + " ("
+                + LocalDate.now(ZoneId.systemDefault()).getDayOfWeek() + ")";
+
         StringBuilder historyBlock = new StringBuilder();
         if (history != null && !history.isEmpty()) {
             historyBlock.append("\nHistorial reciente de la conversacion:\n");
@@ -547,6 +550,7 @@ public class ChatbotVertexService {
         return String.join(
                 "\n",
                 "Contexto del sistema:",
+                todayHint,
                 moduleHint,
                 contextBlock,
                 historyBlock.toString(),
@@ -780,6 +784,8 @@ public class ChatbotVertexService {
                 "Resultado herramienta " + execution.tool() + ": " + payload,
                 "Si ok es false o hay error, indica que no tenes acceso a esos datos.",
                 "Si ok es true, responde solo a lo preguntado y no menciones faltantes.",
+                "IMPORTANTE: Se conciso pero responde lo preguntado. Si hay muchos meses, prioriza resumir los meses con mas actividad para evitar que se corte la respuesta.",
+                "Podes listar los meses principales y preguntar si quiere ver el resto.",
                 "IMPORTANTE: Si el usuario pide 'otro' o 'más', verifica el historial de mensajes.",
                 "Identifica qué elementos ya mencionaste y elige UN ELEMENTO DISTINTO de los resultados de la herramienta.",
                 "IMPORTANTE: Siempre que menciones que puede ir a una sección, usa EXACTAMENTE el formato [[/ruta|Nombre de Sección]]. No dejes el nombre vacío.",
@@ -872,7 +878,8 @@ public class ChatbotVertexService {
                 "movimientos", "movimento", "movimentos")) {
             return ToolName.SEARCH_MOVEMENTS;
         }
-        if (matchesAny(normalizedMessage, "saldo", "balance", "caja", "saldo total", "plata", "dinero", "efectivo")) {
+        if (matchesAny(normalizedMessage, "saldo", "balance", "saldo total", "plata", "dinero", "efectivo")
+                || (normalizedMessage.contains("caja") && !normalizedMessage.contains("flujo"))) {
             return ToolName.GET_BALANCE;
         }
         if (matchesAny(normalizedMessage, "factura", "facturas")) {
@@ -943,6 +950,10 @@ public class ChatbotVertexService {
         }
         Integer year = extractYearFromMessage(message);
         Integer month = extractMonthFromMessage(message);
+        // Fallback: Si no hay año pero la pantalla lo requiere, usamos el actual
+        if (year == null && matchesAny(screenKey, "flujo-de-caja", "estado-de-resultados", "reporte-mensual")) {
+            year = LocalDate.now(ZoneId.systemDefault()).getYear();
+        }
         if (year != null)
             params.put("anio", year);
         if (month != null)
@@ -1032,6 +1043,11 @@ public class ChatbotVertexService {
         if (normalized.contains("este mes")) {
             LocalDate start = today.withDayOfMonth(1);
             LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
+            return new DateRange(start, end);
+        }
+        if (matchesAny(normalized, "este ano", "ano actual", "este ejercicio")) {
+            LocalDate start = today.withDayOfMonth(1).withMonth(1);
+            LocalDate end = today.withMonth(12).withDayOfMonth(31);
             return new DateRange(start, end);
         }
         return null;
