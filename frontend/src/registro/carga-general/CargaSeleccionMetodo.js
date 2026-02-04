@@ -54,7 +54,14 @@ export default function CargaSeleccionMetodo() {
         {modos.map((m) => (
           <Grid item key={m.key}>
             <ButtonBase
-              onClick={() => navigate(`/carga/${tipo}/${m.key}`)}
+              onClick={() => {
+                const tipoLower = (tipo || "").toLowerCase();
+                if ((tipoLower === "ingreso" || tipoLower === "egreso") && m.key === "documento") {
+                  navigate("/carga-movimientos");
+                  return;
+                }
+                navigate(`/carga/${tipo}/${m.key}`);
+              }}
               sx={{
                 flexDirection: "column",
                 p: 3,

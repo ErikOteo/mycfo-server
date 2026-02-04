@@ -11,6 +11,7 @@ import {
   CircularProgress,
   Paper,
   Chip,
+  MenuItem
   Stack,
   Dialog,
   DialogTitle,
@@ -50,6 +51,11 @@ export default function Organizacion() {
   const [esPropietario, setEsPropietario] = useState(false);
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [empresaEditada, setEmpresaEditada] = useState({});
+  const CONDICION_IVA_OPTIONS = [
+    "Responsable Inscripto",
+    "Monotributo",
+    "Exento",
+  ];
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [empleadoToDelete, setEmpleadoToDelete] = useState(null);
   const theme = useTheme();
@@ -220,6 +226,7 @@ export default function Organizacion() {
       await organizacionService.actualizarOrganizacion(empresaEditada);
 
       setEmpresa(empresaEditada);
+      sessionService.actualizarEmpresa(empresaEditada);
       setMensaje({ tipo: 'success', texto: 'Datos de la empresa actualizados exitosamente' });
       handleCerrarEdicionEmpresa();
 
@@ -398,9 +405,17 @@ export default function Organizacion() {
                   <TextField
                     fullWidth
                     size="small"
+                    select
                     value={empresaEditada.condicionIVA || ''}
                     onChange={(e) => handleChangeEmpresa('condicionIVA', e.target.value)}
-                  />
+                  >
+                    <MenuItem value="">Seleccionar...</MenuItem>
+                    {CONDICION_IVA_OPTIONS.map((opcion) => (
+                      <MenuItem key={opcion} value={opcion}>
+                        {opcion}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
