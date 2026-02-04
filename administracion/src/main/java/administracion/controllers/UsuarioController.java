@@ -46,7 +46,14 @@ public class UsuarioController {
     }
 
     @GetMapping("/empresa/{empresaId}")
-    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleados(@PathVariable Long empresaId) {
+    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleados(
+            @RequestHeader(value = "X-Usuario-Sub") String subActual,
+            @PathVariable Long empresaId) {
+
+        if (!permissionService.tienePermiso(subActual, "admin", "view")) {
+            return ResponseEntity.status(403).build();
+        }
+
         List<UsuarioDTO> empleados = usuarioService.obtenerEmpleadosPorEmpresa(empresaId);
         return ResponseEntity.ok(empleados);
     }
@@ -61,7 +68,14 @@ public class UsuarioController {
             UsuarioDTO actualizado = usuarioService.actualizarEmpleado(sub, dto, subUsuarioActual);
             return ResponseEntity.ok(actualizado);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).body(null);
+            String message = e.getMessage();
+            if (message != null
+                    && (message.contains("Solo los administradores") || message.contains("Solo un administrador"))) {
+                return ResponseEntity.status(403).body(null);
+            }
+            // Para otros errores (como truncado de datos o DB), devolver 500 para facilitar
+            // diagnóstico
+            return ResponseEntity.status(500).body(null);
         }
     }
 
@@ -101,6 +115,21 @@ public class UsuarioController {
             return ResponseEntity.ok(activado);
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).build();
+        }
+    }
+
+    @PostMapping("/abandonar")
+    public ResponseEntity<Void> abandonarEmpresa(
+            @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual) {
+        try {
+            usuarioService.abandonarEmpresa(subUsuarioActual);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            // Si el error es porque es propietario (400 Bad Request) o no encontrado (404)
+            if (e.getMessage().contains("Propietario")) {
+                return ResponseEntity.badRequest().build();
+            }
+            return ResponseEntity.notFound().build();
         }
     }
 

@@ -70,7 +70,7 @@ export default function NotificationSettings() {
           return;
         }
         const response = await fetch(
-          `${API_CONFIG.NOTIFICACION}/api/users/1/notification-preferences`,
+          `${API_CONFIG.NOTIFICACION}/api/users/${usuarioSub}/notification-preferences`,
           {
             headers: {
               "X-Usuario-Sub": usuarioSub,
@@ -220,7 +220,7 @@ export default function NotificationSettings() {
 
       // Enviar preferencias al backend
       const response = await fetch(
-        `${API_CONFIG.NOTIFICACION}/api/users/1/notification-preferences`,
+        `${API_CONFIG.NOTIFICACION}/api/users/${usuarioSub}/notification-preferences`,
         {
           method: "PUT",
           headers: {

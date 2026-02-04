@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from "react";
-
-import { Box, Typography, CircularProgress, Stack, Avatar, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Divider } from "@mui/material";
+import { organizacionService } from "../../shared-services/organizacionService";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Stack,
+  Avatar,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Divider,
+  Snackbar,
+  Alert
+} from "@mui/material";
+import { Logout as LogoutIcon, Business as BusinessIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import CampoEditable from "../../shared-components/CampoEditable";
 import BotonConsolidar from "../../shared-components/CustomButton";
@@ -17,6 +33,11 @@ export default function Perfil() {
   });
   const [editados, setEditados] = useState({}); // campos editados
   const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  const [empresa, setEmpresa] = useState(null); // Nuevo estado para empresa
+  const [openAbandonar, setOpenAbandonar] = useState(false); // Estado dialog abandonar
+  const [esPropietario, setEsPropietario] = useState(false); // Validacion real de API
 
   // Estado para el color del avatar
   const [avatarColor, setAvatarColor] = useState(localStorage.getItem('avatarColor') || '#008375');
@@ -25,20 +46,54 @@ export default function Perfil() {
   // Manejo del cambio de color
   const handleColorChange = (color) => {
     setAvatarColor(color);
-    localStorage.setItem('avatarColor', color);
-    window.dispatchEvent(new Event('avatarUpdated'));
+    // Ya no guardamos en localStorage aquí, se guardará al apretar "Consolidar"
+    setEditados((prev) => ({ ...prev, avatarColor: true }));
   };
 
   // 🔹 Cargar datos desde la sesión al montar el componente
   useEffect(() => {
-    const cargarDatos = () => {
-      // Cargar datos del usuario desde sesión
+    const cargarDatos = async () => {
+      // Cargar datos del usuario desde sesión (inicial)
       const usuario = sessionService.getUsuario();
       setPerfil({
         nombre: usuario.nombre || "",
         telefono: usuario.telefono || "",
         email: usuario.email || "",
       });
+
+      const cachedColor = sessionStorage.getItem('avatarColor');
+      if (cachedColor) setAvatarColor(cachedColor);
+
+      // Cargar perfil completo (incluyendo esPropietario) y datos de empresa
+      try {
+        const sub = sessionStorage.getItem("sub");
+        if (sub) {
+          const response = await axios.get(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
+            headers: { "X-Usuario-Sub": sub }
+          });
+
+          if (response.data) {
+            // Actualizar si es propietario
+            if (response.data.esPropietario) {
+              sessionStorage.setItem("esPropietario", "true"); // Cachearlo por si acaso
+              setEsPropietario(true);
+            } else {
+              sessionStorage.removeItem("esPropietario");
+              setEsPropietario(false);
+            }
+
+            // Cargar empresa si existe
+            if (response.data.empresaId) {
+              // Podríamos llamar a organizacionService, pero ya tenemos los datos básicos aquí si el DTO los trae
+              // O usamos el servicio existente para la data completa de empresa
+              const empresaData = await organizacionService.obtenerOrganizacionUsuario();
+              if (empresaData) setEmpresa(empresaData);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error cargando perfil completo:", err);
+      }
 
       setLoading(false);
     };
@@ -51,6 +106,22 @@ export default function Perfil() {
     setEditados((prev) => ({ ...prev, [campo]: true }));
   };
 
+  const handleAbandonarEmpresa = async () => {
+    try {
+      await organizacionService.abandonarEmpresa();
+      setOpenAbandonar(false);
+      setSnackbar({ open: true, message: "Has abandonado la organización correctamente", severity: "success" });
+      // Redirigir a home/login para refrescar estado
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
+    } catch (error) {
+      console.error("Error abandonando empresa:", error);
+      setSnackbar({ open: true, message: "Error al abandonar la organización", severity: "error" });
+      setOpenAbandonar(false);
+    }
+  };
+
   const handleConsolidar = async () => {
     console.log("Datos enviados:", perfil);
 
@@ -58,10 +129,19 @@ export default function Perfil() {
       const sub = sessionStorage.getItem("sub");
 
       // 🔹 Actualizar datos del usuario en BD y Cognito mediante el backend
+      // Recuperamos el rol actual para no perder los permisos al guardar el color
+      const currentRol = sessionStorage.getItem("rol") || "COLABORADOR";
+      let baseRol = currentRol.split('|PERM:')[0];
+      let permsPart = currentRol.includes('|PERM:') ? currentRol.split('|PERM:')[1].split('|COLOR:')[0] : "{}";
+
+      // Formato: ROL_BASE|PERM:JSON|COLOR:#HEX
+      const finalRol = `${baseRol}|PERM:${permsPart}|COLOR:${avatarColor}`;
+
       await axios.put(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`, {
         nombre: perfil.nombre,
         email: perfil.email,
         telefono: perfil.telefono,
+        rol: finalRol
       }, {
         headers: {
           "X-Usuario-Sub": sub
@@ -72,13 +152,16 @@ export default function Perfil() {
       sessionStorage.setItem("nombre", perfil.nombre);
       sessionStorage.setItem("email", perfil.email);
       sessionStorage.setItem("telefono", perfil.telefono);
+      sessionStorage.setItem("rol", finalRol);
+      sessionStorage.setItem("avatarColor", avatarColor);
 
-      alert("Cambios guardados con éxito ✅");
+      setSnackbar({ open: true, message: "Cambios guardados con éxito ✅", severity: "success" });
       setEditados({});
       window.dispatchEvent(new Event("userDataUpdated"));
+      window.dispatchEvent(new Event("avatarUpdated"));
     } catch (error) {
       console.error("Error actualizando perfil:", error);
-      alert("Hubo un error al actualizar el perfil.");
+      setSnackbar({ open: true, message: "Hubo un error al actualizar el perfil.", severity: "error" });
     }
   };
 
@@ -127,7 +210,7 @@ export default function Perfil() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      alert("Contraseña actualizada con éxito");
+      setSnackbar({ open: true, message: "Contraseña actualizada con éxito ✅", severity: "success" });
       setOpenPasswordDialog(false);
       setPasswords({ old: '', new: '', confirm: '' });
       setPassError('');
@@ -158,8 +241,6 @@ export default function Perfil() {
       </Box>
     );
   }
-
-
 
   return (
     <Box sx={{ width: "100%", maxWidth: 1000, mx: "auto", mt: 4, p: 3 }}>
@@ -245,6 +326,49 @@ export default function Perfil() {
       </Box>
 
       <Divider sx={{ my: 4 }} />
+
+      {/* Mi Organización */}
+      {empresa && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" gutterBottom>Mi Organización</Typography>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <BusinessIcon color="action" />
+                <Typography variant="subtitle1" fontWeight="500">{empresa.nombre}</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.primary">
+                Estás vinculado a esta empresa.
+              </Typography>
+            </Box>
+
+            {/* Botón Salir: Solo para Colaboradores (No Propietarios y No Admins) */}
+            {!esPropietario && !(sessionStorage.getItem("rol") || "").includes("ADMINISTRADOR") && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<LogoutIcon />}
+                onClick={() => setOpenAbandonar(true)}
+                sx={{ lineHeight: 1.2 }}
+              >
+                Salir de la Organización
+              </Button>
+            )}
+
+            {/* Botón Gestionar: Para Administradores y Propietarios */}
+            {(esPropietario || (sessionStorage.getItem("rol") || "").includes("ADMINISTRADOR")) && (
+              <Button
+                variant="contained"
+                sx={{ lineHeight: 1.2 }}
+                onClick={() => navigate('/organizacion')}
+              >
+                Gestionar Organización
+              </Button>
+            )}
+          </Stack>
+          <Divider sx={{ mt: 4 }} />
+        </Box>
+      )}
 
       {/* Seguridad */}
       <Box sx={{ mb: 4 }}>
@@ -337,6 +461,23 @@ export default function Perfil() {
         </DialogActions>
       </Dialog>
 
+      {/* Dialog Abandonar Organización */}
+      <Dialog open={openAbandonar} onClose={() => setOpenAbandonar(false)}>
+        <DialogTitle>¿Abandonar Organización?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Estás a punto de desvincularte de <strong>{empresa?.nombre}</strong>.
+            Perderás el acceso a la información y tendrás que ser invitado nuevamente para volver a entrar.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAbandonar(false)}>Cancelar</Button>
+          <Button onClick={handleAbandonarEmpresa} color="error" variant="contained">
+            Sí, Abandonar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {hayCambios && (
         <BotonConsolidar
           label="Guardar Cambios"
@@ -344,6 +485,21 @@ export default function Perfil() {
           width="100%"
         />
       )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

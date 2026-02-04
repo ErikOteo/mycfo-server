@@ -236,18 +236,20 @@ export default function DocumentoCard({ documento, onVincular }) {
         </Box>
 
         {/* Botón de vincular */}
-        <Button
-          variant={
-            documento.nivelSugerencia === "ALTA" ? "contained" : "outlined"
-          }
-          color="primary"
-          startIcon={<LinkIcon />}
-          fullWidth
-          onClick={() => onVincular(documento.idDocumento)}
-          sx={{ mt: 1 }}
-        >
-          Vincular
-        </Button>
+        {onVincular && (
+          <Button
+            variant={
+              documento.nivelSugerencia === "ALTA" ? "contained" : "outlined"
+            }
+            color="primary"
+            startIcon={<LinkIcon />}
+            fullWidth
+            onClick={() => onVincular(documento.idDocumento)}
+            sx={{ mt: 1 }}
+          >
+            Vincular
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

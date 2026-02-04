@@ -10,6 +10,7 @@ public class NotificationMapper {
                 n.getId(),
                 n.getTitle(),
                 n.getBody(),
+                n.getType().name(),
                 // badge: usaremos el nombre del type como etiqueta "bonita"
                 prettify(n.getType().name()),
                 n.isRead(),

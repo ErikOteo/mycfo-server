@@ -133,10 +133,10 @@ export default function NotificationCenter() {
       );
     }
 
-    // Filtro por tipo
+    // Filtro por tipo (usa notification.type)
     if (filterType !== "all") {
       filtered = filtered.filter(
-        (notification) => notification.badge === filterType,
+        (notification) => notification.type === filterType,
       );
     }
 
@@ -243,13 +243,17 @@ export default function NotificationCenter() {
                 onChange={(e) => handleFilterChange("type", e.target.value)}
               >
                 <MenuItem value="all">Todos los tipos</MenuItem>
-                <MenuItem value="MOVEMENT_NEW">Nuevos Movimientos</MenuItem>
-                <MenuItem value="BUDGET_EXCEEDED">
-                  Presupuestos Excedidos
+                <MenuItem value="MOVEMENT_HIGH">Movimientos Altos</MenuItem>
+                <MenuItem value="MOVEMENT_IMPORT">
+                  Importación de Movimientos
                 </MenuItem>
-                <MenuItem value="CASH_FLOW_ALERT">Alertas Cash Flow</MenuItem>
+                <MenuItem value="ACCOUNT_MP_LINKED">
+                  Vinculación Mercado Pago
+                </MenuItem>
                 <MenuItem value="REPORT_READY">Reportes Listos</MenuItem>
-                <MenuItem value="REMINDER_CUSTOM">Recordatorios</MenuItem>
+                <MenuItem value="MONTHLY_SUMMARY">Resumen Mensual</MenuItem>
+                <MenuItem value="REMINDER_CREATED">Recordatorio creado</MenuItem>
+                <MenuItem value="REMINDER_CUSTOM">Recordatorio</MenuItem>
               </Select>
             </FormControl>
           </Grid>

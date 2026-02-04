@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Paper, TextField, IconButton, Typography, Fab, CircularProgress, useTheme } from '@mui/material';
+import { Box, Paper, TextField, IconButton, Typography, Fab, CircularProgress, useTheme, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
@@ -610,6 +611,7 @@ const fetchCargaData = async ({ tipo, modo }) => {
 
 const ChatbotWidget = ({ currentModule = 'general' }) => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const { context } = useChatbotContext();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
@@ -618,16 +620,19 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
 
     const getPerfilFromSession = () => {
         try {
             const usuario = sessionService.getUsuario();
+            const rol = sessionStorage.getItem('rol');
             const perfil = {
                 nombre: usuario?.nombre || "",
                 email: usuario?.email || "",
-                telefono: usuario?.telefono || ""
+                telefono: usuario?.telefono || "",
+                rol: rol || ""
             };
-            if (!perfil.nombre && !perfil.email && !perfil.telefono) {
+            if (!perfil.nombre && !perfil.email && !perfil.telefono && !perfil.rol) {
                 return null;
             }
             return perfil;
@@ -642,9 +647,21 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
             : null;
         const base = context && typeof context === 'object' ? context : {};
         const perfil = base.perfil ?? getPerfilFromSession();
+
+        let permisos = null;
+        try {
+            const storedPermisos = sessionStorage.getItem('permisos');
+            if (storedPermisos) {
+                permisos = JSON.parse(storedPermisos);
+            }
+        } catch (e) {
+            console.error("Error al obtener permisos para el chatbot:", e);
+        }
+
         const payload = {
             ...base,
             ...(perfil ? { perfil } : {}),
+            ...(permisos ? { permisos } : {}),
             ...(route ? { route } : {})
         };
         return Object.keys(payload).length ? payload : null;
@@ -857,6 +874,10 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
     useEffect(() => {
         if (isOpen) {
             scrollToBottom();
+            // Pequeño delay para asegurar que el DOM esté listo
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
         }
     }, [isOpen]);
 
@@ -892,7 +913,8 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                 body: JSON.stringify({
                     message: userMessage.text,
                     module: currentModule,
-                    context: Object.keys(mergedContext).length ? mergedContext : null
+                    context: Object.keys(mergedContext).length ? mergedContext : null,
+                    history: messages.slice(-6)
                 }),
             });
 
@@ -998,8 +1020,36 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                                     border: `1px solid ${(theme.vars || theme).palette.divider}`
                                 })}
                             >
-                                <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
-                                    {msg.text}
+                                <Typography variant="body2" sx={{ display: 'inline', wordBreak: 'break-word' }}>
+                                    {msg.text.split(/(\[\[.*?\]\])/g).map((part, i) => {
+                                        const match = part.match(/^\[\[(.*?)\|(.*?)\]\]$/);
+                                        if (match) {
+                                            const [_, route, label] = match;
+                                            return (
+                                                <Button
+                                                    key={i}
+                                                    size="small"
+                                                    variant="contained"
+                                                    onClick={() => navigate(route)}
+                                                    sx={{
+                                                        mx: 0.5,
+                                                        my: 0.2,
+                                                        px: 1,
+                                                        minWidth: 'auto',
+                                                        height: 'auto',
+                                                        textTransform: 'none',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 'bold',
+                                                        borderRadius: 1,
+                                                        lineHeight: 1.2
+                                                    }}
+                                                >
+                                                    {label}
+                                                </Button>
+                                            );
+                                        }
+                                        return part;
+                                    })}
                                 </Typography>
                             </Box>
                         ))}
@@ -1022,6 +1072,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     })}>
                         <TextField
                             fullWidth
+                            inputRef={inputRef}
                             size="small"
                             placeholder="Escribe tu duda..."
                             value={input}

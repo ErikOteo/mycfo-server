@@ -26,6 +26,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import usePermisos from "../../hooks/usePermisos";
 import FormFactura from "../carga-general/components/forms/FormFactura";
 import {
   fetchFacturas,
@@ -55,6 +56,8 @@ const FacturaListPage = () => {
   const [filters, setFilters] = useState({});
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('facts', 'edit');
   const navigate = useNavigate();
 
   // Paginación del servidor
@@ -454,7 +457,7 @@ const FacturaListPage = () => {
       return Array.isArray(response) ? response : [];
     } catch (error) {
       console.error("Error al exportar facturas:", error);
-      alert("No se pudieron obtener las facturas para exportar.");
+      setSnackbar({ open: true, message: "No se pudieron obtener las facturas para exportar.", severity: "error" });
       return [];
     }
   }, [
@@ -660,7 +663,7 @@ const FacturaListPage = () => {
             >
               <VisibilityIcon fontSize="small" />
             </IconButton>
-            {isAdmin && (
+            {canEdit && (
               <>
                 <IconButton
                   size="small"

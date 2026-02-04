@@ -9,12 +9,14 @@ import java.util.Optional;
 
 @Repository
 public interface UsuarioRepository extends JpaRepository<Usuario, String> {
-    
+
     Optional<Usuario> findByEmail(String email);
-    
+
     List<Usuario> findByEmpresaId(Long empresaId);
-    
+
     Optional<Usuario> findBySub(String sub);
-    
+
+    Optional<Usuario> findByEmpresaIdAndEsPropietarioTrue(Long empresaId);
+
     long countByEmpresa(administracion.models.Empresa empresa);
 }

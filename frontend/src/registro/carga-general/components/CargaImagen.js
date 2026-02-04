@@ -10,6 +10,7 @@ import {
   Alert,
   Button,
   CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import { CameraAlt, Check, Close, Delete } from "@mui/icons-material";
 import Webcam from "react-webcam";
@@ -48,6 +49,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
     }
     return { facingMode: { ideal: "environment" } };
   }, [esMobile, usarCamaraDefault]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const tomarFoto = () => {
     if (onNewCapture) {
@@ -165,7 +167,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
       if (onResultado) {
         onResultado(response.data);
       } else {
-        alert("Fotos enviadas!");
+        setSnackbar({ open: true, message: "¡Fotos enviadas con éxito! 📸✅", severity: "success" });
       }
       setFotoFinal(null);
       setFotoNombre(null);
@@ -173,6 +175,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
     } catch (err) {
       console.error("❌ Error en envío de foto:", err);
       const mensaje = err.response?.data?.message || err.message || "Error al procesar las fotos.";
+      setSnackbar({ open: true, message: mensaje, severity: "error" });
       setError(mensaje);
       if (onFallback) {
         onFallback({
@@ -200,7 +203,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
 
   return (
     <Box sx={{ mt: 3 }}>
-      
+
       <Box
         sx={{
           position: "relative",
@@ -340,6 +343,21 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
           )}
         </DialogContent>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

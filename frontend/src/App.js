@@ -7,17 +7,17 @@ import Home from "./home/Home";
 import ConfirmAccount from "./sign-up/ConfirmAccount";
 import routeConfig from "./config/routes";
 import Checkout from "./template/checkout/Checkout";
-import Perfil from "./administracion/perfil/Perfil";
+import usePermisos from "./hooks/usePermisos";
+
 
 import "./App.css";
-import Organizacion from "./administracion/organizacion/Organizacion";
 import LoadingSpinner from "./shared-components/LoadingSpinner";
 
 // Lazy loading para componentes pesados
 const Dashboard = React.lazy(() => import("./dashboard/Dashboard"));
 
 // Función helper para aplanar rutas (fuera del componente)
-function flattenRoutesHelper(routes) {
+function flattenRoutesHelper(routes, parentModulo = null) {
   let flatRoutes = [];
 
   routes.forEach((route) => {
@@ -26,10 +26,13 @@ function flattenRoutesHelper(routes) {
         path: route.path.replace(/^\//, ""),
         element: route.element,
         label: route.label,
+        modulo: route.modulo || parentModulo,
+        accion: route.accion,
       });
     }
+    const currentModulo = route.modulo || parentModulo;
     if (route.children) {
-      flatRoutes = flatRoutes.concat(flattenRoutesHelper(route.children));
+      flatRoutes = flatRoutes.concat(flattenRoutesHelper(route.children, currentModulo));
     }
   });
 
@@ -39,6 +42,21 @@ function flattenRoutesHelper(routes) {
 function RequireAuth() {
   const isLoggedIn = !!sessionStorage.getItem("accessToken");
   return isLoggedIn ? <Outlet /> : <Navigate to="/signin" replace />;
+}
+
+function ProtectedRoute({ modulo, accion, children }) {
+  const { tienePermiso } = usePermisos();
+
+  // Si no tiene módulo definido, permitimos (ej: /perfil)
+  if (!modulo) return children;
+
+  if (!tienePermiso(modulo, accion || 'view')) {
+    // Redirigir a una página de "No autorizado" o al dashboard
+    console.warn(`Acceso denegado al módulo: ${modulo}`);
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 }
 
 // Memoizar el componente App para evitar re-renderizados innecesarios
@@ -71,26 +89,26 @@ const App = React.memo(() => {
                 <Dashboard />
               </Suspense>
             } />
-            <Route path="perfil" element={<Perfil />} />
-            <Route path="organizacion" element={<Organizacion />} />
-            
+
             {/* Rutas dinámicas desde la configuración */}
-            {flattenRoutes.map(({ path, element }, idx) => (
-              <Route 
-                key={idx} 
-                path={path} 
+            {flattenRoutes.map(({ path, element, modulo, accion }, idx) => (
+              <Route
+                key={idx}
+                path={path}
                 element={
                   <Suspense fallback={<LoadingSpinner />}>
-                    {element}
+                    <ProtectedRoute modulo={modulo} accion={accion}>
+                      {element}
+                    </ProtectedRoute>
                   </Suspense>
-                } 
+                }
               />
             ))}
           </Route>
         </Route>
 
-        {/* Catch-all: redirigir a signin */}
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        {/* Catch-all: redirigir a raíz (RequireAuth se encargará de signin si es necesario) */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
