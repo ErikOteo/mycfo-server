@@ -77,6 +77,8 @@ const BottomNavigationBar = () => {
                 display: { xs: 'block', lg: 'none' }, // Solo visible en mobile/tablet
                 borderTop: `1px solid ${theme.palette.divider}`,
                 boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)',
+                paddingBottom: 'max(18px, env(safe-area-inset-bottom))',
+                backgroundColor: theme.palette.background.paper,
             }}
             elevation={3}
         >

@@ -235,7 +235,7 @@ const Home = React.memo(function Home(props) {
                 position: "relative",
                 zIndex: 1,
                 mx: 3,
-                pb: { xs: 10, lg: 5 }, // Más padding en mobile para la barra inferior
+                pb: { xs: 14, lg: 5 }, // Más padding en mobile para la barra inferior más alta
                 minHeight: "100vh",
                 alignItems: "center",
               }}
