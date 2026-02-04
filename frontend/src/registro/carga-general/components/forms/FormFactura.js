@@ -13,7 +13,13 @@ import { sessionService } from "../../../../shared-services/sessionService";
 
 const CURRENCY_OPTIONS = ["ARS", "USD"];
 
-export default function FormFactura({ formData, setFormData, errors = {}, modoEdicion = true }) {
+export default function FormFactura({
+  formData,
+  setFormData,
+  errors = {},
+  modoEdicion = true,
+  disableDynamicCategorias = false,
+}) {
   const [datosEmpresa, setDatosEmpresa] = useState(null);
 
   // Establecer fecha de hoy por defecto si no hay fecha de emisión
@@ -41,7 +47,7 @@ export default function FormFactura({ formData, setFormData, errors = {}, modoEd
     return () => clearTimeout(timer);
   }, []);
 
-  // Función para autocompletar datos según la versión
+  // Función para autocompletar datos según la versión (sin pisar lo detectado por audio)
   const autocompletarDatos = (version) => {
     console.log('Autocompletando datos para versión:', version);
     console.log('Datos de empresa disponibles:', datosEmpresa);
@@ -52,39 +58,65 @@ export default function FormFactura({ formData, setFormData, errors = {}, modoEd
     }
 
     if (version === "Original") {
-      // Para Original: empresa va en comprador, limpiar vendedor
-      console.log('Autocompletando datos del comprador y limpiando vendedor');
+      // Para Original: empresa va en comprador (sin borrar vendedor)
+      console.log('Autocompletando datos del comprador');
       setFormData((p) => (modoEdicion ? {
         ...p,
-        // Autocompletar comprador
-        compradorNombre: datosEmpresa.nombre || "",
-        compradorCuit: datosEmpresa.cuit || "",
-        compradorCondicionIVA: datosEmpresa.condicionIVA || "",
-        compradorDomicilio: datosEmpresa.domicilio || "",
-        // Limpiar vendedor
-        vendedorNombre: "",
-        vendedorCuit: "",
-        vendedorCondicionIVA: "",
-        vendedorDomicilio: ""
+        compradorNombre: p.compradorNombre || datosEmpresa.nombre || "",
+        compradorCuit: p.compradorCuit || datosEmpresa.cuit || "",
+        compradorCondicionIVA: p.compradorCondicionIVA || datosEmpresa.condicionIVA || "",
+        compradorDomicilio: p.compradorDomicilio || datosEmpresa.domicilio || ""
       } : p));
     } else if (version === "Duplicado") {
-      // Para Duplicado: empresa va en vendedor, limpiar comprador
-      console.log('Autocompletando datos del vendedor y limpiando comprador');
+      // Para Duplicado: empresa va en vendedor (sin borrar comprador)
+      console.log('Autocompletando datos del vendedor');
       setFormData((p) => (modoEdicion ? {
         ...p,
-        // Limpiar comprador
-        compradorNombre: "",
-        compradorCuit: "",
-        compradorCondicionIVA: "",
-        compradorDomicilio: "",
-        // Autocompletar vendedor
-        vendedorNombre: datosEmpresa.nombre || "",
-        vendedorCuit: datosEmpresa.cuit || "",
-        vendedorCondicionIVA: datosEmpresa.condicionIVA || "",
-        vendedorDomicilio: datosEmpresa.domicilio || ""
+        vendedorNombre: p.vendedorNombre || datosEmpresa.nombre || "",
+        vendedorCuit: p.vendedorCuit || datosEmpresa.cuit || "",
+        vendedorCondicionIVA: p.vendedorCondicionIVA || datosEmpresa.condicionIVA || "",
+        vendedorDomicilio: p.vendedorDomicilio || datosEmpresa.domicilio || ""
       } : p));
     }
   };
+
+  const inferirTipoFactura = (vendedorCondicion, compradorCondicion) => {
+    if (!vendedorCondicion || !compradorCondicion) return "";
+    const vendedor = vendedorCondicion.toLowerCase();
+    const comprador = compradorCondicion.toLowerCase();
+    const esRI = (texto) => texto.includes("responsable");
+    const esMono = (texto) => texto.includes("monotributo") || texto.includes("mono");
+    const esExento = (texto) => texto.includes("exento");
+
+    if (esRI(vendedor) && esRI(comprador)) return "A";
+    if (esRI(vendedor) && (esMono(comprador) || esExento(comprador))) return "B";
+    if (esMono(vendedor) || esExento(vendedor)) return "C";
+    return "";
+  };
+
+  // Si la versión ya viene seteada (por autocompletado), completar datos automáticamente
+  useEffect(() => {
+    if (!modoEdicion) return;
+    if (!datosEmpresa) return;
+    if (!formData.versionDocumento) return;
+    autocompletarDatos(formData.versionDocumento);
+  }, [formData.versionDocumento, datosEmpresa, modoEdicion]);
+
+  useEffect(() => {
+    if (!modoEdicion) return;
+    if (formData.tipoFactura) return;
+    if (!formData.vendedorCondicionIVA || !formData.compradorCondicionIVA) return;
+    const tipo = inferirTipoFactura(formData.vendedorCondicionIVA, formData.compradorCondicionIVA);
+    if (!tipo) return;
+    setFormData((p) => ({ ...p, tipoFactura: tipo }));
+  }, [
+    formData.tipoFactura,
+    formData.vendedorCondicionIVA,
+    formData.compradorCondicionIVA,
+    modoEdicion,
+    setFormData,
+  ]);
+
 
   return (
     <Box
@@ -209,8 +241,25 @@ export default function FormFactura({ formData, setFormData, errors = {}, modoEd
               setFormData((p) => ({ ...p, categoria: valor }));
             }}
             disabled={!modoEdicion}
+            disableDynamic={disableDynamicCategorias}
           />
         </Box>
+      </Box>
+
+      {/* 4️⃣ Descripción */}
+      <Box>
+        <FormLabel>Descripción</FormLabel>
+        <OutlinedInput
+          value={formData.descripcion || ""}
+          onChange={(e) => {
+            if (!modoEdicion) return;
+            setFormData((p) => ({ ...p, descripcion: e.target.value }));
+          }}
+          size="small"
+          fullWidth
+          multiline
+          disabled={!modoEdicion}
+        />
       </Box>
 
 

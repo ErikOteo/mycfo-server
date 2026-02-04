@@ -88,7 +88,7 @@ public class VertexAudioScannerService {
 
             log.info("Respuesta recibida de Vertex AI en {} ms", nanosToMillis(requestEnd - requestStart));
             String raw = extractTextFromResponse(response.getBody());
-            log.info("Respuesta raw de Vertex (recortada): {}", truncate(raw, 2000));
+            log.info("Respuesta raw de Vertex (completa): {}", raw);
             long parseStart = System.nanoTime();
             Map<String, Object> schema = expectedSchema(scanType);
             Map<String, Object> normalized = extractAndFixJson(raw, schema);
@@ -151,6 +151,7 @@ public class VertexAudioScannerService {
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", properties.getTemperature());
         generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
+        generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("contents", List.of(content));
@@ -163,18 +164,39 @@ public class VertexAudioScannerService {
             return "";
         }
         JsonNode root = objectMapper.readTree(json);
-        JsonNode textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
-        if (textNode.isMissingNode()) {
+        JsonNode candidates = root.path("candidates");
+        if (!candidates.isArray()) {
             return "";
         }
-        return textNode.asText();
+        StringBuilder combined = new StringBuilder();
+        for (JsonNode candidate : candidates) {
+            JsonNode parts = candidate.path("content").path("parts");
+            if (!parts.isArray()) {
+                continue;
+            }
+            for (JsonNode part : parts) {
+                JsonNode textNode = part.path("text");
+                if (textNode.isMissingNode()) {
+                    continue;
+                }
+                String text = textNode.asText();
+                if (text == null || text.isBlank()) {
+                    continue;
+                }
+                if (!combined.isEmpty()) {
+                    combined.append("\n");
+                }
+                combined.append(text);
+            }
+        }
+        return combined.toString();
     }
 
     private Map<String, Object> expectedSchema(ScanType type) {
         return switch (type) {
             case FACTURA -> buildSchema(
                     "numeroDocumento", "versionDocumento", "tipoFactura", "fechaEmision", "montoTotal", "moneda",
-                    "categoria", "vendedorNombre", "vendedorCuit", "vendedorCondicionIVA", "vendedorDomicilio",
+                    "categoria", "descripcion", "vendedorNombre", "vendedorCuit", "vendedorCondicionIVA", "vendedorDomicilio",
                     "compradorNombre", "compradorCuit", "compradorCondicionIVA", "compradorDomicilio"
             );
             case INGRESO -> buildSchema(
@@ -228,6 +250,10 @@ public class VertexAudioScannerService {
         String sanitized = FENCE_PATTERN.matcher(text).replaceAll("").replace("```", "").trim();
         int start = sanitized.indexOf('{');
         if (start < 0) {
+            Map<String, Object> fallback = extractByKeys(sanitized, schema);
+            if (!fallback.isEmpty()) {
+                return normalizeSchema(fallback, schema);
+            }
             return normalizeSchema(Collections.emptyMap(), schema);
         }
         String candidate = sanitized.substring(start);
@@ -257,7 +283,31 @@ public class VertexAudioScannerService {
         if (parsed != null) {
             return normalizeSchema(parsed, schema);
         }
+        Map<String, Object> fallback = extractByKeys(repaired, schema);
+        if (!fallback.isEmpty()) {
+            return normalizeSchema(fallback, schema);
+        }
         return normalizeSchema(Collections.emptyMap(), schema);
+    }
+
+    private Map<String, Object> extractByKeys(String text, Map<String, Object> schema) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (!StringUtils.hasText(text) || schema == null || schema.isEmpty()) {
+            return result;
+        }
+        for (String key : schema.keySet()) {
+            Pattern pattern = Pattern.compile("(?i)\"?" + Pattern.quote(key) + "\"?\\s*:\\s*(\"([^\"]*)\"|([^,}\\n]+))");
+            java.util.regex.Matcher matcher = pattern.matcher(text);
+            if (!matcher.find()) {
+                continue;
+            }
+            String value = matcher.group(2) != null ? matcher.group(2) : matcher.group(3);
+            if (value != null) {
+                value = value.trim();
+            }
+            result.put(key, value);
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -279,9 +329,6 @@ public class VertexAudioScannerService {
             Object normalized = normalizeValue(key, value);
             result.put(key, normalized);
         }
-        if (result.containsKey("moneda") && result.get("moneda") == null) {
-            result.put("moneda", "ARS");
-        }
         return result;
     }
 
@@ -291,11 +338,18 @@ public class VertexAudioScannerService {
         }
         if (value instanceof String str) {
             String trimmed = str.trim();
-            if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed)) {
+            if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed) || isPlaceholderValue(trimmed)) {
                 return null;
             }
+            if (isLimitedOptionField(key)) {
+                return normalizeLimitedOption(key, trimmed);
+            }
             if (isNumericField(key)) {
-                return normalizeNumberString(trimmed);
+                String normalized = normalizeNumberString(trimmed);
+                if (!StringUtils.hasText(normalized)) {
+                    return null;
+                }
+                return normalized;
             }
             return trimmed;
         }
@@ -303,6 +357,89 @@ public class VertexAudioScannerService {
             return number;
         }
         return value;
+    }
+
+    private boolean isLimitedOptionField(String key) {
+        return Set.of("tipoFactura", "versionDocumento", "medioPago", "periodicidad", "moneda").contains(key);
+    }
+
+    private boolean isPlaceholderValue(String value) {
+        return "monto".equalsIgnoreCase(value);
+    }
+
+    private String normalizeLimitedOption(String key, String raw) {
+        String lower = raw.toLowerCase();
+        return switch (key) {
+            case "moneda" -> {
+                if (lower.contains("usd") || lower.contains("dolar") || lower.contains("dólar") || lower.contains("u$s")) {
+                    yield "USD";
+                }
+                if (lower.contains("ars") || lower.contains("peso")) {
+                    yield "ARS";
+                }
+                yield null;
+            }
+            case "tipoFactura" -> {
+                java.util.regex.Matcher matcher = Pattern.compile("(?i)\\b([ABC])\\b").matcher(raw);
+                if (matcher.find()) {
+                    yield matcher.group(1).toUpperCase();
+                }
+                yield null;
+            }
+            case "versionDocumento" -> {
+                if (lower.contains("original")) {
+                    yield "Original";
+                }
+                if (lower.contains("duplicado") || lower.contains("dup") || lower.contains("copia")) {
+                    yield "Duplicado";
+                }
+                yield null;
+            }
+            case "medioPago" -> {
+                if (lower.contains("efectivo") || containsWord(lower, "cash")) {
+                    yield "Efectivo";
+                }
+                if (lower.contains("transferencia") || lower.contains("transf") || lower.contains("banco") || lower.contains("cbu")) {
+                    yield "Transferencia";
+                }
+                if (lower.contains("cheque")) {
+                    yield "Cheque";
+                }
+                if (lower.contains("tarjeta") || lower.contains("debito") || lower.contains("débito") || lower.contains("credito") || lower.contains("crédito")) {
+                    yield "Tarjeta";
+                }
+                if (lower.contains("mercadopago") || lower.contains("mercado pago") || containsWord(lower, "mp")) {
+                    yield "MercadoPago";
+                }
+                if (lower.contains("otro")) {
+                    yield "Otro";
+                }
+                yield null;
+            }
+            case "periodicidad" -> {
+                if (lower.contains("mensual")) {
+                    yield "Mensual";
+                }
+                if (lower.contains("bimestral")) {
+                    yield "Bimestral";
+                }
+                if (lower.contains("trimestral")) {
+                    yield "Trimestral";
+                }
+                if (lower.contains("semestral")) {
+                    yield "Semestral";
+                }
+                if (lower.contains("anual")) {
+                    yield "Anual";
+                }
+                yield null;
+            }
+            default -> null;
+        };
+    }
+
+    private boolean containsWord(String text, String word) {
+        return Pattern.compile("(?i)\\b" + Pattern.quote(word) + "\\b").matcher(text).find();
     }
 
     private List<String> buildWarnings(Map<String, Object> campos, Set<String> required) {
@@ -365,21 +502,21 @@ public class VertexAudioScannerService {
                 Analiza el audio de una FACTURA (lectura humana o dictado) y devolve exclusivamente un JSON valido con esta estructura exacta:
 
                 {
-                "numeroDocumento": "",
-                "versionDocumento": "",
-                "tipoFactura": "",
-                "fechaEmision": "",
                 "montoTotal": "",
                 "moneda": "",
                 "categoria": "",
-                "vendedorNombre": "",
-                "vendedorCuit": "",
-                "vendedorCondicionIVA": "",
-                "vendedorDomicilio": "",
+                "descripcion":"",
+                "versionDocumento": "",
                 "compradorNombre": "",
-                "compradorCuit": "",
+                "vendedorNombre": "",
+                "vendedorCondicionIVA": "",
                 "compradorCondicionIVA": "",
-                "compradorDomicilio": ""
+                "vendedorCuit": "",
+                "vendedorDomicilio": "",
+                "compradorCuit": "",
+                "compradorDomicilio": "",
+                "numeroDocumento": "",
+                "fechaEmision": "",
                 }
 
                 REGLAS GENERALES:
@@ -387,12 +524,10 @@ public class VertexAudioScannerService {
                 - Si un dato no esta presente, usar null.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No inventar datos.
-
+                
                 REGLAS ESPECIFICAS:
-                - tipoFactura solo puede ser A, B, C, M o null.
-                - versionDocumento solo puede ser Original, Duplicado o null.
+                - versionDocumento solo puede ser Original si se menciona que compre algo, Duplicado si se menciona que vendi algo.
                 - fechaEmision debe estar en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
-                - moneda en ARS si no se identifica otra.
                 - montoTotal debe ser numerico con punto decimal.
                 - Si hay varios importes, usar el mayor correspondiente al total a pagar.
                 """;
@@ -413,13 +548,15 @@ public class VertexAudioScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
+                - Si algun concepto no se identifica, completar igual los demas campos que si se entiendan.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
                 - montoTotal debe ser numero con punto decimal.
                 - medioPago debe ser uno de: Efectivo, Transferencia, Cheque, Tarjeta, MercadoPago, Otro.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en el audio; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en el audio.
                 """;
             case EGRESO -> """
                 Sos un sistema de extraccion de datos para un movimiento de EGRESO.
@@ -438,13 +575,15 @@ public class VertexAudioScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
+                - Si algun concepto no se identifica, completar igual los demas campos que si se entiendan.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
                 - montoTotal debe ser numero con punto decimal.
                 - medioPago debe ser uno de: Efectivo, Transferencia, Cheque, Tarjeta, MercadoPago, Otro.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en el audio; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en el audio.
                 """;
             case DEUDA -> """
                 Sos un sistema de extraccion de datos para un movimiento de DEUDA.
@@ -468,7 +607,8 @@ public class VertexAudioScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
+                - Si algun concepto no se identifica, completar igual los demas campos que si se entiendan.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
@@ -476,7 +616,7 @@ public class VertexAudioScannerService {
                 - montoTotal y montoCuota deben ser numeros con punto decimal.
                 - tasaInteres es porcentaje (ej: 45.5).
                 - periodicidad debe ser: Mensual, Bimestral, Trimestral, Semestral, Anual.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en el audio; si no, null.
                 """;
             case ACREENCIA -> """
                 Sos un sistema de extraccion de datos para un movimiento de ACREENCIA.
@@ -500,7 +640,8 @@ public class VertexAudioScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
+                - Si algun concepto no se identifica, completar igual los demas campos que si se entiendan.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
@@ -508,7 +649,8 @@ public class VertexAudioScannerService {
                 - montoTotal y montoCuota deben ser numeros con punto decimal.
                 - tasaInteres es porcentaje (ej: 45.5).
                 - periodicidad debe ser: Mensual, Bimestral, Trimestral, Semestral, Anual.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en el audio; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en el audio.
                 """;
             case MOVIMIENTO -> """
                 Sos un sistema de extraccion de datos para un movimiento general.
@@ -528,13 +670,15 @@ public class VertexAudioScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
+                - Si algun concepto no se identifica, completar igual los demas campos que si se entiendan.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DD.
                 - montoTotal debe ser numero con punto decimal.
                 - medioPago debe ser uno de: Efectivo, Transferencia, Cheque, Tarjeta, MercadoPago, Otro.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en el audio; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en el audio.
                 """;
         };
     }

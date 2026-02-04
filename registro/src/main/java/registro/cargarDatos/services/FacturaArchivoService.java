@@ -177,6 +177,7 @@ public class FacturaArchivoService {
                 lineNumber));
         factura.setMoneda(parseMoneda(firstNonBlank(valores, "moneda", "divisa")));
         factura.setCategoria(firstNonBlank(valores, "categoria", "rubro"));
+        factura.setDescripcion(firstNonBlank(valores, "descripcion", "descripción", "detalle", "concepto"));
         factura.setEstadoDocumentoComercial(parseEstadoDocumento(firstNonBlank(valores, "estado_documento", "estado_documento_comercial")));
         factura.setVersionDocumento(parseVersionDocumento(firstNonBlank(valores, "version_documento", "version")));
         factura.setEstadoPago(parseEstadoPago(firstNonBlank(valores, "estado_pago", "pago_estado")));
