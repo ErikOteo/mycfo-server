@@ -530,7 +530,7 @@ const Dashboard = React.memo(() => {
         if (profile.rol) {
           sessionStorage.setItem('rol', profile.rol);
           if (profile.rol.includes('|PERM:')) {
-            const jsonPart = profile.rol.split('|PERM:')[1];
+            const jsonPart = profile.rol.split('|PERM:')[1].split('|')[0];
             sessionStorage.setItem('permisos', jsonPart);
           } else {
             sessionStorage.removeItem('permisos');
