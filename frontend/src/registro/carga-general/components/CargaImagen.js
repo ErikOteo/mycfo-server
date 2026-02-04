@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -25,7 +25,7 @@ const tipoMovimientoMap = {
   Acreencia: "Acreencia",
 };
 
-export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen }) {
+export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen, onNewCapture }) {
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
   const [capturando, setCapturando] = useState(true);
@@ -35,8 +35,25 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [usarCamaraDefault, setUsarCamaraDefault] = useState(false);
+
+  const esMobile = useMemo(
+    () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""),
+    []
+  );
+
+  const videoConstraints = useMemo(() => {
+    if (!esMobile || usarCamaraDefault) {
+      return undefined;
+    }
+    return { facingMode: { ideal: "environment" } };
+  }, [esMobile, usarCamaraDefault]);
 
   const tomarFoto = () => {
+    if (onNewCapture) {
+      onNewCapture();
+    }
+    setError(null);
     const img = webcamRef.current.getScreenshot();
     setFotoTemporal(img);
     setCapturando(false);
@@ -62,6 +79,10 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
   const seleccionarArchivo = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (onNewCapture) {
+      onNewCapture();
+    }
+    setError(null);
     const reader = new FileReader();
     reader.onload = () => {
       setFotoFinal(reader.result);
@@ -193,6 +214,12 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
             ref={webcamRef}
             audio={false}
             screenshotFormat="image/jpeg"
+            videoConstraints={videoConstraints}
+            onUserMediaError={() => {
+              if (!usarCamaraDefault) {
+                setUsarCamaraDefault(true);
+              }
+            }}
             style={{ width: "100%" }}
           />
         ) : (

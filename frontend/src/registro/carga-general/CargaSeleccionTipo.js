@@ -17,8 +17,8 @@ export default function CargaSeleccionTipo() {
   const tipos = [
     { key: "Ingreso", label: "Ingreso", icon: <TrendingUp fontSize="large" /> },
     { key: "Egreso", label: "Egreso", icon: <TrendingDown fontSize="large" /> },
-    { key: "Deuda", label: "Deuda", icon: <AccountBalance fontSize="large" /> },
-    { key: "Acreencia", label: "Acreencia", icon: <Wallet fontSize="large" /> },
+    // { key: "Deuda", label: "Deuda", icon: <AccountBalance fontSize="large" /> },
+    // { key: "Acreencia", label: "Acreencia", icon: <Wallet fontSize="large" /> },
     { key: "Factura", label: "Factura", icon: <Receipt fontSize="large" /> },
   ];
 

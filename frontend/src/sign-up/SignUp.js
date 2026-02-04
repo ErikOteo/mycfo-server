@@ -70,6 +70,8 @@ export default function SignUp(props) {
   const empresaInvitacion = searchParams.get('empresa');
   const esInvitacion = !!empresaInvitacion;
 
+  const passwordRequirements = ["Debe contener letras, números y símbolos.", "Debe contener al menos 8 caracteres.", "Debe contener tanto mayúsculas como minúsculas."];
+
   const [formData, setFormData] = React.useState({
     email: "",
     password: "",
@@ -232,6 +234,20 @@ export default function SignUp(props) {
                 error={!!errors.password}
                 helperText={errors.password}
               />
+              <Box
+                component="ul"
+                sx={{
+                  mt: 1,
+                  mb: 0,
+                  pl: 3,
+                  color: "text.secondary",
+                  fontSize: "0.875rem",
+                }}
+              >
+                {passwordRequirements.map((rule) => (
+                  <li key={rule}>{rule}</li>
+                ))}
+              </Box>
             </FormControl>
 
             {(errors.global || successMsg) && (
@@ -240,13 +256,13 @@ export default function SignUp(props) {
                   mt: 1,
                   p: 1.5,
                   borderRadius: 1.5,
-                  bgcolor: "#FFF8E1",
-                  border: "1px solid #FFE082",
+                  bgcolor: "#FFDE70",
+                  border: "1px solid #F5C16C",
                 }}
               >
                 <Typography
                   variant="body2"
-                  sx={{ textAlign: "center", color: "text.primary" }}
+                  sx={{ textAlign: "center", color: "#000" }}
                 >
                   {errors.global || successMsg}
                 </Typography>

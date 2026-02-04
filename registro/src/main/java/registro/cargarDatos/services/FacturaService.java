@@ -141,6 +141,7 @@ public class FacturaService {
         factura.setMontoTotal(datosActualizados.getMontoTotal());
         factura.setMoneda(datosActualizados.getMoneda());
         factura.setCategoria(datosActualizados.getCategoria());
+        factura.setDescripcion(datosActualizados.getDescripcion());
         factura.setEstadoDocumentoComercial(datosActualizados.getEstadoDocumentoComercial());
 
         // Actualizar campos específicos de factura

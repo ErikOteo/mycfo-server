@@ -68,6 +68,7 @@ export default function CargaFormulario({
   setFormData,
   errors,
   setErrors,
+  disableDynamicCategorias = false,
 }) {
   const [localErrors, setLocalErrors] = React.useState(errors);
   const [snackbar, setSnackbar] = React.useState({
@@ -195,7 +196,12 @@ export default function CargaFormulario({
       case "factura":
         return (
           <LazyFormWrapper>
-            <FormFactura formData={formData} setFormData={setFormData} errors={localErrors} />
+            <FormFactura
+              formData={formData}
+              setFormData={setFormData}
+              errors={localErrors}
+              disableDynamicCategorias={disableDynamicCategorias}
+            />
           </LazyFormWrapper>
         );
       case "movimiento":
