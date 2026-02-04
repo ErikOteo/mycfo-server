@@ -77,8 +77,9 @@ const BottomNavigationBar = () => {
                 display: { xs: 'block', lg: 'none' }, // Solo visible en mobile/tablet
                 borderTop: `1px solid ${theme.palette.divider}`,
                 boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)',
-                paddingBottom: 'max(18px, env(safe-area-inset-bottom))',
-                backgroundColor: theme.palette.background.paper,
+                paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+                backgroundColor: (theme.vars || theme).palette.background.paper,
+                backgroundImage: 'none', // Resetear posibles overlays de elevación en modo oscuro para que sea igual a la barra lateral
             }}
             elevation={3}
         >
@@ -88,14 +89,18 @@ const BottomNavigationBar = () => {
                 showLabels
                 sx={{
                     height: 64,
-                    backgroundColor: theme.palette.background.paper,
+                    backgroundColor: 'transparent', // Para que herede el color del Paper contenedor
                     '& .MuiBottomNavigationAction-root': {
                         minWidth: 'auto',
                         padding: '6px 12px 8px',
-                        color: theme.palette.text.secondary,
+                        color: (theme.vars || theme).palette.text.secondary,
                         '&.Mui-selected': {
-                            color: '#008375',
+                            color: '#008375 !important', // Siempre verde MyCFO cuando está seleccionado
                             fontWeight: 600,
+                        },
+                        // Color para ítems no seleccionados en modo oscuro (Blanco)
+                        [theme.getColorSchemeSelector('dark')]: {
+                            color: (theme.vars || theme).palette.text.primary,
                         },
                     },
                     '& .MuiBottomNavigationAction-label': {
