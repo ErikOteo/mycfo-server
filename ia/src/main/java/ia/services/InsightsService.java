@@ -44,6 +44,7 @@ public class InsightsService {
                             "Evita términos técnicos no explicados (ej.: gap de liquidez, working capital, leverage).",
                             "Si un término financiero es necesario, explícalo en la misma frase con palabras simples.",
                             "Usa nombres de métricas descriptivos y legibles (ej.: dinero disponible, ganancia del mes, capacidad de pago).",
+                            "Si falta algún dato puntual, genera el reporte igualmente usando la información disponible, siempre que sea posible obtener conclusiones razonables. Solo rechaza el reporte si la información es claramente insuficiente para un análisis confiable.",
                             "Usa solo los datos proporcionados; no inventes valores faltantes.",
                             "Al final incluye OPCIONALMENTE un bloque JSON dentro de ```json ... ``` con llaves: diagnostico_corto, senales, detalles, riesgos_clave, tips, alerta.",
                             "diagnostico_corto debe ser 3 frases cortas separadas por \\n.",
@@ -85,24 +86,28 @@ public class InsightsService {
         headers.add("X-Usuario-Sub", userSub);
         headers.add("Authorization", authorization);
 
-        // P&L (devengado)
-        String pylUrl = reporteUrl + "/pyl?anio=" + year;
+        String currency = "ARS";
+
+        // P&L (devengado) solo ARS
+        String pylUrl = reporteUrl + "/pyl?anio=" + year + "&moneda=" + currency;
         var pylResp = restTemplate.exchange(
                 pylUrl, HttpMethod.GET, new HttpEntity<>(headers),
                 new ParameterizedTypeReference<Map<String, Object>>() {}
         );
         Map<String, Object> pyl = Optional.ofNullable(pylResp.getBody()).orElse(Map.of());
+        log.info("P&L detalle ingresos: {}", describirDetalle(pyl.get("detalleIngresos")));
+        log.info("P&L detalle egresos: {}", describirDetalle(pyl.get("detalleEgresos")));
 
-        // Cashflow (caja)
-        String cashUrl = reporteUrl + "/cashflow?anio=" + analysisYear;
+        // Cashflow (caja) solo ARS
+        String cashUrl = reporteUrl + "/cashflow?anio=" + analysisYear + "&moneda=" + currency;
         var cashResp = restTemplate.exchange(
                 cashUrl, HttpMethod.GET, new HttpEntity<>(headers),
                 new ParameterizedTypeReference<List<Map<String, Object>>>() {}
         );
         List<Map<String, Object>> cash = Optional.ofNullable(cashResp.getBody()).orElse(List.of());
 
-        // Resumen mensual (caja)
-        String resumenUrl = reporteUrl + "/resumen?anio=" + analysisYear + "&mes=" + analysisMonth;
+        // Resumen mensual (caja) solo ARS
+        String resumenUrl = reporteUrl + "/resumen?anio=" + analysisYear + "&mes=" + analysisMonth + "&moneda=" + currency;
         var resResp = restTemplate.exchange(
                 resumenUrl, HttpMethod.GET, new HttpEntity<>(headers),
                 new ParameterizedTypeReference<Map<String, Object>>() {}
@@ -116,7 +121,46 @@ public class InsightsService {
         compact.put("presupuestos", compactarPresupuestos(presupuestos));
         payload.put("datos", compact);
 
-        log.info("Datos listos para Vertex: userSub={}, keys={}", userSub, compact.keySet());
+        log.info("P&L devengado (GET {}/pyl?anio={}): ingresosMensuales={}, egresosMensuales={}, detalleIngresos={}, detalleEgresos={}",
+                reporteUrl, year,
+                pyl.getOrDefault("ingresosMensuales", List.of()),
+                pyl.getOrDefault("egresosMensuales", List.of()),
+                sizeOf(pyl.get("detalleIngresos")),
+                sizeOf(pyl.get("detalleEgresos")));
+
+        double[] logIngCash = (double[]) mapOrEmpty(compact.get("cashflow")).getOrDefault("ingresosMensuales", new double[0]);
+        double[] logEgrCash = (double[]) mapOrEmpty(compact.get("cashflow")).getOrDefault("egresosMensuales", new double[0]);
+        log.info("Cashflow (GET {}/cashflow?anio={}): ingresosMensuales={}, egresosMensuales={}",
+                reporteUrl, analysisYear,
+                Arrays.toString(logIngCash),
+                Arrays.toString(logEgrCash));
+
+        log.info("Resumen mensual (GET {}/resumen?anio={}&mes={}): detalleIngresos={}, detalleEgresos={}",
+                reporteUrl, analysisYear, analysisMonth,
+                sizeOf(resumen.get("detalleIngresos")),
+                sizeOf(resumen.get("detalleEgresos")));
+
+        Map<String, Object> presupLog = mapOrEmpty(compact.get("presupuestos"));
+        Object presupTotal = presupLog.getOrDefault("total", 0);
+        Object presupNombres = presupLog.getOrDefault("nombres", List.of());
+        log.info("Presupuestos activos (GET {}/api/presupuestos?page=0&size=5&status=active): total={}, nombres={}",
+                pronosticoUrl, presupTotal, presupNombres);
+
+        Map<String, Object> derivadosLog = mapOrEmpty(compact.get("derivados"));
+        log.info("Derivados calculados localmente: gapLiquidez={}, cajaNetaMes={}, devengadoNetoMes={}, ingresosMes={}, egresosMes={}, devengadoYtd={}, ingresosYtd={}, egresosYtd={}, mesAnalisis={}, anioAnalisis={}",
+                derivadosLog.get("gapLiquidez"),
+                derivadosLog.get("cajaNetaMes"),
+                derivadosLog.get("devengadoNetoMes"),
+                derivadosLog.get("ingresosMes"),
+                derivadosLog.get("egresosMes"),
+                derivadosLog.get("devengadoYtd"),
+                derivadosLog.get("ingresosYtd"),
+                derivadosLog.get("egresosYtd"),
+                derivadosLog.get("mesAnalisis"),
+                derivadosLog.get("anioAnalisis"));
+
+        log.info("Payload listo para Vertex: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}, keys={}",
+                userSub, year, month, analysisYear, analysisMonth, compact.keySet());
         Map<String, Object> ai = llamarVertex(compact);
         payload.put("ai", ai);
         log.info("Vertex response recibida: userSub={}, keys={}", userSub, ai != null ? ai.keySet() : "null");
@@ -152,8 +196,15 @@ public class InsightsService {
         for (Map<String, Object> mov : cash) {
             try {
                 String tipo = Objects.toString(mov.get("tipo"), "");
-                String fecha = Objects.toString(mov.get("fechaEmision"), null);
-                Double monto = (mov.get("montoTotal") instanceof Number) ? ((Number) mov.get("montoTotal")).doubleValue() : 0.0;
+                String fecha = Objects.toString(
+                        mov.getOrDefault("fechaEmision", mov.getOrDefault("fecha", null)),
+                        null);
+                if (fecha != null && fecha.length() > 10 && fecha.contains("T")) {
+                    fecha = fecha.substring(0, 10);
+                }
+                Double monto = (mov.get("montoTotal") instanceof Number)
+                        ? ((Number) mov.get("montoTotal")).doubleValue()
+                        : 0.0;
                 if (fecha == null) continue;
                 int monthIdx = LocalDate.parse(fecha).getMonthValue() - 1;
                 if ("Ingreso".equalsIgnoreCase(tipo)) ingCash[monthIdx] += monto;
@@ -173,12 +224,12 @@ public class InsightsService {
         int idxDevengado = (anioAnalisis == anioPyl)
                 ? idxCash
                 : Math.max(0, Math.min(11, mesActual - 1));
-        double cajaNeta = ingCash[idxCash] - egrCash[idxCash];
+        double ingresosMes = (idxCash < ingCash.length) ? ingCash[idxCash] : 0;
+        double egresosMes = (idxCash < egrCash.length) ? egrCash[idxCash] : 0;
+        double cajaNeta = ingresosMes - egresosMes;
         double devengadoNeto = (idxDevengado < ingPyl.length ? ingPyl[idxDevengado] : 0)
                 - (idxDevengado < egrPyl.length ? egrPyl[idxDevengado] : 0);
         double gapLiquidez = devengadoNeto - cajaNeta;
-        double ingresosMes = (idxCash < ingCash.length) ? ingCash[idxCash] : 0;
-        double egresosMes = (idxCash < egrCash.length) ? egrCash[idxCash] : 0;
 
         int idxYtd = Math.max(0, Math.min(11, mesActual - 1));
         double ingresosYtd = 0;
@@ -204,6 +255,34 @@ public class InsightsService {
                 "anioAnalisis", anioAnalisis
         ));
         return out;
+    }
+
+    private int sizeOf(Object listLike) {
+        if (listLike instanceof Collection<?> c) {
+            return c.size();
+        }
+        return 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String describirDetalle(Object detalle) {
+        if (!(detalle instanceof List<?> list) || list.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder sb = new StringBuilder("[");
+        boolean first = true;
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+            Object categoria = map.containsKey("categoria")
+                    ? map.get("categoria")
+                    : (map.containsKey("nombre") ? map.get("nombre") : "sin_categoria");
+            double total = asDouble(map.get("total"));
+            if (!first) sb.append("; ");
+            sb.append(categoria).append(": ").append(total);
+            first = false;
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     private double[] toDoubleArray(List<?> list) {
