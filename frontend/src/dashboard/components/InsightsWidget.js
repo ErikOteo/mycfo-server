@@ -2,18 +2,19 @@ import * as React from "react";
 import Card from "@mui/material/Card";
 import CardHeader from "@mui/material/CardHeader";
 import CardContent from "@mui/material/CardContent";
-import CardActions from "@mui/material/CardActions";
-import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
-import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
+import Chip from "@mui/material/Chip";
+import Divider from "@mui/material/Divider";
+import Paper from "@mui/material/Paper";
+import Avatar from "@mui/material/Avatar";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -25,11 +26,13 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import FiberManualRecordRoundedIcon from "@mui/icons-material/FiberManualRecordRounded";
+import { useTheme } from "@mui/material/styles";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import API_CONFIG from "../../config/api-config";
 
 const InsightsWidget = ({ currency = "ARS" }) => {
+  const theme = useTheme();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [data, setData] = React.useState(null);
@@ -121,26 +124,16 @@ const InsightsWidget = ({ currency = "ARS" }) => {
           {...props}
         />
       ),
-      ul: ({ node, ordered, ...props }) => (
-        <List dense sx={{ pl: 2, mb: 1 }} {...props} />
+      ul: ({ node, ...props }) => (
+        <Box component="ul" sx={{ pl: 2, mb: 1 }} {...props} />
       ),
-      ol: ({ node, ordered, ...props }) => (
-        <List dense sx={{ pl: 2, mb: 1 }} component="ol" {...props} />
+      ol: ({ node, ...props }) => (
+        <Box component="ol" sx={{ pl: 2, mb: 1 }} {...props} />
       ),
-      li: ({ node, children, ordered, ...props }) => (
-        <ListItem
-          {...props}
-          sx={{ alignItems: "flex-start", py: 0, px: 0 }}
-          disableGutters
-        >
-          <ListItemIcon sx={{ minWidth: 20, mt: "4px" }}>
-            <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
-          </ListItemIcon>
-          <ListItemText
-            primaryTypographyProps={{ variant: "body2", lineHeight: 1.5 }}
-            primary={children}
-          />
-        </ListItem>
+      li: ({ node, children, ...props }) => (
+        <Box component="li" sx={{ mb: 0.4, lineHeight: 1.5 }} {...props}>
+          {children}
+        </Box>
       ),
       table: ({ node, ...props }) => (
         <TableContainer
@@ -256,23 +249,39 @@ const InsightsWidget = ({ currency = "ARS" }) => {
   return (
     <Card
       variant="outlined"
-      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: 2,
+        boxShadow: theme.shadows[2],
+      }}
     >
       <CardHeader
-        title="Análisis IA"
-        subheader="Diagnóstico automático de tu situación"
-        action={<Chip label="Reporte IA" color="info" size="small" />}
-        subheaderTypographyProps={{
-          sx: (theme) => ({
-            color: theme.vars
-              ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
-              : theme.palette.text.primary,
-          }),
-        }}
+        title={
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Diagnóstico financiero con IA
+            </Typography>
+            <Chip label="IA" size="small" color="info" />
+          </Stack>
+        }
+        subheader={
+          <Typography variant="body2" color="text.secondary">
+            Resumen automático de tu situación. Elige mes y año, luego genera el
+            diagnóstico con IA.
+          </Typography>
+        }
       />
       <CardContent sx={{ flexGrow: 1 }}>
-        <Grid container spacing={1} sx={{ mb: 1 }}>
-          <Grid item xs={12} sm={6}>
+        <Grid
+          container
+          spacing={1}
+          sx={{ mb: 1 }}
+          justifyContent="center"
+          alignItems="center"
+        >
+          <Grid item xs={12} sm={6} md={5}>
             <TextField
               select
               fullWidth
@@ -280,6 +289,8 @@ const InsightsWidget = ({ currency = "ARS" }) => {
               label="Mes"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              SelectProps={{ fullWidth: true }}
+              sx={{ width: "100%" }}
             >
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
                 <MenuItem key={m} value={m}>
@@ -288,7 +299,7 @@ const InsightsWidget = ({ currency = "ARS" }) => {
               ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={6} md={5}>
             <TextField
               fullWidth
               size="small"
@@ -296,9 +307,19 @@ const InsightsWidget = ({ currency = "ARS" }) => {
               type="number"
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
+              sx={{ width: "100%" }}
             />
           </Grid>
         </Grid>
+        <Button
+          variant="contained"
+          onClick={handleRun}
+          disabled={loading}
+          fullWidth
+          sx={{ mb: 2 }}
+        >
+          {loading ? "Analizando…" : "Generar reporte con IA"}
+        </Button>
         {loading ? (
           <Stack spacing={1}>
             <Skeleton variant="text" width="40%" />
@@ -319,6 +340,22 @@ const InsightsWidget = ({ currency = "ARS" }) => {
                 Indicadores financieros en observación.
               </Alert>
             ) : null}
+            <Box
+              sx={{
+                p: 1.25,
+                borderRadius: 1.5,
+                bgcolor: theme.palette.action.hover,
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Periodo de análisis: {monthName(analysisMonth)} {analysisYear} ·
+                Moneda: {currency}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Seleccionado: {monthName(selectedMonth)} {selectedYear}
+              </Typography>
+            </Box>
             {markdown ? (
               <Box
                 sx={(theme) => ({
@@ -335,153 +372,178 @@ const InsightsWidget = ({ currency = "ARS" }) => {
                   {markdown}
                 </ReactMarkdown>
               </Box>
-            ) : summaryLines.length > 0 ? (
-              summaryLines.map((line, idx) => (
-                <Typography key={idx} variant="body2">
-                  {line}
-                </Typography>
-              ))
             ) : (
-              <Typography variant="body2">
-                No hay resumen disponible.
-              </Typography>
+              <>
+                {summaryLines.length > 0 ? (
+                  summaryLines.map((line, idx) => (
+                    <Typography key={idx} variant="body2">
+                      {line}
+                    </Typography>
+                  ))
+                ) : (
+                  <Typography variant="body2">
+                    No hay resumen disponible.
+                  </Typography>
+                )}
+
+                {detalleLines.length > 0 && (
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      borderColor: theme.palette.divider,
+                      bgcolor: theme.palette.background.paper,
+                    }}
+                  >
+                    <Typography variant="overline" color="text.secondary">
+                      Detalle del mes
+                    </Typography>
+                    <List dense sx={{ pl: 1, mt: 0.5 }}>
+                      {detalleLines.map((line, idx) => (
+                        <ListItem key={`det-${idx}`} sx={{ py: 0.25 }}>
+                          <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                            <FiberManualRecordRoundedIcon
+                              sx={{ fontSize: 8 }}
+                            />
+                          </ListItemIcon>
+                          <ListItemText
+                            primaryTypographyProps={{ variant: "body2" }}
+                            primary={line}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                )}
+
+                {(senalesEntries.length > 0 ||
+                  riesgos.length > 0 ||
+                  tips.length > 0) && (
+                  <Grid container spacing={1}>
+                    {senalesEntries.length > 0 && (
+                      <Grid item xs={12} md={6}>
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.25,
+                            borderRadius: 2,
+                            borderColor: theme.palette.divider,
+                            bgcolor: theme.palette.action.hover,
+                          }}
+                        >
+                          <Typography variant="overline" color="text.secondary">
+                            Señales
+                          </Typography>
+                          <List dense sx={{ pl: 1, mt: 0.5 }}>
+                            {senalesEntries.map(([key, value]) => (
+                              <ListItem key={key} sx={{ py: 0.25 }}>
+                                <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                                  <FiberManualRecordRoundedIcon
+                                    sx={{
+                                      fontSize: 8,
+                                      color: theme.palette.info.main,
+                                    }}
+                                  />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primaryTypographyProps={{ variant: "body2" }}
+                                  primary={
+                                    <span>
+                                      <b>
+                                        {key.charAt(0).toUpperCase() +
+                                          key.slice(1)}
+                                        :{" "}
+                                      </b>
+                                      {value}
+                                    </span>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Paper>
+                      </Grid>
+                    )}
+                    {riesgos.length > 0 && (
+                      <Grid item xs={12} md={6}>
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.25,
+                            borderRadius: 2,
+                            borderColor: theme.palette.divider,
+                            bgcolor: theme.palette.background.paper,
+                          }}
+                        >
+                          <Typography variant="overline" color="text.secondary">
+                            Riesgos
+                          </Typography>
+                          <List dense sx={{ pl: 1, mt: 0.5 }}>
+                            {riesgos.map((item, idx) => (
+                              <ListItem key={`risk-${idx}`} sx={{ py: 0.25 }}>
+                                <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                                  <FiberManualRecordRoundedIcon
+                                    sx={{
+                                      fontSize: 8,
+                                      color: theme.palette.warning.main,
+                                    }}
+                                  />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primaryTypographyProps={{ variant: "body2" }}
+                                  primary={item}
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Paper>
+                      </Grid>
+                    )}
+                    {tips.length > 0 && (
+                      <Grid item xs={12} md={6}>
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.25,
+                            borderRadius: 2,
+                            borderColor: theme.palette.divider,
+                            bgcolor: theme.palette.background.paper,
+                          }}
+                        >
+                          <Typography variant="overline" color="text.secondary">
+                            Acciones sugeridas
+                          </Typography>
+                          <List dense sx={{ pl: 1, mt: 0.5 }}>
+                            {tips.slice(0, 6).map((item, idx) => (
+                              <ListItem key={`tip-${idx}`} sx={{ py: 0.25 }}>
+                                <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
+                                  <FiberManualRecordRoundedIcon
+                                    sx={{
+                                      fontSize: 8,
+                                      color: theme.palette.success.main,
+                                    }}
+                                  />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primaryTypographyProps={{ variant: "body2" }}
+                                  primary={item}
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Paper>
+                      </Grid>
+                    )}
+                  </Grid>
+                )}
+              </>
             )}
-            {!markdown && detalleLines.length > 0 ? (
-              <Box
-                sx={(theme) => ({
-                  bgcolor: theme.palette.action.hover,
-                  borderRadius: 1.5,
-                  p: 1.5,
-                  border: `1px solid ${theme.palette.divider}`,
-                })}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Detalle del mes
-                </Typography>
-                <List dense sx={{ pl: 1, mt: 0.5 }}>
-                  {detalleLines.map((line, idx) => (
-                    <ListItem key={`det-${idx}`} sx={{ py: 0.25 }}>
-                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
-                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primaryTypographyProps={{ variant: "body2" }}
-                        primary={line}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            ) : null}
-            {!markdown && senalesEntries.length > 0 ? (
-              <Box
-                sx={(theme) => ({
-                  bgcolor: theme.palette.action.hover,
-                  borderRadius: 1.5,
-                  p: 1.5,
-                  border: `1px solid ${theme.palette.divider}`,
-                })}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Señales
-                </Typography>
-                <List dense sx={{ pl: 1, mt: 0.5 }}>
-                  {senalesEntries.map(([key, value]) => (
-                    <ListItem key={key} sx={{ py: 0.25 }}>
-                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
-                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primaryTypographyProps={{ variant: "body2" }}
-                        primary={
-                          <span>
-                            <b>
-                              {key.charAt(0).toUpperCase() + key.slice(1)}:{" "}
-                            </b>
-                            {value}
-                          </span>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            ) : null}
-            {!markdown && riesgos.length > 0 ? (
-              <Box
-                sx={(theme) => ({
-                  bgcolor: theme.palette.action.hover,
-                  borderRadius: 1.5,
-                  p: 1.5,
-                  border: `1px solid ${theme.palette.divider}`,
-                })}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Riesgos clave
-                </Typography>
-                <List dense sx={{ pl: 1, mt: 0.5 }}>
-                  {riesgos.map((item, idx) => (
-                    <ListItem key={`risk-${idx}`} sx={{ py: 0.25 }}>
-                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
-                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primaryTypographyProps={{ variant: "body2" }}
-                        primary={item}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            ) : null}
-            {!markdown && tips.length > 0 ? (
-              <Box
-                sx={(theme) => ({
-                  bgcolor: theme.palette.action.hover,
-                  borderRadius: 1.5,
-                  p: 1.5,
-                  border: `1px solid ${theme.palette.divider}`,
-                })}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Recomendaciones
-                </Typography>
-                <List dense sx={{ pl: 1, mt: 0.5 }}>
-                  {tips.slice(0, 4).map((item, idx) => (
-                    <ListItem key={`tip-${idx}`} sx={{ py: 0.25 }}>
-                      <ListItemIcon sx={{ minWidth: 18, mt: "2px" }}>
-                        <FiberManualRecordRoundedIcon sx={{ fontSize: 8 }} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primaryTypographyProps={{ variant: "body2" }}
-                        primary={item}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            ) : null}
           </Stack>
         ) : (
-          <Typography
-            variant="body2"
-            sx={(theme) => ({
-              color: theme.vars
-                ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
-                : theme.palette.text.primary,
-            })}
-          >
-            Presiona "Interpretar situación" para obtener el análisis con IA.
-          </Typography>
+          <></>
         )}
       </CardContent>
-      <CardActions
-        sx={{ px: 2, pb: 2, justifyContent: "flex-end", alignItems: "center" }}
-      >
-        <Button variant="contained" onClick={handleRun} disabled={loading}>
-          Interpretar situación
-        </Button>
-      </CardActions>
     </Card>
   );
 };
