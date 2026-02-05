@@ -1,4 +1,4 @@
-import * as React from "react";
+﻿import * as React from "react";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -1382,113 +1382,13 @@ const Dashboard = React.memo(() => {
               {esAdminTotal() && (
                 <Grid size={{ xs: 12, md: 10 }}>
                   <Box sx={{ width: "100%", mx: "auto" }}>
-                    <InsightsWidget />
+                    <InsightsWidget currency={currency} />
                   </Box>
                 </Grid>
               )}
             </Grid>
           </>
         )}
-
-<<<<<<<<< Temporary merge branch 1
-=========
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          {tienePermiso('pres', 'view') && (
-            <Grid size={{ xs: 12, md: 4 }}>
-              <BudgetWidget
-                companyId={company}
-                period={period}
-                data={state.budget.data}
-                loading={state.budget.loading && !state.budget.data}
-                error={state.budget.error}
-                onRetry={loadDashboardData}
-                currency={currency}
-              />
-            </Grid>
-          )}
-          {tienePermiso('movs', 'view') && (
-            <Grid size={{ xs: 12, md: 4 }}>
-              <LiquidityGapWidget currency={currency} />
-            </Grid>
-          )}
-          {tienePermiso('concil', 'view') && (
-            <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
-              <ReconciliationWidget
-                data={state.reconciliation.data}
-                loading={
-                  state.reconciliation.loading && !state.reconciliation.data
-                }
-                error={state.reconciliation.error}
-                onRetry={loadDashboardData}
-                currency={currency}
-                onNavigate={(account) =>
-                  handleNavigate(
-                    "/conciliacion",
-                    account ? { cuenta: account } : undefined
-                  )
-                }
-              />
-            </Grid>
-          )}
-        </Grid>
-
-        {/* Bloque de IA / insights a lo ancho al final */}
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{
-            mt: 1,
-            width: "100%",
-            maxWidth: 1600,
-            mx: "auto",
-            display: { xs: "none", md: "flex" },
-          }}
-        >
-          {tienePermiso('movs', 'view') && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <RecentMovementsWidget
-                data={state.movements.data}
-                loading={state.movements.loading && !state.movements.data}
-                error={state.movements.error}
-                onRetry={loadDashboardData}
-                onNavigate={() => handleNavigate("/ver-movimientos")}
-              />
-            </Grid>
-          )}
-          {tienePermiso('facts', 'view') && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <RecentInvoicesWidget
-                data={state.invoices?.data ?? null}
-                loading={state.invoices?.loading && !state.invoices?.data}
-                error={state.invoices?.error ?? null}
-                onRetry={loadDashboardData}
-                onNavigate={() => handleNavigate("/ver-facturas")}
-              />
-            </Grid>
-          )}
-        </Grid>
-
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          {esAdminTotal() && (
-            <Grid size={{ xs: 12, md: 10 }}>
-              <Box sx={{ width: "100%", mx: "auto" }}>
-                <InsightsWidget currency={currency} />
-              </Box>
-            </Grid>
-          </>
-        )}
-
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <Button
             variant="text"
