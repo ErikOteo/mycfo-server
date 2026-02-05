@@ -37,7 +37,7 @@ public class InsightsService {
                             "Genera un reporte narrativo en Markdown orientado a mostrar el estado actual del negocio y facilitar decisiones.",
                             "Estructura el reporte con las siguientes secciones y respeta el rol de cada una:",
                             "## Diagnostico: resumen breve del estado financiero general. Indica si la empresa tiene dinero disponible, si está generando ganancia y si la situación es sólida o frágil. No repitas detalles que luego aparezcan en otras secciones.",
-                            "## Senales: 3 a 5 puntos que aporten lecturas nuevas (oportunidades, alertas tempranas o patrones relevantes). No repitas conclusiones del Diagnostico.",
+                            "## Señales: 3 a 5 puntos que aporten lecturas nuevas (oportunidades, alertas tempranas o patrones relevantes). No repitas conclusiones del Diagnostico.",
                             "## Riesgos: 2 a 4 riesgos concretos que puedan afectar el negocio si no se actúa. Sé directo y específico.",
                             "## Recomendaciones: 3 acciones claras y priorizadas (1, 2 y 3), pensadas para ejecutarse en el corto plazo.",
                             "## KPIs clave: lista o tabla corta con 3 a 5 métricas numéricas relevantes para entender el mes.",
@@ -66,12 +66,8 @@ public class InsightsService {
         LocalDate now = LocalDate.now();
         int year = (anio != null) ? anio : now.getYear();
         int month = (mes != null) ? mes : now.getMonthValue();
-        int analysisMonth = month - 1;
+        int analysisMonth = month; // analizar exactamente el mes seleccionado
         int analysisYear = year;
-        if (analysisMonth < 1) {
-            analysisMonth = 12;
-            analysisYear = year - 1;
-        }
 
         // Llamar microservicio reporte para obtener datos compactos
         Map<String, Object> payload = new HashMap<>();

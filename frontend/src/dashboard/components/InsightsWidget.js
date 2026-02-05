@@ -11,7 +11,7 @@ import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/Grid";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
 import List from "@mui/material/List";
@@ -35,7 +35,9 @@ const InsightsWidget = ({ currency = "ARS" }) => {
   const [data, setData] = React.useState(null);
   const today = React.useMemo(() => new Date(), []);
   const [selectedYear, setSelectedYear] = React.useState(today.getFullYear());
-  const [selectedMonth, setSelectedMonth] = React.useState(today.getMonth() + 1); // 1-12
+  const [selectedMonth, setSelectedMonth] = React.useState(
+    today.getMonth() + 1,
+  ); // 1-12
   const monthName = React.useCallback((m) => {
     const names = [
       "Enero",
@@ -53,8 +55,8 @@ const InsightsWidget = ({ currency = "ARS" }) => {
     ];
     return names[Math.max(0, Math.min(11, m - 1))];
   }, []);
-  const analysisMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
-  const analysisYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+  const analysisMonth = selectedMonth;
+  const analysisYear = selectedYear;
 
   const markdownRaw =
     data && typeof data.reporte_markdown === "string"
@@ -79,7 +81,7 @@ const InsightsWidget = ({ currency = "ARS" }) => {
   const detalleLines =
     data && data.detalles
       ? Object.values(data.detalles).filter(
-          (value) => typeof value === "string" && value.trim().length > 0
+          (value) => typeof value === "string" && value.trim().length > 0,
         )
       : [];
   const riesgos =
@@ -103,12 +105,21 @@ const InsightsWidget = ({ currency = "ARS" }) => {
       h3: ({ node, ...props }) => (
         <Typography
           variant="subtitle1"
-          sx={{ mt: 1.5, mb: 0.75, fontWeight: 700, textTransform: "uppercase" }}
+          sx={{
+            mt: 1.5,
+            mb: 0.75,
+            fontWeight: 700,
+            textTransform: "uppercase",
+          }}
           {...props}
         />
       ),
       p: ({ node, ...props }) => (
-        <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 1 }} {...props} />
+        <Typography
+          variant="body2"
+          sx={{ lineHeight: 1.6, mb: 1 }}
+          {...props}
+        />
       ),
       ul: ({ node, ordered, ...props }) => (
         <List dense sx={{ pl: 2, mb: 1 }} {...props} />
@@ -149,7 +160,10 @@ const InsightsWidget = ({ currency = "ARS" }) => {
       th: ({ node, ...props }) => (
         <TableCell
           {...props}
-          sx={{ fontWeight: 700, bgcolor: (theme) => theme.palette.action.hover }}
+          sx={{
+            fontWeight: 700,
+            bgcolor: (theme) => theme.palette.action.hover,
+          }}
           component="th"
         />
       ),
@@ -176,7 +190,11 @@ const InsightsWidget = ({ currency = "ARS" }) => {
         const isCompactBlock = txt.length <= 120 && !txt.includes("\n");
         if (isCompactBlock) {
           return (
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }} {...props}>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 600, mb: 1 }}
+              {...props}
+            >
               {txt}
             </Typography>
           );
@@ -198,7 +216,7 @@ const InsightsWidget = ({ currency = "ARS" }) => {
       },
       hr: () => <Divider sx={{ my: 2 }} />,
     }),
-    []
+    [],
   );
 
   const handleRun = async () => {
@@ -253,6 +271,34 @@ const InsightsWidget = ({ currency = "ARS" }) => {
         }}
       />
       <CardContent sx={{ flexGrow: 1 }}>
+        <Grid container spacing={1} sx={{ mb: 1 }}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Mes"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                <MenuItem key={m} value={m}>
+                  {monthName(m)}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Año"
+              type="number"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+            />
+          </Grid>
+        </Grid>
         {loading ? (
           <Stack spacing={1}>
             <Skeleton variant="text" width="40%" />
@@ -261,7 +307,11 @@ const InsightsWidget = ({ currency = "ARS" }) => {
             <Skeleton variant="rectangular" height={14} width="70%" />
           </Stack>
         ) : error ? (
-          <Alert severity="error">{error}</Alert>
+          <Alert severity="error">
+            No pudimos generar el reporte para el periodo elegido. Puede que no
+            haya datos suficientes o haya un problema de conexion. Detalle
+            tecnico: {error}
+          </Alert>
         ) : data ? (
           <Stack spacing={1.25}>
             {data.alerta ? (
@@ -345,7 +395,9 @@ const InsightsWidget = ({ currency = "ARS" }) => {
                         primaryTypographyProps={{ variant: "body2" }}
                         primary={
                           <span>
-                            <b>{key.charAt(0).toUpperCase() + key.slice(1)}: </b>
+                            <b>
+                              {key.charAt(0).toUpperCase() + key.slice(1)}:{" "}
+                            </b>
                             {value}
                           </span>
                         }
