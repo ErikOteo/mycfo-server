@@ -184,14 +184,16 @@ export default function SignIn(props) {
           sessionStorage.setItem("telefono", userData.telefono || "");
 
           // Guardar el rol bruto (fundamental para que usePermisos detecte ADMINISTRADOR)
-          sessionStorage.setItem("rol", userData.rol || 'NORMAL');
+          sessionStorage.setItem("rol", userData.rol || 'COLABORADOR');
 
           // --- Lógica de Permisos Granulares ---
           let permisos = null;
           if (userData.rol && userData.rol.includes('|PERM:')) {
             try {
               const parts = userData.rol.split('|PERM:');
-              permisos = JSON.parse(parts[1]);
+              // El JSON de permisos puede estar seguido por |COLOR: u otros metadatos
+              const permsJson = parts[1].split('|')[0];
+              permisos = JSON.parse(permsJson);
             } catch (e) {
               console.error("Error parseando permisos del rol:", e);
             }

@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import CustomMultiLine from "../../shared-components/CustomMultiLine";
 import CustomButton from "../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
 
 const API_URL_NOTIFICACIONES = API_CONFIG.NOTIFICACION;
@@ -34,15 +34,9 @@ export default function InvitarColaboradores({ empresaNombre, esAdministrador })
       console.log('👤 Usuario invitador:', sub);
       console.log('🏢 Empresa:', empresaNombre);
 
-      const response = await axios.post(
+      const response = await http.post(
         `${API_URL_NOTIFICACIONES}/api/invitaciones/enviar`,
-        emailsInvitacion,
-        {
-          headers: {
-            "X-Usuario-Sub": sub,
-            "Content-Type": "application/json"
-          }
-        }
+        emailsInvitacion
       );
 
       console.log('✅ Respuesta del servidor:', response);

@@ -21,6 +21,9 @@ function ButtonField(props) {
   const handleRef = useForkRef(pickerContext.triggerRef, pickerContext.rootRef);
   const parsedFormat = useParsedFormat();
 
+  // Filtrar props que causan advertencias en el DOM
+  const { slotProps, inputRef, ownerState, ...otherProps } = forwardedProps;
+
   const valueStr =
     pickerContext.value == null
       ? parsedFormat
@@ -28,7 +31,7 @@ function ButtonField(props) {
 
   return (
     <Button
-      {...forwardedProps}
+      {...otherProps}
       variant="outlined"
       ref={handleRef}
       size="small"

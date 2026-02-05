@@ -17,8 +17,8 @@ export default function CargaSeleccionTipo() {
   const tipos = [
     { key: "Ingreso", label: "Ingreso", icon: <TrendingUp fontSize="large" /> },
     { key: "Egreso", label: "Egreso", icon: <TrendingDown fontSize="large" /> },
-    { key: "Deuda", label: "Deuda", icon: <AccountBalance fontSize="large" /> },
-    { key: "Acreencia", label: "Acreencia", icon: <Wallet fontSize="large" /> },
+    // { key: "Deuda", label: "Deuda", icon: <AccountBalance fontSize="large" /> },
+    // { key: "Acreencia", label: "Acreencia", icon: <Wallet fontSize="large" /> },
     { key: "Factura", label: "Factura", icon: <Receipt fontSize="large" /> },
   ];
 
@@ -52,7 +52,7 @@ export default function CargaSeleccionTipo() {
       >
         Registro de Documentos y Movimientos
       </Typography>
-      <Typography variant="subtitle1" sx={{ mb: 4 }}>
+      <Typography variant="subtitle1" sx={{ mb: 4, display: { xs: 'none', md: 'block' } }}>
         Elegí qué tipo de registro querés cargar
       </Typography>
 
@@ -67,8 +67,8 @@ export default function CargaSeleccionTipo() {
                 borderRadius: 3,
                 border: "2px solid",
                 borderColor: "divider",
-                width: 180,
-                height: 180,
+                width: { xs: 120, md: 180 }, // 120px en mobile, 180px en desktop
+                height: { xs: 120, md: 180 }, // 120px en mobile, 180px en desktop
                 justifyContent: "center",
                 alignItems: "center",
                 bgcolor: "background.paper",

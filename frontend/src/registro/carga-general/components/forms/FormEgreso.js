@@ -25,7 +25,7 @@ export default function FormEgreso({
       sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}
     >
       {/* 1: Monto total + Moneda + Medio de pago */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
           <OutlinedInput
@@ -91,7 +91,7 @@ export default function FormEgreso({
       </Box>
 
       {/* Datos del proveedor (destino) */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre del proveedor</FormLabel>
           <OutlinedInput

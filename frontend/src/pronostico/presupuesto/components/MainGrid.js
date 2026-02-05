@@ -1098,7 +1098,19 @@ export default function MainGrid() {
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">
-              <IconButton onClick={handleSearch} size="small" edge="end">
+              <IconButton
+                onClick={handleSearch}
+                size="small"
+                edge="end"
+                disableRipple
+                sx={{
+                  border: "none",
+                  outline: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                  "&:focus": { outline: "none", backgroundColor: "transparent" },
+                }}
+              >
                 <SearchRoundedIcon />
               </IconButton>
             </InputAdornment>

@@ -1,5 +1,5 @@
 // Servicio para manejar datos de organización y empleados
-import axios from 'axios';
+import http from '../api/http';
 import API_CONFIG from '../config/api-config';
 
 const API_BASE_URL = API_CONFIG.ADMINISTRACION;
@@ -13,11 +13,7 @@ export const organizacionService = {
         throw new Error('No hay usuario autenticado');
       }
 
-      const response = await axios.get(`${API_BASE_URL}/api/organizacion/info-completa`, {
-        headers: {
-          'X-Usuario-Sub': sub,
-        },
-      });
+      const response = await http.get(`${API_BASE_URL}/api/organizacion/info-completa`);
 
       return response.data;
     } catch (error) {
@@ -34,11 +30,7 @@ export const organizacionService = {
         throw new Error('No hay usuario autenticado');
       }
 
-      const response = await axios.get(`${API_BASE_URL}/api/usuarios/perfil`, {
-        headers: {
-          'X-Usuario-Sub': sub
-        }
-      });
+      const response = await http.get(`${API_BASE_URL}/api/usuarios/perfil`);
 
       console.log('🔍 [ORGANIZACION-SERVICE] Perfil response:', response.data);
       console.log('🔍 [ORGANIZACION-SERVICE] EmpresaId:', response.data?.empresaId);
@@ -47,11 +39,7 @@ export const organizacionService = {
         console.log('🔍 [ORGANIZACION-SERVICE] Obteniendo datos de empresa con ID:', response.data.empresaId);
 
         // Obtener datos completos de la empresa
-        const empresaResponse = await axios.get(`${API_BASE_URL}/api/empresas/${response.data.empresaId}`, {
-          headers: {
-            'X-Usuario-Sub': sub
-          }
-        });
+        const empresaResponse = await http.get(`${API_BASE_URL}/api/empresas/${response.data.empresaId}`);
 
         console.log('🔍 [ORGANIZACION-SERVICE] Empresa response:', empresaResponse.data);
 
@@ -85,19 +73,11 @@ export const organizacionService = {
       }
 
       // Primero obtener el ID de la organización del usuario
-      const perfilResponse = await axios.get(`${API_BASE_URL}/api/usuarios/perfil`, {
-        headers: {
-          'X-Usuario-Sub': sub
-        }
-      });
+      const perfilResponse = await http.get(`${API_BASE_URL}/api/usuarios/perfil`);
 
       if (perfilResponse.data && perfilResponse.data.empresaId) {
         // Obtener empleados de la organización
-        const empleadosResponse = await axios.get(`${API_BASE_URL}/api/usuarios/empresa/${perfilResponse.data.empresaId}`, {
-          headers: {
-            'X-Usuario-Sub': sub
-          }
-        });
+        const empleadosResponse = await http.get(`${API_BASE_URL}/api/usuarios/empresa/${perfilResponse.data.empresaId}`);
 
         return empleadosResponse.data;
       }
@@ -117,18 +97,10 @@ export const organizacionService = {
       }
 
       // Obtener el ID de la organización
-      const perfilResponse = await axios.get(`${API_BASE_URL}/api/usuarios/perfil`, {
-        headers: {
-          'X-Usuario-Sub': sub
-        }
-      });
+      const perfilResponse = await http.get(`${API_BASE_URL}/api/usuarios/perfil`);
 
       if (perfilResponse.data && perfilResponse.data.empresaId) {
-        const response = await axios.put(`${API_BASE_URL}/api/empresas/${perfilResponse.data.empresaId}`, datosOrganizacion, {
-          headers: {
-            'X-Usuario-Sub': sub
-          }
-        });
+        const response = await http.put(`${API_BASE_URL}/api/empresas/${perfilResponse.data.empresaId}`, datosOrganizacion);
 
         return response.data;
       }
@@ -147,11 +119,7 @@ export const organizacionService = {
         throw new Error('No hay usuario autenticado');
       }
 
-      const response = await axios.put(`${API_BASE_URL}/api/usuarios/${empleadoSub}`, datosEmpleado, {
-        headers: {
-          'X-Usuario-Sub': sub
-        }
-      });
+      const response = await http.put(`${API_BASE_URL}/api/usuarios/${empleadoSub}`, datosEmpleado);
 
       return response.data;
     } catch (error) {
@@ -168,15 +136,45 @@ export const organizacionService = {
         throw new Error('No hay usuario autenticado');
       }
 
-      const response = await axios.delete(`${API_BASE_URL}/api/usuarios/${empleadoSub}`, {
-        headers: {
-          'X-Usuario-Sub': sub
-        }
-      });
+      const response = await http.delete(`${API_BASE_URL}/api/usuarios/${empleadoSub}`);
 
       return response.data;
     } catch (error) {
       console.error('Error al eliminar empleado:', error);
+      throw error;
+    }
+  },
+
+  // Abandonar empresa (para usuarios no propietarios)
+  async abandonarEmpresa() {
+    try {
+      const sub = sessionStorage.getItem('sub');
+      if (!sub) {
+        throw new Error('No hay usuario autenticado');
+      }
+
+      const response = await http.post(`${API_BASE_URL}/api/usuarios/abandonar`, {});
+
+      return response.data;
+    } catch (error) {
+      console.error('Error al abandonar empresa:', error);
+      throw error;
+    }
+  },
+
+  // Eliminar empresa completa (solo propietario)
+  async eliminarEmpresa(empresaId) {
+    try {
+      const sub = sessionStorage.getItem('sub');
+      if (!sub) {
+        throw new Error('No hay usuario autenticado');
+      }
+
+      const response = await http.delete(`${API_BASE_URL}/api/empresas/${empresaId}`);
+
+      return response.data;
+    } catch (error) {
+      console.error('Error al eliminar empresa:', error);
       throw error;
     }
   }

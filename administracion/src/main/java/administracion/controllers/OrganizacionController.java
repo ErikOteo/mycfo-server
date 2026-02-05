@@ -5,6 +5,7 @@ import administracion.dtos.OrganizacionInfoResponse;
 import administracion.dtos.UsuarioDTO;
 import administracion.services.EmpresaService;
 import administracion.services.UsuarioService;
+import administracion.services.PermissionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,11 +22,11 @@ public class OrganizacionController {
 
     private final UsuarioService usuarioService;
     private final EmpresaService empresaService;
+    private final PermissionService permissionService;
 
     @GetMapping("/info-completa")
     public ResponseEntity<OrganizacionInfoResponse> obtenerInfoCompletaOrganizacion(
-            @RequestHeader("X-Usuario-Sub") String sub
-    ) {
+            @RequestHeader("X-Usuario-Sub") String sub) {
         try {
             UsuarioDTO perfil = usuarioService.obtenerUsuarioPorSub(sub);
 
@@ -40,7 +41,18 @@ public class OrganizacionController {
             }
 
             EmpresaDTO empresa = empresaService.obtenerEmpresa(perfil.getEmpresaId());
-            List<UsuarioDTO> empleados = usuarioService.obtenerEmpleadosPorEmpresa(perfil.getEmpresaId());
+
+            // Solo incluimos la lista de empleados si el usuario tiene permiso admin.view
+            List<UsuarioDTO> empleados = List.of();
+            boolean tienePermisoAdmin = permissionService.tienePermiso(sub, "admin", "view");
+            System.out.println("🔍 [DEBUG-ORGANIZACION] Sub: " + sub);
+            System.out.println("🔍 [DEBUG-ORGANIZACION] EmpresaId: " + perfil.getEmpresaId());
+            System.out.println("🔍 [DEBUG-ORGANIZACION] Tiene permiso admin.view: " + tienePermisoAdmin);
+
+            if (tienePermisoAdmin) {
+                empleados = usuarioService.obtenerEmpleadosPorEmpresa(perfil.getEmpresaId());
+                System.out.println("🔍 [DEBUG-ORGANIZACION] Empleados encontrados: " + empleados.size());
+            }
 
             OrganizacionInfoResponse respuesta = OrganizacionInfoResponse.builder()
                     .perfil(perfil)
