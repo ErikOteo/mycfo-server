@@ -19,7 +19,7 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
-      
+
       {/* 1️⃣ Número documento */}
       <Box>
         <FormLabel>Número documento *</FormLabel>
@@ -38,7 +38,7 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 2️⃣ Versión + Medio de pago + Fecha emisión */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Versión *</FormLabel>
           <CustomSelect
@@ -85,7 +85,7 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 3️⃣ Monto total + Moneda */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
           <OutlinedInput
@@ -116,7 +116,7 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 4️⃣ Receptor */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre receptor *</FormLabel>
           <OutlinedInput
@@ -168,7 +168,7 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 5️⃣ Emisor */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre emisor *</FormLabel>
           <OutlinedInput
@@ -234,7 +234,7 @@ export default function FormRecibo({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 7️⃣ Documento asociado */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Documento asociado</FormLabel>
           <CustomSelect

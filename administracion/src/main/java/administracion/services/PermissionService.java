@@ -30,7 +30,7 @@ public class PermissionService {
     /**
      * Verifica si el usuario actual puede editar el usuario objetivo
      * Un administrador puede editar cualquier usuario de su empresa
-     * Un usuario normal solo puede editar su propio perfil
+     * Un colaborador solo puede editar su propio perfil
      * 
      * @param subUsuarioActual   Sub del usuario que está haciendo la petición
      * @param subUsuarioObjetivo Sub del usuario que se quiere editar
@@ -56,6 +56,20 @@ public class PermissionService {
         }
 
         return false;
+    }
+
+    /**
+     * Verifica si el usuario pertenece a la empresa especificada
+     * 
+     * @param subUsuarioActual Sub del usuario
+     * @param empresaId        ID de la empresa
+     * @return true si pertenece
+     */
+    public boolean perteneceAEmpresa(String subUsuarioActual, Long empresaId) {
+        Usuario usuario = usuarioRepository.findBySub(subUsuarioActual)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        return usuario.getEmpresa() != null && usuario.getEmpresa().getId().equals(empresaId);
     }
 
     /**
@@ -99,31 +113,32 @@ public class PermissionService {
         if (rolRaw == null)
             return false;
 
-        // Si es ADMINISTRADOR puro (sin JSON), tiene acceso total
-        if (rolRaw.equals("ADMINISTRADOR") || rolRaw.startsWith("ADMINISTRADOR|")) {
-            // Si tiene el pipe pero no el JSON (admin de legado modificado), o es admin
-            // puro
-            if (!rolRaw.contains("|PERM:")) {
-                return true;
-            }
+        // GOD MODE: Si es ADMINISTRADOR, tiene acceso a todo por defecto
+        if (rolRaw.startsWith("ADMINISTRADOR")) {
+            return true;
         }
 
-        // Si tiene el formato de permisos JSON
+        // Si es COLABORADOR y tiene el formato de permisos JSON
         if (rolRaw.contains("|PERM:")) {
             try {
                 String jsonPart = rolRaw.split("\\|PERM:")[1];
-                JsonNode root = objectMapper.readTree(jsonPart);
+                // El split puede incluir el COLOR, así que tomamos solo hasta el siguiente pipe
+                // si existe
+                String jsonOnly = jsonPart.contains("|") ? jsonPart.split("\\|")[0] : jsonPart;
+
+                JsonNode root = objectMapper.readTree(jsonOnly);
                 JsonNode moduloNode = root.get(modulo);
                 if (moduloNode != null && moduloNode.has(accion)) {
                     return moduloNode.get(accion).asBoolean();
                 }
             } catch (Exception e) {
-                // Si falla el parseo, pero empieza con ADMINISTRADOR, permitimos por seguridad
-                return rolRaw.startsWith("ADMINISTRADOR");
+                // Si falla el parseo de un colaborador, denegamos por seguridad
+                return false;
             }
         }
 
-        // Caso por defecto para usuarios NORMAL sin JSON o sin ese permiso específico
+        // Caso por defecto para usuarios COLABORADOR sin JSON o sin ese permiso
+        // específico
         return false;
     }
 }

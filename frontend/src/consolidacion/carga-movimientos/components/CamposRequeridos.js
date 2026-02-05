@@ -57,6 +57,19 @@ const CamposRequeridos = (props) => (
         startIcon={<FileDownloadIcon />}
         href="/plantilla-mycfo.xlsx"
         download
+        sx={{
+          fontSize: { xs: '0.75rem', md: '0.875rem' },
+          padding: { xs: '8px 12px', md: '6px 16px' }, // Más padding vertical en mobile
+          minHeight: { xs: 'auto', md: '36px' }, // Altura mínima automática
+          height: 'auto', // Altura automática para adaptarse al contenido
+          whiteSpace: 'normal', // Permite saltos de línea
+          textAlign: 'center', // Centra el texto
+          lineHeight: 1.4, // Mejor espaciado entre líneas
+          '& .MuiButton-startIcon': {
+            marginRight: { xs: '6px', md: '8px' },
+            alignSelf: 'center', // Centra el icono verticalmente
+          },
+        }}
       >
         Descargar plantilla MyCFO
       </Button>

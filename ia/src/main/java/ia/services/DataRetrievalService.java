@@ -112,7 +112,8 @@ public class DataRetrievalService {
         return exchangeForMap(builder.toUriString(), userSub, authorization);
     }
 
-    public Map<String, Object> getScreenData(String screen, Map<String, Object> params, String userSub, String authorization) {
+    public Map<String, Object> getScreenData(String screen, Map<String, Object> params, String userSub,
+            String authorization) {
         if (!StringUtils.hasText(screen)) {
             return Map.of("error", "missing_screen");
         }
@@ -122,8 +123,10 @@ public class DataRetrievalService {
         Integer month = getInt(params, "mes", "month");
         Integer page = getInt(params, "page");
         Integer size = getInt(params, "size", "limit", "limite");
-        if (page == null) page = 0;
-        if (size == null) size = 10;
+        if (page == null)
+            page = 0;
+        if (size == null)
+            size = 10;
 
         return switch (normalized) {
             case "dashboard" -> {
@@ -132,7 +135,8 @@ public class DataRetrievalService {
                 if (year != null && month != null) {
                     builder.queryParam("fecha", year + "-" + String.format("%02d", month) + "-01");
                 }
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 yield wrapScreen(normalized, exchangeForObject(builder.toUriString(), userSub, authorization));
             }
             case "reporte-mensual" -> {
@@ -143,7 +147,8 @@ public class DataRetrievalService {
                         .fromHttpUrl(reporteUrl + "/resumen")
                         .queryParam("anio", year)
                         .queryParam("mes", month);
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 yield wrapScreen(normalized, exchangeForObject(builder.toUriString(), userSub, authorization));
             }
             case "flujo-de-caja" -> {
@@ -151,9 +156,10 @@ public class DataRetrievalService {
                     yield missingParams(normalized, "anio");
                 }
                 UriComponentsBuilder builder = UriComponentsBuilder
-                        .fromHttpUrl(reporteUrl + "/cashflow")
+                        .fromHttpUrl(reporteUrl + "/cashflow/resumen")
                         .queryParam("anio", year);
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 yield wrapScreen(normalized, exchangeForObject(builder.toUriString(), userSub, authorization));
             }
             case "estado-de-resultados", "estado-de-resultado" -> {
@@ -163,7 +169,8 @@ public class DataRetrievalService {
                 UriComponentsBuilder builder = UriComponentsBuilder
                         .fromHttpUrl(reporteUrl + "/pyl")
                         .queryParam("anio", year);
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 yield wrapScreen(normalized, exchangeForObject(builder.toUriString(), userSub, authorization));
             }
             case "presupuestos" -> {
@@ -175,7 +182,8 @@ public class DataRetrievalService {
                 if (year != null) {
                     builder.queryParam("year", year);
                 }
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 yield wrapScreen(normalized, exchangeForObject(builder.toUriString(), userSub, authorization));
             }
             case "pronostico-fijo" -> {
@@ -191,7 +199,8 @@ public class DataRetrievalService {
                 UriComponentsBuilder builder = UriComponentsBuilder
                         .fromHttpUrl(pronosticoUrl + "/api/forecasts/rolling")
                         .queryParam("horizonteMeses", horizonte);
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 Object data = exchangeForObject(builder.toUriString(), userSub, authorization, HttpMethod.POST, null);
                 yield wrapScreen(normalized, data);
             }
@@ -203,16 +212,29 @@ public class DataRetrievalService {
                         .queryParam("size", Math.min(Math.max(size, 1), 50))
                         .queryParam("sortBy", "fechaEmision")
                         .queryParam("sortDir", "desc");
-                if (currency != null) builder.queryParam("moneda", currency);
+                if (currency != null)
+                    builder.queryParam("moneda", currency);
                 LocalDate desde = parseDate(params, "fechaDesde", "desde");
                 LocalDate hasta = parseDate(params, "fechaHasta", "hasta");
-                if (desde != null) builder.queryParam("fechaDesde", desde);
-                if (hasta != null) builder.queryParam("fechaHasta", hasta);
+                if (desde != null)
+                    builder.queryParam("fechaDesde", desde);
+                if (hasta != null)
+                    builder.queryParam("fechaHasta", hasta);
                 yield wrapScreen(normalized, exchangeForObject(builder.toUriString(), userSub, authorization));
             }
             case "conciliacion" -> {
+                String status = getString(params, "status", "estado");
+                String endpoint;
+                if ("conciliados".equalsIgnoreCase(status)) {
+                    endpoint = "/movimientos/conciliados";
+                } else if ("todos".equalsIgnoreCase(status)) {
+                    endpoint = "/movimientos";
+                } else {
+                    endpoint = "/movimientos/sin-conciliar";
+                }
+
                 UriComponentsBuilder movs = UriComponentsBuilder
-                        .fromHttpUrl(registroUrl + "/api/conciliacion/movimientos/sin-conciliar")
+                        .fromHttpUrl(registroUrl + "/api/conciliacion" + endpoint)
                         .queryParam("page", page)
                         .queryParam("size", Math.min(Math.max(size, 1), 50))
                         .queryParam("sortBy", "fechaEmision")
@@ -228,6 +250,7 @@ public class DataRetrievalService {
                 Map<String, Object> data = new LinkedHashMap<>();
                 data.put("movimientos", movimientos);
                 data.put("estadisticas", estadisticas);
+                data.put("status", status != null ? status : "sin-conciliar");
                 yield wrapScreen(normalized, data);
             }
             case "carga-movimientos" -> wrapScreen(normalized,
@@ -249,7 +272,8 @@ public class DataRetrievalService {
                     yield missingParams(normalized, "userId");
                 }
                 yield wrapScreen(normalized,
-                        exchangeForObject(notificacionUrl + "/api/users/" + userId + "/reminders", userSub, authorization));
+                        exchangeForObject(notificacionUrl + "/api/users/" + userId + "/reminders", userSub,
+                                authorization));
             }
             case "listado-notificaciones" -> {
                 Integer userId = getInt(params, "userId", "usuarioId");
@@ -257,7 +281,8 @@ public class DataRetrievalService {
                     yield missingParams(normalized, "userId");
                 }
                 yield wrapScreen(normalized,
-                        exchangeForObject(notificacionUrl + "/api/users/" + userId + "/notifications", userSub, authorization));
+                        exchangeForObject(notificacionUrl + "/api/users/" + userId + "/notifications", userSub,
+                                authorization));
             }
             case "configuracion-notificaciones" -> {
                 Integer userId = getInt(params, "userId", "usuarioId");
@@ -265,7 +290,8 @@ public class DataRetrievalService {
                     yield missingParams(normalized, "userId");
                 }
                 yield wrapScreen(normalized,
-                        exchangeForObject(notificacionUrl + "/api/users/" + userId + "/notification-preferences", userSub, authorization));
+                        exchangeForObject(notificacionUrl + "/api/users/" + userId + "/notification-preferences",
+                                userSub, authorization));
             }
             case "perfil" -> wrapScreen(normalized,
                     exchangeForObject(administracionUrl + "/api/usuarios/perfil", userSub, authorization));
@@ -286,7 +312,8 @@ public class DataRetrievalService {
                     url,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<Map<String, Object>>() {});
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
             Map<String, Object> body = response.getBody();
             return body != null ? body : Map.of();
         } catch (RestClientResponseException ex) {

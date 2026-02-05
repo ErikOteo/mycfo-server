@@ -19,6 +19,7 @@ import java.util.List;
 public class Factura extends DocumentoComercial {
 
     private String tipoFactura; // obligatorio
+    private String descripcion;
 
     // --- Datos del vendedor ---
     private String vendedorNombre; // obligatorio

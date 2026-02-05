@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Paper, TextField, IconButton, Typography, Fab, CircularProgress, useTheme } from '@mui/material';
+import { Box, Paper, TextField, IconButton, Typography, Fab, CircularProgress, useTheme, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
@@ -244,17 +245,27 @@ const detectTargetScreen = (normalizedMessage) => {
 
 const extractYear = (normalizedMessage) => {
     if (!normalizedMessage) return null;
-    const match = normalizedMessage.match(/\\b(20\\d{2}|19\\d{2})\\b/);
-    return match ? Number(match[1]) : null;
+    const match = normalizedMessage.match(/\b(20\d{2}|19\d{2})\b/);
+    if (match) return Number(match[1]);
+
+    const normalized = normalizeText(normalizedMessage);
+    if (normalized.includes("este ano") || normalized.includes("ano actual") || normalized.includes("este ejercicio") || normalized.includes("actual")) {
+        return new Date().getFullYear();
+    }
+    return null;
 };
 
 const extractMonth = (normalizedMessage) => {
     if (!normalizedMessage) return null;
-    const slashMatch = normalizedMessage.match(/\\b(0?[1-9]|1[0-2])\\s*[/-]\\s*(20\\d{2}|19\\d{2})\\b/);
+    const slashMatch = normalizedMessage.match(/\b(0?[1-9]|1[0-2])\s*[/-]\s*(20\d{2}|19\d{2})\b/);
     if (slashMatch) {
         return Number(slashMatch[1]);
     }
-    const parts = normalizedMessage.split(" ");
+    const normalized = normalizeText(normalizedMessage);
+    if (normalized.includes("este mes") || normalized.includes("mes actual")) {
+        return new Date().getMonth() + 1;
+    }
+    const parts = normalized.split(" ");
     for (const part of parts) {
         if (MONTHS_MAP[part]) {
             return MONTHS_MAP[part];
@@ -320,32 +331,14 @@ const fetchCashflow = async ({ year, currency }) => {
     const params = new URLSearchParams();
     params.set("anio", Number(year));
     if (currency) params.set("moneda", currency);
-    const response = await fetch(`${API_CONFIG.REPORTE}/cashflow?${params.toString()}`, { headers: getAuthHeaders() });
+    const response = await fetch(`${API_CONFIG.REPORTE}/cashflow/resumen?${params.toString()}`, { headers: getAuthHeaders() });
     if (!response.ok) {
         throw new Error(`http_${response.status}`);
     }
     const json = await response.json();
-    const registros = Array.isArray(json) ? json : [];
-    const totalIngresosMensual = Array(12).fill(0);
-    const totalEgresosMensual = Array(12).fill(0);
-    registros.forEach((tx) => {
-        const monthIndex = tx?.fechaEmision ? new Date(tx.fechaEmision).getMonth() : null;
-        if (monthIndex == null || monthIndex < 0 || monthIndex > 11) return;
-        if (tx?.tipo === "Ingreso") {
-            totalIngresosMensual[monthIndex] += Number(tx?.montoTotal || 0);
-        } else if (tx?.tipo === "Egreso") {
-            totalEgresosMensual[monthIndex] += Math.abs(Number(tx?.montoTotal || 0));
-        }
-    });
-    const netosMensuales = totalIngresosMensual.map((v, i) => v - totalEgresosMensual[i]);
     return {
         screen: "flujo-de-caja",
-        year,
-        currency,
-        registros,
-        ingresosMensuales: totalIngresosMensual,
-        egresosMensuales: totalEgresosMensual,
-        netosMensuales,
+        ...json
     };
 };
 
@@ -610,6 +603,7 @@ const fetchCargaData = async ({ tipo, modo }) => {
 
 const ChatbotWidget = ({ currentModule = 'general' }) => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const { context } = useChatbotContext();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
@@ -618,16 +612,19 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
 
     const getPerfilFromSession = () => {
         try {
             const usuario = sessionService.getUsuario();
+            const rol = sessionStorage.getItem('rol');
             const perfil = {
                 nombre: usuario?.nombre || "",
                 email: usuario?.email || "",
-                telefono: usuario?.telefono || ""
+                telefono: usuario?.telefono || "",
+                rol: rol || ""
             };
-            if (!perfil.nombre && !perfil.email && !perfil.telefono) {
+            if (!perfil.nombre && !perfil.email && !perfil.telefono && !perfil.rol) {
                 return null;
             }
             return perfil;
@@ -642,9 +639,21 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
             : null;
         const base = context && typeof context === 'object' ? context : {};
         const perfil = base.perfil ?? getPerfilFromSession();
+
+        let permisos = null;
+        try {
+            const storedPermisos = sessionStorage.getItem('permisos');
+            if (storedPermisos) {
+                permisos = JSON.parse(storedPermisos);
+            }
+        } catch (e) {
+            console.error("Error al obtener permisos para el chatbot:", e);
+        }
+
         const payload = {
             ...base,
             ...(perfil ? { perfil } : {}),
+            ...(permisos ? { permisos } : {}),
             ...(route ? { route } : {})
         };
         return Object.keys(payload).length ? payload : null;
@@ -857,6 +866,10 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
     useEffect(() => {
         if (isOpen) {
             scrollToBottom();
+            // Pequeño delay para asegurar que el DOM esté listo
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
         }
     }, [isOpen]);
 
@@ -892,7 +905,8 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                 body: JSON.stringify({
                     message: userMessage.text,
                     module: currentModule,
-                    context: Object.keys(mergedContext).length ? mergedContext : null
+                    context: Object.keys(mergedContext).length ? mergedContext : null,
+                    history: messages.slice(-6)
                 }),
             });
 
@@ -923,7 +937,12 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     color="primary"
                     aria-label="chat"
                     onClick={() => setIsOpen(true)}
-                    sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}
+                    sx={{
+                        position: 'fixed',
+                        bottom: { xs: 'calc(78px + max(16px, env(safe-area-inset-bottom)))', lg: 20 }, // Dinámico para sincronizar con la altura de la barra inferior (16px padding + 64px altura + safe area)
+                        right: 20,
+                        zIndex: 1000
+                    }}
                 >
                     <ChatIcon />
                 </Fab>
@@ -935,7 +954,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     elevation={12}
                     sx={(theme) => ({
                         position: 'fixed',
-                        bottom: 20,
+                        bottom: { xs: 'calc(78px + max(16px, env(safe-area-inset-bottom)))', lg: 20 }, // Dinámico para sincronizar con la altura de la barra inferior
                         right: 20,
                         width: 350,
                         height: 500,
@@ -998,8 +1017,36 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                                     border: `1px solid ${(theme.vars || theme).palette.divider}`
                                 })}
                             >
-                                <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
-                                    {msg.text}
+                                <Typography variant="body2" sx={{ display: 'inline', wordBreak: 'break-word' }}>
+                                    {msg.text.split(/(\[\[.*?\]\])/g).map((part, i) => {
+                                        const match = part.match(/^\[\[(.*?)\|(.*?)\]\]$/);
+                                        if (match) {
+                                            const [_, route, label] = match;
+                                            return (
+                                                <Button
+                                                    key={i}
+                                                    size="small"
+                                                    variant="contained"
+                                                    onClick={() => navigate(route)}
+                                                    sx={{
+                                                        mx: 0.5,
+                                                        my: 0.2,
+                                                        px: 1,
+                                                        minWidth: 'auto',
+                                                        height: 'auto',
+                                                        textTransform: 'none',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 'bold',
+                                                        borderRadius: 1,
+                                                        lineHeight: 1.2
+                                                    }}
+                                                >
+                                                    {label}
+                                                </Button>
+                                            );
+                                        }
+                                        return part;
+                                    })}
                                 </Typography>
                             </Box>
                         ))}
@@ -1022,6 +1069,7 @@ const ChatbotWidget = ({ currentModule = 'general' }) => {
                     })}>
                         <TextField
                             fullWidth
+                            inputRef={inputRef}
                             size="small"
                             placeholder="Escribe tu duda..."
                             value={input}

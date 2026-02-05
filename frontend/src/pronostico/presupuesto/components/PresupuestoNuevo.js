@@ -780,7 +780,14 @@ export default function PresupuestoNuevo() {
       {step === 1 && (
         <>
           <Box mt={1} mb={2} display="flex" gap={1} alignItems="center">
-            <Button startIcon={<AddIcon />} variant="outlined" onClick={handleAgregarCategoria}>Nueva categoría</Button>
+            <Button
+              startIcon={<AddIcon />}
+              variant="outlined"
+              onClick={handleAgregarCategoria}
+              sx={{ lineHeight: 1.4 }}
+            >
+              Nueva categoría
+            </Button>
             <Tooltip title="Bloquear montos negativos">
               <FormControlLabel
                 control={<Switch size="small" checked={lockNegative} onChange={(_, v) => setLockNegative(v)} />}
@@ -1100,7 +1107,20 @@ export default function PresupuestoNuevo() {
           </Paper>
 
           <Box display="flex" gap={1} mb={2}>
-            <Button startIcon={<CalculateIcon />} variant="contained" color="primary" onClick={aplicarReglas}>
+            <Button
+              startIcon={<CalculateIcon />}
+              variant="contained"
+              color="primary"
+              onClick={aplicarReglas}
+              sx={{
+                height: { xs: 'auto', md: '36px' }, // Altura automática en mobile
+                minHeight: { xs: 'auto', md: '36px' },
+                lineHeight: 1.4, // Mismo interlineado que "Nueva categoría"
+                whiteSpace: { xs: 'normal', md: 'nowrap' }, // Permite saltos de línea en mobile
+                padding: { xs: '8px 16px', md: '6px 16px' }, // Más padding vertical en mobile
+                textAlign: 'center',
+              }}
+            >
               Aplicar reglas a los meses
             </Button>
             <Button variant="outlined" onClick={next}>Continuar</Button>

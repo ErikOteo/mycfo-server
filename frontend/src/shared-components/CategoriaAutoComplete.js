@@ -99,6 +99,19 @@ export default function CategoriaAutoComplete({
       onChange={handleChange}
       inputValue={inputValue}
       onInputChange={(_e, newInput) => setInputValue(newInput)}
+      sx={{
+        "& .MuiAutocomplete-clearIndicator": {
+          border: "none",
+          outline: "none",
+          backgroundColor: "transparent",
+          "&:hover": {
+            backgroundColor: "transparent",
+            border: "none",
+          },
+          "&:focus": { outline: "none" },
+          "& .MuiTouchRipple-root": { display: "none" },
+        },
+      }}
       options={[crearOpcion, ...options]}
       filterOptions={(opts, params) => {
         const filtered = filter(

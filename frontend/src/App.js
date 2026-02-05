@@ -81,16 +81,12 @@ const App = React.memo(() => {
             {/* Ruta por defecto - mostrar dashboard en la URL principal */}
             <Route index element={
               <Suspense fallback={<LoadingSpinner />}>
-                <ProtectedRoute modulo="dashboard">
-                  <Dashboard />
-                </ProtectedRoute>
+                <Dashboard />
               </Suspense>
             } />
             <Route path="dashboard" element={
               <Suspense fallback={<LoadingSpinner />}>
-                <ProtectedRoute modulo="dashboard">
-                  <Dashboard />
-                </ProtectedRoute>
+                <Dashboard />
               </Suspense>
             } />
 
@@ -111,8 +107,8 @@ const App = React.memo(() => {
           </Route>
         </Route>
 
-        {/* Catch-all: redirigir a signin */}
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        {/* Catch-all: redirigir a raíz (RequireAuth se encargará de signin si es necesario) */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
