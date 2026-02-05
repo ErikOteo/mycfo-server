@@ -62,7 +62,7 @@ public class InsightsService {
     private final ObjectMapper mapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public Map<String, Object> generarInsights(String userSub, String authorization, Integer anio, Integer mes) throws Exception {
+    public Map<String, Object> generarInsights(String userSub, String authorization, Integer anio, Integer mes, String moneda) throws Exception {
         LocalDate now = LocalDate.now();
         int year = (anio != null) ? anio : now.getYear();
         int month = (mes != null) ? mes : now.getMonthValue();
@@ -86,7 +86,7 @@ public class InsightsService {
         headers.add("X-Usuario-Sub", userSub);
         headers.add("Authorization", authorization);
 
-        String currency = "ARS";
+        String currency = (moneda != null && !moneda.isBlank()) ? moneda : "ARS";
 
         // P&L (devengado) solo ARS
         String pylUrl = reporteUrl + "/pyl?anio=" + year + "&moneda=" + currency;
@@ -95,8 +95,8 @@ public class InsightsService {
                 new ParameterizedTypeReference<Map<String, Object>>() {}
         );
         Map<String, Object> pyl = Optional.ofNullable(pylResp.getBody()).orElse(Map.of());
-        log.info("P&L detalle ingresos: {}", describirDetalle(pyl.get("detalleIngresos")));
-        log.info("P&L detalle egresos: {}", describirDetalle(pyl.get("detalleEgresos")));
+        log.info("P&L detalle ingresos (moneda={}): {}", currency, describirDetalle(pyl.get("detalleIngresos")));
+        log.info("P&L detalle egresos (moneda={}): {}", currency, describirDetalle(pyl.get("detalleEgresos")));
 
         // Cashflow (caja) solo ARS
         String cashUrl = reporteUrl + "/cashflow?anio=" + analysisYear + "&moneda=" + currency;
@@ -121,8 +121,8 @@ public class InsightsService {
         compact.put("presupuestos", compactarPresupuestos(presupuestos));
         payload.put("datos", compact);
 
-        log.info("P&L devengado (GET {}/pyl?anio={}): ingresosMensuales={}, egresosMensuales={}, detalleIngresos={}, detalleEgresos={}",
-                reporteUrl, year,
+        log.info("P&L devengado (GET {}/pyl?anio={}&moneda={}): ingresosMensuales={}, egresosMensuales={}, detalleIngresos={}, detalleEgresos={}",
+                reporteUrl, year, currency,
                 pyl.getOrDefault("ingresosMensuales", List.of()),
                 pyl.getOrDefault("egresosMensuales", List.of()),
                 sizeOf(pyl.get("detalleIngresos")),
@@ -130,13 +130,13 @@ public class InsightsService {
 
         double[] logIngCash = (double[]) mapOrEmpty(compact.get("cashflow")).getOrDefault("ingresosMensuales", new double[0]);
         double[] logEgrCash = (double[]) mapOrEmpty(compact.get("cashflow")).getOrDefault("egresosMensuales", new double[0]);
-        log.info("Cashflow (GET {}/cashflow?anio={}): ingresosMensuales={}, egresosMensuales={}",
-                reporteUrl, analysisYear,
+        log.info("Cashflow (GET {}/cashflow?anio={}&moneda={}): ingresosMensuales={}, egresosMensuales={}",
+                reporteUrl, analysisYear, currency,
                 Arrays.toString(logIngCash),
                 Arrays.toString(logEgrCash));
 
-        log.info("Resumen mensual (GET {}/resumen?anio={}&mes={}): detalleIngresos={}, detalleEgresos={}",
-                reporteUrl, analysisYear, analysisMonth,
+        log.info("Resumen mensual (GET {}/resumen?anio={}&mes={}&moneda={}): detalleIngresos={}, detalleEgresos={}",
+                reporteUrl, analysisYear, analysisMonth, currency,
                 sizeOf(resumen.get("detalleIngresos")),
                 sizeOf(resumen.get("detalleEgresos")));
 
@@ -147,7 +147,8 @@ public class InsightsService {
                 pronosticoUrl, presupTotal, presupNombres);
 
         Map<String, Object> derivadosLog = mapOrEmpty(compact.get("derivados"));
-        log.info("Derivados calculados localmente: gapLiquidez={}, cajaNetaMes={}, devengadoNetoMes={}, ingresosMes={}, egresosMes={}, devengadoYtd={}, ingresosYtd={}, egresosYtd={}, mesAnalisis={}, anioAnalisis={}",
+        log.info("Derivados calculados localmente (moneda={}): gapLiquidez={}, cajaNetaMes={}, devengadoNetoMes={}, ingresosMes={}, egresosMes={}, devengadoYtd={}, ingresosYtd={}, egresosYtd={}, mesAnalisis={}, anioAnalisis={}",
+                currency,
                 derivadosLog.get("gapLiquidez"),
                 derivadosLog.get("cajaNetaMes"),
                 derivadosLog.get("devengadoNetoMes"),
@@ -159,8 +160,8 @@ public class InsightsService {
                 derivadosLog.get("mesAnalisis"),
                 derivadosLog.get("anioAnalisis"));
 
-        log.info("Payload listo para Vertex: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}, keys={}",
-                userSub, year, month, analysisYear, analysisMonth, compact.keySet());
+        log.info("Payload listo para Vertex: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}, moneda={}, keys={}",
+                userSub, year, month, analysisYear, analysisMonth, currency, compact.keySet());
         Map<String, Object> ai = llamarVertex(compact);
         payload.put("ai", ai);
         log.info("Vertex response recibida: userSub={}, keys={}", userSub, ai != null ? ai.keySet() : "null");

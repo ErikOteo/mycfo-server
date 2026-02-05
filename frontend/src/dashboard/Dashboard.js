@@ -1325,7 +1325,7 @@ const Dashboard = React.memo(() => {
           {esAdminTotal() && (
             <Grid size={{ xs: 12, md: 10 }}>
               <Box sx={{ width: "100%", mx: "auto" }}>
-                <InsightsWidget />
+                <InsightsWidget currency={currency} />
               </Box>
             </Grid>
           )}

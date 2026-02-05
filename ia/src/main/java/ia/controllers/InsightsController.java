@@ -21,11 +21,12 @@ public class InsightsController {
             @RequestHeader("X-Usuario-Sub") String userSub,
             @RequestHeader("Authorization") String authorization,
             @RequestParam(required = false) Integer anio,
-            @RequestParam(required = false) Integer mes
+            @RequestParam(required = false) Integer mes,
+            @RequestParam(required = false, defaultValue = "ARS") String moneda
     ) {
-        log.info("Insights request: userSub={}, anio={}, mes={}", userSub, anio, mes);
+        log.info("Insights request: userSub={}, anio={}, mes={}, moneda={}", userSub, anio, mes, moneda);
         try {
-            var resp = insightsService.generarInsights(userSub, authorization, anio, mes);
+            var resp = insightsService.generarInsights(userSub, authorization, anio, mes, moneda);
             log.info("Insights response ready: userSub={}, keys={}", userSub, resp != null ? resp.keySet() : "null");
             return ResponseEntity.ok(resp);
         } catch (Exception e) {

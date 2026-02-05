@@ -11,6 +11,9 @@ import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid2";
+import TextField from "@mui/material/TextField";
+import MenuItem from "@mui/material/MenuItem";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -26,10 +29,32 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import API_CONFIG from "../../config/api-config";
 
-const InsightsWidget = () => {
+const InsightsWidget = ({ currency = "ARS" }) => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [data, setData] = React.useState(null);
+  const today = React.useMemo(() => new Date(), []);
+  const [selectedYear, setSelectedYear] = React.useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = React.useState(today.getMonth() + 1); // 1-12
+  const monthName = React.useCallback((m) => {
+    const names = [
+      "Enero",
+      "Febrero",
+      "Marzo",
+      "Abril",
+      "Mayo",
+      "Junio",
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre",
+      "Noviembre",
+      "Diciembre",
+    ];
+    return names[Math.max(0, Math.min(11, m - 1))];
+  }, []);
+  const analysisMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+  const analysisYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
 
   const markdownRaw =
     data && typeof data.reporte_markdown === "string"
@@ -182,10 +207,10 @@ const InsightsWidget = () => {
     setData(null);
     try {
       const baseUrl = API_CONFIG.IA;
-      const now = new Date();
       const params = new URLSearchParams();
-      params.set("anio", now.getFullYear());
-      params.set("mes", now.getMonth() + 1);
+      params.set("anio", selectedYear);
+      params.set("mes", selectedMonth);
+      params.set("moneda", currency || "ARS");
       const headers = { "Content-Type": "application/json" };
       const sub = sessionStorage.getItem("sub");
       const token = sessionStorage.getItem("accessToken");
