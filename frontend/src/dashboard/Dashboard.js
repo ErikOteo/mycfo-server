@@ -1390,13 +1390,15 @@ const Dashboard = React.memo(() => {
           </>
         )}
 
+<<<<<<<<< Temporary merge branch 1
+=========
         <Grid
           container
           spacing={2}
           justifyContent="center"
           sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
         >
-          {tienePermiso("pres", "view") && (
+          {tienePermiso('pres', 'view') && (
             <Grid size={{ xs: 12, md: 4 }}>
               <BudgetWidget
                 companyId={company}
@@ -1409,16 +1411,13 @@ const Dashboard = React.memo(() => {
               />
             </Grid>
           )}
-          {tienePermiso("movs", "view") && (
+          {tienePermiso('movs', 'view') && (
             <Grid size={{ xs: 12, md: 4 }}>
               <LiquidityGapWidget currency={currency} />
             </Grid>
           )}
-          {tienePermiso("concil", "view") && (
-            <Grid
-              size={{ xs: 12, md: 4 }}
-              sx={{ display: { xs: "none", md: "block" } }}
-            >
+          {tienePermiso('concil', 'view') && (
+            <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
               <ReconciliationWidget
                 data={state.reconciliation.data}
                 loading={
@@ -1430,7 +1429,7 @@ const Dashboard = React.memo(() => {
                 onNavigate={(account) =>
                   handleNavigate(
                     "/conciliacion",
-                    account ? { cuenta: account } : undefined,
+                    account ? { cuenta: account } : undefined
                   )
                 }
               />
@@ -1451,7 +1450,7 @@ const Dashboard = React.memo(() => {
             display: { xs: "none", md: "flex" },
           }}
         >
-          {tienePermiso("movs", "view") && (
+          {tienePermiso('movs', 'view') && (
             <Grid size={{ xs: 12, md: 6 }}>
               <RecentMovementsWidget
                 data={state.movements.data}
@@ -1462,7 +1461,7 @@ const Dashboard = React.memo(() => {
               />
             </Grid>
           )}
-          {tienePermiso("facts", "view") && (
+          {tienePermiso('facts', 'view') && (
             <Grid size={{ xs: 12, md: 6 }}>
               <RecentInvoicesWidget
                 data={state.invoices?.data ?? null}
@@ -1487,8 +1486,8 @@ const Dashboard = React.memo(() => {
                 <InsightsWidget currency={currency} />
               </Box>
             </Grid>
-          )}
-        </Grid>
+          </>
+        )}
 
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <Button
