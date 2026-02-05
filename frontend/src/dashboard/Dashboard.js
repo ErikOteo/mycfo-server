@@ -1291,20 +1291,20 @@ const Dashboard = React.memo(() => {
                 </Grid>
               )}
             </Grid>
+          )}
+        </Grid>
 
-            <Grid
-              container
-              spacing={2}
-              justifyContent="center"
-              sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-            >
-              {esAdminTotal() && (
-                <Grid size={{ xs: 12, md: 10 }}>
-                  <Box sx={{ width: "100%", mx: "auto" }}>
-                    <InsightsWidget />
-                  </Box>
-                </Grid>
-              )}
+        <Grid
+          container
+          spacing={2}
+          justifyContent="center"
+          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
+        >
+          {esAdminTotal() && (
+            <Grid size={{ xs: 12, md: 10 }}>
+              <Box sx={{ width: "100%", mx: "auto" }}>
+                <InsightsWidget currency={currency} />
+              </Box>
             </Grid>
           </>
         )}
