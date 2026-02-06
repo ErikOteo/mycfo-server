@@ -32,21 +32,24 @@ public class InsightsService {
     };
     private static final String INSIGHTS_SYSTEM_PROMPT = String.join(
             "\n",
-            "Actua como un analista financiero experto. Tu tono debe ser simple, directo y accionable.",
-            "Tarea: Analiza los siguientes datos financieros de mi empresa (Ingresos, Egresos, Categorias y Presupuesto)",
-            "y genera un diagnostico de la situacion actual.",
-            "Por favor incluye en tu analisis:",
-            "Diagnostico Corto (3 puntos clave):",
-            "Liquidez: Compara mi flujo de caja (dinero real) vs. lo devengado (facturado/comprometido) del ultimo mes.",
-            "Solvencia: Analiza el resultado acumulado del anio (P&L). Es la empresa solvente?",
-            "Estado del Mes: Genere caja positiva o tuve deficit este mes? Menciona mis mayores ingresos y egresos por categoria.",
-            "Senales: Identifica alertas financieras (ej. si estoy gastando mas de lo que ingreso o si tengo problemas de cobro).",
-            "Riesgos y Recomendaciones: Dame 3 tips breves para mejorar mi situacion financiera basados en estos numeros.",
-            "Responde SOLO en JSON con la forma exacta:",
-            "{diagnostico_corto:string, senales:object, detalles:object, riesgos_clave:[], tips:[], alerta:boolean}.",
-            "En diagnostico_corto genera 3 frases cortas, una por cada punto clave, separadas por \\n.",
-            "En detalles incluye ingresoMaximo y egresoMaximo con las categorias principales.",
-            "Si no hay datos suficientes, indicalo sin inventar."
+             "Actua como analista financiero senior.",
+                            "Usa lenguaje claro, cotidiano y accionable, pensado para lectores sin formación financiera.",
+                            "Genera un reporte narrativo en Markdown orientado a mostrar el estado actual del negocio y facilitar decisiones.",
+                            "Estructura el reporte con las siguientes secciones y respeta el rol de cada una:",
+                            "## Diagnostico: resumen breve del estado financiero general. Indica si la empresa tiene dinero disponible, si está generando ganancia y si la situación es sólida o frágil. No repitas detalles que luego aparezcan en otras secciones.",
+                            "## Señales: 3 a 5 puntos que aporten lecturas nuevas (oportunidades, alertas tempranas o patrones relevantes). No repitas conclusiones del Diagnostico.",
+                            "## Riesgos: 2 a 4 riesgos concretos que puedan afectar el negocio si no se actúa. Sé directo y específico.",
+                            "## Recomendaciones: 3 acciones claras y priorizadas (1, 2 y 3), pensadas para ejecutarse en el corto plazo.",
+                            "## KPIs clave: lista o tabla corta con 3 a 5 métricas numéricas relevantes para entender el mes.",
+                            "Evita términos técnicos no explicados (ej.: gap de liquidez, working capital, leverage).",
+                            "Si un término financiero es necesario, explícalo en la misma frase con palabras simples.",
+                            "Usa nombres de métricas descriptivos y legibles (ej.: dinero disponible, ganancia del mes, capacidad de pago).",
+                            "Si falta algún dato puntual, genera el reporte igualmente usando la información disponible, siempre que sea posible obtener conclusiones razonables. Solo rechaza el reporte si la información es claramente insuficiente para un análisis confiable.",
+                            "Usa solo los datos proporcionados; no inventes valores faltantes.",
+                            "Al final incluye OPCIONALMENTE un bloque JSON dentro de ```json ... ``` con llaves: diagnostico_corto, senales, detalles, riesgos_clave, tips, alerta.",
+                            "diagnostico_corto debe ser 3 frases cortas separadas por \\n.",
+                            "Si los datos son insuficientes responde exactamente: \"No hay datos suficientes para generar un reporte confiable.\"",
+                            "No incluyas explicaciones meta ni disculpas."
     );
 
     @Value("${mycfo.reporte.url}")
@@ -59,16 +62,12 @@ public class InsightsService {
     private final ObjectMapper mapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public Map<String, Object> generarInsights(String userSub, String authorization, Integer anio, Integer mes) {
+    public Map<String, Object> generarInsights(String userSub, String authorization, Integer anio, Integer mes, String moneda) throws Exception {
         LocalDate now = LocalDate.now();
         int year = (anio != null) ? anio : now.getYear();
         int month = (mes != null) ? mes : now.getMonthValue();
-        int analysisMonth = month - 1;
+        int analysisMonth = month; // analizar exactamente el mes seleccionado
         int analysisYear = year;
-        if (analysisMonth < 1) {
-            analysisMonth = 12;
-            analysisYear = year - 1;
-        }
 
         // Llamar microservicio reporte para obtener datos compactos
         Map<String, Object> payload = new HashMap<>();
@@ -77,58 +76,92 @@ public class InsightsService {
         payload.put("anioAnalisis", analysisYear);
         payload.put("mesAnalisis", analysisMonth);
 
-        try {
-            log.info("Generando insights: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}",
-                    userSub, year, month, analysisYear, analysisMonth);
-            var headers = new HttpHeaders();
-            headers.add("X-Usuario-Sub", userSub);
-            headers.add("Authorization", authorization);
+        log.info("Generando insights: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}",
+                userSub, year, month, analysisYear, analysisMonth);
+        var headers = new HttpHeaders();
+        headers.add("X-Usuario-Sub", userSub);
+        headers.add("Authorization", authorization);
 
-            // P&L (devengado)
-            String pylUrl = reporteUrl + "/pyl?anio=" + year;
-            var pylResp = restTemplate.exchange(
-                    pylUrl, HttpMethod.GET, new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
-            Map<String, Object> pyl = Optional.ofNullable(pylResp.getBody()).orElse(Map.of());
+        String currency = (moneda != null && !moneda.isBlank()) ? moneda : "ARS";
 
-            // Cashflow (caja)
-            String cashUrl = reporteUrl + "/cashflow?anio=" + analysisYear;
-            var cashResp = restTemplate.exchange(
-                    cashUrl, HttpMethod.GET, new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-            );
-            List<Map<String, Object>> cash = Optional.ofNullable(cashResp.getBody()).orElse(List.of());
+        // P&L (devengado) solo ARS
+        String pylUrl = reporteUrl + "/pyl?anio=" + year + "&moneda=" + currency;
+        var pylResp = restTemplate.exchange(
+                pylUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+        );
+        Map<String, Object> pyl = Optional.ofNullable(pylResp.getBody()).orElse(Map.of());
+        log.info("P&L detalle ingresos (moneda={}): {}", currency, describirDetalle(pyl.get("detalleIngresos")));
+        log.info("P&L detalle egresos (moneda={}): {}", currency, describirDetalle(pyl.get("detalleEgresos")));
 
-            // Resumen mensual (caja)
-            String resumenUrl = reporteUrl + "/resumen?anio=" + analysisYear + "&mes=" + analysisMonth;
-            var resResp = restTemplate.exchange(
-                    resumenUrl, HttpMethod.GET, new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
-            Map<String, Object> resumen = Optional.ofNullable(resResp.getBody()).orElse(Map.of());
+        // Cashflow (caja) solo ARS
+        String cashUrl = reporteUrl + "/cashflow?anio=" + analysisYear + "&moneda=" + currency;
+        var cashResp = restTemplate.exchange(
+                cashUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+        );
+        List<Map<String, Object>> cash = Optional.ofNullable(cashResp.getBody()).orElse(List.of());
 
-            Map<String, Object> presupuestos = fetchPresupuestos(headers);
+        // Resumen mensual (caja) solo ARS
+        String resumenUrl = reporteUrl + "/resumen?anio=" + analysisYear + "&mes=" + analysisMonth + "&moneda=" + currency;
+        var resResp = restTemplate.exchange(
+                resumenUrl, HttpMethod.GET, new HttpEntity<>(headers),
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+        );
+        Map<String, Object> resumen = Optional.ofNullable(resResp.getBody()).orElse(Map.of());
 
-            // Reducir datos a lo esencial para el prompt
-            Map<String, Object> compact = compactarDatos(year, month, analysisYear, analysisMonth, pyl, cash, resumen);
-            compact.put("presupuestos", compactarPresupuestos(presupuestos));
-            payload.put("datos", compact);
+        Map<String, Object> presupuestos = fetchPresupuestos(headers);
 
-            log.info("Datos listos para Vertex: userSub={}, keys={}", userSub, compact.keySet());
-            Map<String, Object> ai = llamarVertex(compact);
-            payload.put("ai", ai);
-            log.info("Vertex response recibida: userSub={}, keys={}", userSub, ai != null ? ai.keySet() : "null");
-            return ai;
-        } catch (Exception e) {
-            log.error("Error generando insights para userSub={}, anio={}, mes={}", userSub, anio, mes, e);
-            Map<String, Object> fallback = new HashMap<>();
-            fallback.put("diagnostico_corto", "No se pudo generar el análisis en este momento.");
-            fallback.put("senales", Map.of());
-            fallback.put("tips", List.of("Reintenta en unos minutos", "Verifica tu conexión"));
-            fallback.put("error", e.getMessage());
-            return fallback;
-        }
+        // Reducir datos a lo esencial para el prompt
+        Map<String, Object> compact = compactarDatos(year, month, analysisYear, analysisMonth, pyl, cash, resumen);
+        compact.put("presupuestos", compactarPresupuestos(presupuestos));
+        payload.put("datos", compact);
+
+        log.info("P&L devengado (GET {}/pyl?anio={}&moneda={}): ingresosMensuales={}, egresosMensuales={}, detalleIngresos={}, detalleEgresos={}",
+                reporteUrl, year, currency,
+                pyl.getOrDefault("ingresosMensuales", List.of()),
+                pyl.getOrDefault("egresosMensuales", List.of()),
+                sizeOf(pyl.get("detalleIngresos")),
+                sizeOf(pyl.get("detalleEgresos")));
+
+        double[] logIngCash = (double[]) mapOrEmpty(compact.get("cashflow")).getOrDefault("ingresosMensuales", new double[0]);
+        double[] logEgrCash = (double[]) mapOrEmpty(compact.get("cashflow")).getOrDefault("egresosMensuales", new double[0]);
+        log.info("Cashflow (GET {}/cashflow?anio={}&moneda={}): ingresosMensuales={}, egresosMensuales={}",
+                reporteUrl, analysisYear, currency,
+                Arrays.toString(logIngCash),
+                Arrays.toString(logEgrCash));
+
+        log.info("Resumen mensual (GET {}/resumen?anio={}&mes={}&moneda={}): detalleIngresos={}, detalleEgresos={}",
+                reporteUrl, analysisYear, analysisMonth, currency,
+                sizeOf(resumen.get("detalleIngresos")),
+                sizeOf(resumen.get("detalleEgresos")));
+
+        Map<String, Object> presupLog = mapOrEmpty(compact.get("presupuestos"));
+        Object presupTotal = presupLog.getOrDefault("total", 0);
+        Object presupNombres = presupLog.getOrDefault("nombres", List.of());
+        log.info("Presupuestos activos (GET {}/api/presupuestos?page=0&size=5&status=active): total={}, nombres={}",
+                pronosticoUrl, presupTotal, presupNombres);
+
+        Map<String, Object> derivadosLog = mapOrEmpty(compact.get("derivados"));
+        log.info("Derivados calculados localmente (moneda={}): gapLiquidez={}, cajaNetaMes={}, devengadoNetoMes={}, ingresosMes={}, egresosMes={}, devengadoYtd={}, ingresosYtd={}, egresosYtd={}, mesAnalisis={}, anioAnalisis={}",
+                currency,
+                derivadosLog.get("gapLiquidez"),
+                derivadosLog.get("cajaNetaMes"),
+                derivadosLog.get("devengadoNetoMes"),
+                derivadosLog.get("ingresosMes"),
+                derivadosLog.get("egresosMes"),
+                derivadosLog.get("devengadoYtd"),
+                derivadosLog.get("ingresosYtd"),
+                derivadosLog.get("egresosYtd"),
+                derivadosLog.get("mesAnalisis"),
+                derivadosLog.get("anioAnalisis"));
+
+        log.info("Payload listo para Vertex: userSub={}, anio={}, mes={}, anioAnalisis={}, mesAnalisis={}, moneda={}, keys={}",
+                userSub, year, month, analysisYear, analysisMonth, currency, compact.keySet());
+        Map<String, Object> ai = llamarVertex(compact);
+        payload.put("ai", ai);
+        log.info("Vertex response recibida: userSub={}, keys={}", userSub, ai != null ? ai.keySet() : "null");
+        return ai;
     }
 
     private Map<String, Object> compactarDatos(int anioPyl, int mesActual,
@@ -160,8 +193,15 @@ public class InsightsService {
         for (Map<String, Object> mov : cash) {
             try {
                 String tipo = Objects.toString(mov.get("tipo"), "");
-                String fecha = Objects.toString(mov.get("fechaEmision"), null);
-                Double monto = (mov.get("montoTotal") instanceof Number) ? ((Number) mov.get("montoTotal")).doubleValue() : 0.0;
+                String fecha = Objects.toString(
+                        mov.getOrDefault("fechaEmision", mov.getOrDefault("fecha", null)),
+                        null);
+                if (fecha != null && fecha.length() > 10 && fecha.contains("T")) {
+                    fecha = fecha.substring(0, 10);
+                }
+                Double monto = (mov.get("montoTotal") instanceof Number)
+                        ? ((Number) mov.get("montoTotal")).doubleValue()
+                        : 0.0;
                 if (fecha == null) continue;
                 int monthIdx = LocalDate.parse(fecha).getMonthValue() - 1;
                 if ("Ingreso".equalsIgnoreCase(tipo)) ingCash[monthIdx] += monto;
@@ -181,12 +221,12 @@ public class InsightsService {
         int idxDevengado = (anioAnalisis == anioPyl)
                 ? idxCash
                 : Math.max(0, Math.min(11, mesActual - 1));
-        double cajaNeta = ingCash[idxCash] - egrCash[idxCash];
+        double ingresosMes = (idxCash < ingCash.length) ? ingCash[idxCash] : 0;
+        double egresosMes = (idxCash < egrCash.length) ? egrCash[idxCash] : 0;
+        double cajaNeta = ingresosMes - egresosMes;
         double devengadoNeto = (idxDevengado < ingPyl.length ? ingPyl[idxDevengado] : 0)
                 - (idxDevengado < egrPyl.length ? egrPyl[idxDevengado] : 0);
         double gapLiquidez = devengadoNeto - cajaNeta;
-        double ingresosMes = (idxCash < ingCash.length) ? ingCash[idxCash] : 0;
-        double egresosMes = (idxCash < egrCash.length) ? egrCash[idxCash] : 0;
 
         int idxYtd = Math.max(0, Math.min(11, mesActual - 1));
         double ingresosYtd = 0;
@@ -214,6 +254,34 @@ public class InsightsService {
         return out;
     }
 
+    private int sizeOf(Object listLike) {
+        if (listLike instanceof Collection<?> c) {
+            return c.size();
+        }
+        return 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String describirDetalle(Object detalle) {
+        if (!(detalle instanceof List<?> list) || list.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder sb = new StringBuilder("[");
+        boolean first = true;
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+            Object categoria = map.containsKey("categoria")
+                    ? map.get("categoria")
+                    : (map.containsKey("nombre") ? map.get("nombre") : "sin_categoria");
+            double total = asDouble(map.get("total"));
+            if (!first) sb.append("; ");
+            sb.append(categoria).append(": ").append(total);
+            first = false;
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
     private double[] toDoubleArray(List<?> list) {
         double[] out = new double[list.size()];
         for (int i = 0; i < list.size(); i++) {
@@ -221,123 +289,6 @@ public class InsightsService {
             out[i] = (v instanceof Number) ? ((Number) v).doubleValue() : 0.0;
         }
         return out;
-    }
-
-    private Map<String, Object> construirInsightBasico(Map<String, Object> compact) {
-        Map<String, Object> derivados = mapOrEmpty(compact.get("derivados"));
-        double gapLiquidez = asDouble(derivados.get("gapLiquidez"));
-        double cajaNeta = asDouble(derivados.get("cajaNetaMes"));
-        double devengadoMes = asDouble(derivados.get("devengadoNetoMes"));
-        double ingresosMes = asDouble(derivados.get("ingresosMes"));
-        double egresosMes = asDouble(derivados.get("egresosMes"));
-        double devengadoYtd = asDouble(derivados.get("devengadoYtd"));
-        double ingresosYtd = asDouble(derivados.get("ingresosYtd"));
-        double egresosYtd = asDouble(derivados.get("egresosYtd"));
-
-        int anioAnalisis = asInt(compact.get("anioAnalisis"), LocalDate.now().getYear());
-        int anioPyl = asInt(compact.get("anio"), anioAnalisis);
-        String mesAnalisisNombre = Objects.toString(compact.getOrDefault("mesAnalisisNombre", "Mes analizado"));
-        String mesActualNombre = Objects.toString(compact.getOrDefault("mesActualNombre", "Mes actual"));
-
-        String estadoLiquidez = gapLiquidez >= 0 ? "sana" : "tensionada";
-        String estadoSolvencia = devengadoYtd >= 0 ? "solvente" : "en riesgo";
-        String estadoMes = ingresosMes >= egresosMes ? "genero caja positiva" : "presento deficit de caja";
-
-        Map<String, Object> resumen = mapOrEmpty(compact.get("resumen"));
-        Map<String, Object> ingresoTop = obtenerMaxCategoria(resumen.get("detalleIngresos"));
-        Map<String, Object> egresoTop = obtenerMaxCategoria(resumen.get("detalleEgresos"));
-
-        String lineaLiquidez = String.format(
-                "Liquidez (cashflow vs devengado %s %d): %s; gap = devengado (%s) - caja (%s) = %s.",
-                mesAnalisisNombre, anioAnalisis, estadoLiquidez,
-                formatCurrency(devengadoMes), formatCurrency(cajaNeta), formatCurrency(gapLiquidez));
-
-        String lineaSolvencia = String.format(
-                "Solvencia (P&L %d acumulado a %s): %s con resultado neto %s (ingresos %s vs egresos %s).",
-                anioPyl, mesActualNombre, estadoSolvencia,
-                formatCurrency(devengadoYtd), formatCurrency(ingresosYtd), formatCurrency(egresosYtd));
-
-        String lineaIngreso = formatearCategoria(
-                String.format("Ingreso mayor del mes %s %d", mesAnalisisNombre, anioAnalisis), ingresoTop);
-        String lineaEgreso = formatearCategoria(
-                String.format("Egreso mayor del mes %s %d", mesAnalisisNombre, anioAnalisis), egresoTop);
-
-        String lineaEstado = String.format(
-                "Estado reportes mes %s %d (cashflow/resumen): %s; ingresos %s vs egresos %s. %s / %s.",
-                mesAnalisisNombre, anioAnalisis, estadoMes,
-                formatCurrency(ingresosMes), formatCurrency(egresosMes),
-                lineaIngreso, lineaEgreso);
-
-        String diagnostico = String.join("\n", List.of(lineaLiquidez, lineaSolvencia, lineaEstado));
-
-        Map<String, String> senales = new LinkedHashMap<>();
-        senales.put("liquidez", lineaLiquidez);
-        senales.put("rentabilidad", lineaSolvencia);
-
-        Map<String, String> detalles = new LinkedHashMap<>();
-        detalles.put("ingresoMaximo", lineaIngreso);
-        detalles.put("egresoMaximo", lineaEgreso);
-
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("diagnostico_corto", diagnostico);
-        resp.put("senales", senales);
-        resp.put("detalles", detalles);
-        resp.put("riesgos_clave", List.of());
-        resp.put("tips", List.of());
-        resp.put("alerta", gapLiquidez < 0 || devengadoYtd < 0);
-        return resp;
-    }
-
-    private Map<String, Object> adaptarRespuestaLlm(Map<String, Object> raw, Map<String, Object> compact) {
-        Map<String, Object> base = construirInsightBasico(compact);
-        if (raw == null || raw.isEmpty()) {
-            return base;
-        }
-
-        Map<String, Object> resp = new HashMap<>(base);
-
-        String diag = Objects.toString(raw.get("diagnostico_corto"), "").trim();
-        if (!diag.isEmpty()) {
-            List<String> lines = diag.replace("\r", "")
-                    .lines()
-                    .map(String::trim)
-                    .filter(line -> !line.isEmpty())
-                    .filter(line -> !line.startsWith("{") && !line.startsWith("```"))
-                    .toList();
-            if (!lines.isEmpty()) {
-                resp.put("diagnostico_corto", String.join("\n", lines));
-            }
-        }
-
-        Map<String, Object> rawSenales = mapOrEmpty(raw.get("senales"));
-        if (!rawSenales.isEmpty()) {
-            Map<String, String> senales = new LinkedHashMap<>();
-            rawSenales.forEach((k, v) -> senales.put(k, Objects.toString(v, "")));
-            resp.put("senales", senales);
-        }
-
-        Map<String, Object> rawDetalles = mapOrEmpty(raw.get("detalles"));
-        if (!rawDetalles.isEmpty()) {
-            Map<String, String> detalles = new LinkedHashMap<>();
-            rawDetalles.forEach((k, v) -> detalles.put(k, Objects.toString(v, "")));
-            resp.put("detalles", detalles);
-        }
-
-        List<String> riesgos = extraerListaTexto(raw.get("riesgos_clave"));
-        if (riesgos != null) {
-            resp.put("riesgos_clave", riesgos);
-        }
-
-        List<String> tips = extraerListaTexto(raw.get("tips"));
-        if (tips != null) {
-            resp.put("tips", tips);
-        }
-
-        if (raw.containsKey("alerta")) {
-            resp.put("alerta", Boolean.TRUE.equals(raw.get("alerta")));
-        }
-
-        return resp;
     }
 
     private Map<String, Object> llamarVertex(Map<String, Object> compact) throws Exception {
@@ -368,6 +319,7 @@ public class InsightsService {
 
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", vertexProperties.getTemperature());
+        generationConfig.put("topP", vertexProperties.getTopP());
         generationConfig.put("maxOutputTokens", vertexProperties.getMaxOutputTokens());
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -375,28 +327,40 @@ public class InsightsService {
         body.put("systemInstruction", systemInstruction);
         body.put("generationConfig", generationConfig);
 
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+        String payload = mapper.writeValueAsString(body);
+
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(token);
-            String payload = mapper.writeValueAsString(body);
             ResponseEntity<String> resp = restTemplate.exchange(
                     endpoint, HttpMethod.POST, new HttpEntity<>(payload, headers), String.class);
 
             String rawText = extractTextFromResponse(resp.getBody());
             String contentText = normalizarContenido(rawText);
-            try {
-                Map<String, Object> parsed = mapper.readValue(
-                        contentText,
-                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
-                );
-                return adaptarRespuestaLlm(parsed, compact);
-            } catch (Exception ex) {
-                log.warn("No se pudo parsear respuesta de Vertex como JSON estructurado: {}", rawText, ex);
-                return construirInsightBasico(compact);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("reporte_markdown", contentText);
+
+            String jsonBlock = extractJsonBlock(contentText);
+            if (jsonBlock != null && !jsonBlock.isBlank()) {
+                try {
+                    Map<String, Object> parsed = mapper.readValue(
+                            jsonBlock,
+                            new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
+                    );
+                    mergeOptionalJson(result, parsed);
+                } catch (Exception ex) {
+                    log.warn("No se pudo parsear el bloque JSON opcional de Vertex: {}", jsonBlock, ex);
+                }
             }
+
+            boolean hasReport = StringUtils.hasText(contentText);
+            if (!hasReport) {
+                throw new IllegalStateException("Vertex no devolvio contenido util.");
+            }
+            return result;
         } catch (RestClientResponseException ex) {
-            log.error("Vertex AI respondio con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
+            log.error("Vertex AI respondio con error HTTP {}: {}", ex.getStatusCode().value(), ex.getResponseBodyAsString());
             throw ex;
         } catch (Exception ex) {
             log.error("Error inesperado al invocar Vertex AI", ex);
@@ -437,38 +401,69 @@ public class InsightsService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> obtenerMaxCategoria(Object detalle) {
-        if (!(detalle instanceof List<?> lista) || lista.isEmpty()) {
-            return null;
-        }
-        return lista.stream()
-                .filter(Map.class::isInstance)
-                .map(item -> (Map<String, Object>) item)
-                .max(Comparator.comparingDouble(m -> asDouble(m.get("total"))))
-                .orElse(null);
-    }
-
-    private String formatearCategoria(String titulo, Map<String, Object> categoria) {
-        if (categoria == null) {
-            return titulo + ": sin datos";
-        }
-        String nombre = Objects.toString(categoria.getOrDefault("categoria", "Sin categorizar"));
-        double monto = asDouble(categoria.get("total"));
-        return String.format("%s: %s en %s", titulo, formatCurrency(monto), nombre);
-    }
-
-    private String formatCurrency(double value) {
-        String formatted = String.format(Locale.US, "%,.0f", Math.abs(value));
-        return (value < 0 ? "-$" : "$") + formatted;
-    }
-
-    @SuppressWarnings("unchecked")
     private List<String> extraerListaTexto(Object value) {
         if (value instanceof List<?> list) {
             return list.stream()
                     .map(item -> Objects.toString(item, ""))
                     .filter(str -> !str.isBlank())
                     .toList();
+        }
+        return null;
+    }
+
+    private void mergeOptionalJson(Map<String, Object> target, Map<String, Object> parsed) {
+        if (parsed == null || parsed.isEmpty()) {
+            return;
+        }
+        String diag = Objects.toString(parsed.get("diagnostico_corto"), "").trim();
+        if (StringUtils.hasText(diag)) {
+            target.put("diagnostico_corto", diag.replace("\r", ""));
+        }
+        Map<String, Object> senales = mapOrEmpty(parsed.get("senales"));
+        if (!senales.isEmpty()) {
+            target.put("senales", senales);
+        }
+        Map<String, Object> detalles = mapOrEmpty(parsed.get("detalles"));
+        if (!detalles.isEmpty()) {
+            target.put("detalles", detalles);
+        }
+        List<String> riesgos = extraerListaTexto(parsed.get("riesgos_clave"));
+        if (riesgos != null) {
+            target.put("riesgos_clave", riesgos);
+        }
+        List<String> tips = extraerListaTexto(parsed.get("tips"));
+        if (tips != null) {
+            target.put("tips", tips);
+        }
+        if (parsed.containsKey("alerta")) {
+            target.put("alerta", Boolean.TRUE.equals(parsed.get("alerta")));
+        }
+    }
+
+    private String extractJsonBlock(String content) {
+        if (!StringUtils.hasText(content)) {
+            return null;
+        }
+        int jsonFence = content.indexOf("```json");
+        if (jsonFence >= 0) {
+            int start = jsonFence + "```json".length();
+            int end = content.indexOf("```", start);
+            if (end > start) {
+                return content.substring(start, end).trim();
+            }
+        }
+        int anyFence = content.indexOf("```");
+        if (anyFence >= 0) {
+            int start = anyFence + "```".length();
+            int end = content.indexOf("```", start);
+            if (end > start) {
+                return content.substring(start, end).trim();
+            }
+        }
+        int firstBrace = content.indexOf('{');
+        int lastBrace = content.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            return content.substring(firstBrace, lastBrace + 1).trim();
         }
         return null;
     }
