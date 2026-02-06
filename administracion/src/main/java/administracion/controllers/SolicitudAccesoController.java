@@ -64,4 +64,15 @@ public class SolicitudAccesoController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @GetMapping("/mi-ultima")
+    public ResponseEntity<SolicitudAcceso> obtenerMiUltimaSolicitud(
+            @RequestHeader(value = "X-Usuario-Sub") String subUsuario) {
+        SolicitudAcceso solicitud = solicitudService.obtenerUltimaSolicitud(subUsuario);
+        if (solicitud != null) {
+            return ResponseEntity.ok(solicitud);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }

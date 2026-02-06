@@ -328,7 +328,8 @@ export default function TablaRegistrosV2() {
 
   useEffect(() => {
     fetchMaxMonto();
-  }, [fetchMaxMonto]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency]);
 
   const cargarMovimientos = useCallback(async () => {
     setLoading(true);
@@ -434,12 +435,23 @@ export default function TablaRegistrosV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recargar cuando cambie la paginación
+  // Recargar cuando cambie la paginación o filtros
   useEffect(() => {
     if (initializedRef.current) {
       cargarMovimientos();
     }
-  }, [cargarMovimientos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currency,
+    paginationModel.page,
+    paginationModel.pageSize,
+    debouncedSearch,
+    searchDateISO,
+    fechaDesde,
+    fechaHasta,
+    montoDesde,
+    montoHasta,
+  ]);
 
   // Abrir dialog para VER movimiento
   const handleVerMovimiento = (movimiento) => {
@@ -1433,6 +1445,7 @@ export default function TablaRegistrosV2() {
           autoHeight
           // Paginación del servidor
           paginationMode={paginationMode}
+          sortingMode="server"
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           rowCount={rowCount}
