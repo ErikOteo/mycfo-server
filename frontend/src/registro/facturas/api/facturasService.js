@@ -35,6 +35,7 @@ export const fetchFacturas = async ({
   montoMin,
   montoMax,
 } = {}) => {
+
   const params = new URLSearchParams({
     page,
     size,
@@ -52,8 +53,10 @@ export const fetchFacturas = async ({
   if (montoMin !== undefined && montoMin !== null) params.append("montoMin", montoMin);
   if (montoMax !== undefined && montoMax !== null) params.append("montoMax", montoMax);
 
+  const url = `${BASE_URL}/facturas/buscar?${params.toString()}`;
+
   const response = await http.get(
-    `${BASE_URL}/facturas/buscar?${params.toString()}`,
+    url,
     withUserHeaders()
   );
 
