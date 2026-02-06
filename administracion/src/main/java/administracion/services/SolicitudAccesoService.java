@@ -96,4 +96,9 @@ public class SolicitudAccesoService {
         solicitud.setFechaResolucion(java.time.LocalDateTime.now());
         return solicitudRepository.save(solicitud);
     }
+
+    public SolicitudAcceso obtenerUltimaSolicitud(String usuarioSub) {
+        return solicitudRepository.findTopByUsuarioSubOrderByFechaSolicitudDesc(usuarioSub)
+                .orElse(null);
+    }
 }

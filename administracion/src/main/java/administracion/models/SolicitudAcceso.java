@@ -54,4 +54,9 @@ public class SolicitudAcceso {
         APROBADA,
         RECHAZADA
     }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("nombreEmpresa")
+    public String getNombreEmpresa() {
+        return empresa != null ? empresa.getNombre() : null;
+    }
 }
