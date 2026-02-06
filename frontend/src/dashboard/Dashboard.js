@@ -643,8 +643,16 @@ const Dashboard = React.memo(() => {
       const periodoBase = String(
         response?.periodoBase ?? response?.periodo ?? "",
       );
-      const [baseYearStr] = periodoBase.split("-");
-      const targetYear = Number(baseYearStr) || new Date().getFullYear();
+      // Parsear la fecha base (YYYY-MM). Si falla, usar fecha actual.
+      let targetDate = new Date();
+      const [baseYearStr, baseMonthStr] = periodoBase.split("-");
+      const baseYear = Number(baseYearStr);
+      const baseMonth = Number(baseMonthStr);
+
+      if (Number.isFinite(baseYear) && Number.isFinite(baseMonth)) {
+        // baseMonth en Date es 0-index (Enero = 0) -> restamos 1
+        targetDate = new Date(baseYear, baseMonth - 1, 1);
+      }
 
       const totalsByPeriod = new Map();
       datos.forEach((item) => {
@@ -668,29 +676,37 @@ const Dashboard = React.memo(() => {
         return acc;
       }, new Map());
 
-      const pointsDetailed = Array.from({ length: 12 }, (_, index) => {
-        const date = new Date(targetYear, index, 1);
-        const key = `${date.getFullYear()}-${String(index + 1).padStart(
-          2,
-          "0",
-        )}`;
+      // Generar los últimos 12 meses terminando en targetDate
+      // Iteramos: i=11 (hace 11 meses) hasta i=0 (mes actual) para orden cronológico
+      const pointsDetailed = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(targetDate);
+        d.setMonth(d.getMonth() - i); // Restar meses
+
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+
         let value = totalsByPeriod.get(key);
+
+        // Mantener la lógica de fallback por mes (ignorar año) si no hay dato exacto
         if (typeof value === "undefined") {
-          value = fallbackByMonth.get(index + 1) ?? 0;
+          value = fallbackByMonth.get(m) ?? 0;
         }
-        return {
-          month: monthShort.format(date),
-          fullLabel: monthLong.format(date),
+
+        pointsDetailed.push({
+          month: monthShort.format(d),
+          fullLabel: monthLong.format(d),
           value,
-        };
-      });
+        });
+      }
 
       const values = pointsDetailed.map((point) => point.value);
       const nonZeroValues = values.filter((val) => val !== 0);
       const average =
         nonZeroValues.length > 0
           ? nonZeroValues.reduce((acc, val) => acc + val, 0) /
-            nonZeroValues.length
+          nonZeroValues.length
           : 0;
       const maxValue = values.length > 0 ? Math.max(...values) : 0;
       const minValue = values.length > 0 ? Math.min(...values) : 0;
@@ -734,7 +750,7 @@ const Dashboard = React.memo(() => {
           : Math.max(total - conciliados, 0);
       const porcentaje =
         response.porcentajeConciliados !== undefined &&
-        response.porcentajeConciliados !== null
+          response.porcentajeConciliados !== null
           ? Number(response.porcentajeConciliados)
           : total > 0
             ? (conciliados * 100) / total
@@ -844,52 +860,52 @@ const Dashboard = React.memo(() => {
 
       const salesTrendState = composite.ingresosMensuales
         ? {
-            loading: false,
-            error: null,
-            data: mapTrendResponse(composite.ingresosMensuales, {
-              title: "Ingresos durante el período",
-              emptyMessage: "No hay ingresos registrados en este periodo.",
-              subheader:
-                "Serie mensual de ingresos registrados en los ultimos 12 meses.",
-            }),
-          }
+          loading: false,
+          error: null,
+          data: mapTrendResponse(composite.ingresosMensuales, {
+            title: "Ingresos durante el período",
+            emptyMessage: "No hay ingresos registrados en este periodo.",
+            subheader:
+              "Serie mensual de ingresos registrados en los ultimos 12 meses.",
+          }),
+        }
         : { loading: false, error: null, data: null };
 
       const expensesTrendState = composite.egresosMensuales
         ? {
-            loading: false,
-            error: null,
-            data: mapTrendResponse(composite.egresosMensuales, {
-              title: "Egresos durante el período",
-              emptyMessage: "No hay egresos registrados en este periodo.",
-              subheader:
-                "Serie mensual de egresos registrados en los ultimos 12 meses.",
-            }),
-          }
+          loading: false,
+          error: null,
+          data: mapTrendResponse(composite.egresosMensuales, {
+            title: "Egresos durante el período",
+            emptyMessage: "No hay egresos registrados en este periodo.",
+            subheader:
+              "Serie mensual de egresos registrados en los ultimos 12 meses.",
+          }),
+        }
         : { loading: false, error: null, data: null };
 
       const salesByCategoryState = composite.ingresosPorCategoria
         ? {
-            loading: false,
-            error: null,
-            data: mapCategoryResponse(composite.ingresosPorCategoria),
-          }
+          loading: false,
+          error: null,
+          data: mapCategoryResponse(composite.ingresosPorCategoria),
+        }
         : { loading: false, error: null, data: null };
 
       const expensesByCategoryState = composite.egresosPorCategoria
         ? {
-            loading: false,
-            error: null,
-            data: mapCategoryResponse(composite.egresosPorCategoria),
-          }
+          loading: false,
+          error: null,
+          data: mapCategoryResponse(composite.egresosPorCategoria),
+        }
         : { loading: false, error: null, data: null };
 
       const reconciliationState = composite.conciliacion
         ? {
-            loading: false,
-            error: null,
-            data: mapConciliationResponse(composite.conciliacion),
-          }
+          loading: false,
+          error: null,
+          data: mapConciliationResponse(composite.conciliacion),
+        }
         : { loading: false, error: null, data: null };
 
       applyResult({
@@ -1197,96 +1213,96 @@ const Dashboard = React.memo(() => {
 
             {(tienePermiso("movs", "view") ||
               tienePermiso("facts", "view")) && (
-              <Grid
-                container
-                spacing={3}
-                justifyContent="center"
-                sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-              >
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesTrendWidget
-                      data={
-                        state.salesTrend.data ?? {
-                          title: "Ingresos durante el período",
-                          points: [],
-                          average: 0,
-                          max: { value: 0, label: "--" },
-                          min: { value: 0, label: "--" },
+                <Grid
+                  container
+                  spacing={3}
+                  justifyContent="center"
+                  sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+                >
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesTrendWidget
+                        data={
+                          state.salesTrend.data ?? {
+                            title: "Ingresos durante el período",
+                            points: [],
+                            average: 0,
+                            max: { value: 0, label: "--" },
+                            min: { value: 0, label: "--" },
+                          }
                         }
-                      }
-                      loading={
-                        state.salesTrend.loading && !state.salesTrend.data
-                      }
-                      error={state.salesTrend.error}
-                      onNavigate={() => handleNavigate("/reportes/ventas")}
-                      currency={currency}
-                    />
-                  </Box>
+                        loading={
+                          state.salesTrend.loading && !state.salesTrend.data
+                        }
+                        error={state.salesTrend.error}
+                        onNavigate={() => handleNavigate("/reportes/ventas")}
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesByCategoryWidget
+                        data={state.salesByCategory.data ?? []}
+                        loading={
+                          state.salesByCategory.loading &&
+                          !state.salesByCategory.data
+                        }
+                        error={state.salesByCategory.error}
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
                 </Grid>
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesByCategoryWidget
-                      data={state.salesByCategory.data ?? []}
-                      loading={
-                        state.salesByCategory.loading &&
-                        !state.salesByCategory.data
-                      }
-                      error={state.salesByCategory.error}
-                      currency={currency}
-                    />
-                  </Box>
-                </Grid>
-              </Grid>
-            )}
+              )}
 
             {(tienePermiso("movs", "view") ||
               tienePermiso("facts", "view")) && (
-              <Grid
-                container
-                spacing={3}
-                justifyContent="center"
-                sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-              >
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesTrendWidget
-                      data={
-                        state.expensesTrend.data ?? {
-                          title: "Egresos durante el período",
-                          points: [],
-                          average: 0,
-                          max: { value: 0, label: "--" },
-                          min: { value: 0, label: "--" },
+                <Grid
+                  container
+                  spacing={3}
+                  justifyContent="center"
+                  sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+                >
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesTrendWidget
+                        data={
+                          state.expensesTrend.data ?? {
+                            title: "Egresos durante el período",
+                            points: [],
+                            average: 0,
+                            max: { value: 0, label: "--" },
+                            min: { value: 0, label: "--" },
+                          }
                         }
-                      }
-                      loading={
-                        state.expensesTrend.loading && !state.expensesTrend.data
-                      }
-                      error={state.expensesTrend.error}
-                      emptyMessage="No hay egresos registrados en este periodo."
-                      currency={currency}
-                    />
-                  </Box>
+                        loading={
+                          state.expensesTrend.loading && !state.expensesTrend.data
+                        }
+                        error={state.expensesTrend.error}
+                        emptyMessage="No hay egresos registrados en este periodo."
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesByCategoryWidget
+                        data={state.expensesByCategory.data ?? []}
+                        loading={
+                          state.expensesByCategory.loading &&
+                          !state.expensesByCategory.data
+                        }
+                        error={state.expensesByCategory.error}
+                        emptyMessage="No hay egresos por categoria en este periodo."
+                        title="Egresos por categorias"
+                        subtitle="Distribucion anual por segmento"
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
                 </Grid>
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesByCategoryWidget
-                      data={state.expensesByCategory.data ?? []}
-                      loading={
-                        state.expensesByCategory.loading &&
-                        !state.expensesByCategory.data
-                      }
-                      error={state.expensesByCategory.error}
-                      emptyMessage="No hay egresos por categoria en este periodo."
-                      title="Egresos por categorias"
-                      subtitle="Distribucion anual por segmento"
-                      currency={currency}
-                    />
-                  </Box>
-                </Grid>
-              </Grid>
-            )}
+              )}
 
             <Grid
               container
