@@ -5,6 +5,7 @@ import SignIn from "./sign-in/SignIn";
 import SignUp from "./sign-up/SignUp";
 import Home from "./home/Home";
 import ConfirmAccount from "./sign-up/ConfirmAccount";
+import HelloPage from "./pages/HelloPage";
 import routeConfig from "./config/routes";
 import Checkout from "./template/checkout/Checkout";
 import usePermisos from "./hooks/usePermisos";
@@ -70,6 +71,7 @@ const App = React.memo(() => {
     <Router>
       <Routes>
         {/* Rutas públicas */}
+        <Route path="/" element={<HelloPage />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/confirm-account" element={<ConfirmAccount />} />
@@ -77,13 +79,8 @@ const App = React.memo(() => {
         {/* Rutas privadas (protegidas con RequireAuth) */}
         <Route element={<RequireAuth />}>
           {/* Layout principal con Home como contenedor */}
-          <Route path="/" element={<Home />}>
-            {/* Ruta por defecto - mostrar dashboard en la URL principal */}
-            <Route index element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Dashboard />
-              </Suspense>
-            } />
+          <Route element={<Home />}>
+            {/* Ruta por defecto - dashboard se accede por /dashboard */}
             <Route path="dashboard" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <Dashboard />
