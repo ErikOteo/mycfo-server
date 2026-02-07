@@ -202,7 +202,7 @@ INSERT INTO registro_db.registro (
     'Advisory fees Q1 2026', '2026-02-26', '2026-02-26',
     @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
     NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    'PAGADO', @DOCUMENTO_ID
+    'PAGADO', NULL
 );
 
 -- Documento + Registro vinculado (Egreso ARS)
@@ -427,7 +427,7 @@ INSERT INTO registro_db.registro (
     'Consultoria regional febrero 2026', '2026-02-20', '2026-02-20',
     @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
     NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    'PAGADO', @DOCUMENTO_ID
+    'PAGADO', NULL
 );
 
 -- Documento + Registro vinculado (Egreso ARS)
@@ -509,7 +509,7 @@ INSERT INTO registro_db.registro (
     'Publicidad performance mercados USA febrero 2026', '2026-02-12', '2026-02-12',
     @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
     NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    'PAGADO', @DOCUMENTO_ID
+    'PAGADO', NULL
 );
 
 

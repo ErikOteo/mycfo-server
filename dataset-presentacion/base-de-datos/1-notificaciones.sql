@@ -92,7 +92,7 @@ VALUES
 (@USUARIO_ID, @ORGANIZACION_ID,
     'REPORT_READY',
     'Reporte generado: Flujo de Fondos',
-    'Tipo: CASH_FLOW | Periodo: 2025-Q3',
+    'Tipo: Flujo de Fondos | Periodo: 2025-Q3',
     'INFO',
     'REPORT',
     'report_cf_2025_Q3',
@@ -101,9 +101,102 @@ VALUES
 (@USUARIO_ID, @ORGANIZACION_ID,
     'MONTHLY_SUMMARY',
     'Resumen Mensual Listo',
-    'Tipo: MONTHLY_SUMMARY | Periodo: 2025-10',
+    'Tipo: Resumen Mensual | Periodo: 2025-10',
     'INFO',
     'REPORT',
     'report_monthly_2025_10',
     FALSE,
     DATE_SUB(NOW(), INTERVAL 2 DAY));
+
+-- Día -3
+INSERT INTO notifications
+    (usuario_id, organizacion_id, type, title, body, severity, resource_type, resource_id, is_read, created_at)
+VALUES
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'MOVEMENT_HIGH',
+    'Movimiento alto detectado',
+    'Transferencia Bancaria - $250.000 ARS',
+    'WARN',
+    'MOVEMENT',
+    'mov_high_seed_002',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 3 DAY)),
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'MOVEMENT_IMPORT',
+    'Importación de movimientos',
+    'Fuente: Santander | Registros: 12',
+    'INFO',
+    'MOVEMENT',
+    'import_cc_seed_001',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 3 DAY));
+
+-- Día -4
+INSERT INTO notifications
+    (usuario_id, organizacion_id, type, title, body, severity, resource_type, resource_id, is_read, created_at)
+VALUES
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'BUDGET_CREATED',
+    'Presupuesto creado',
+    'Se creo el presupuesto Operaciones (2025)',
+    'INFO',
+    'BUDGET',
+    'budget_seed_ops_2025',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 4 DAY)),
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'REPORT_READY',
+    'Reporte generado: Flujo de Caja',
+    'Tipo: Flujo de Caja | Periodo: 2025-Q3',
+    'INFO',
+    'REPORT',
+    'report_cf_2025_Q3',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 4 DAY));
+
+-- Día -5
+INSERT INTO notifications
+    (usuario_id, organizacion_id, type, title, body, severity, resource_type, resource_id, is_read, created_at)
+VALUES
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'ACCOUNT_MP_LINKED',
+    'Cuenta vinculada a Mercado Pago',
+    'Cuenta: Mercado Pago - Ventas',
+    'INFO',
+    'SYSTEM',
+    'mp_account_seed_002',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'MOVEMENT_HIGH',
+    'Movimiento alto detectado',
+    'Compra de Inventario - $150.000 ARS',
+    'WARN',
+    'MOVEMENT',
+    'mov_high_seed_003',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'MONTHLY_SUMMARY',
+    'Resumen Mensual Listo',
+    'Tipo: Resumen Mensual | Periodo: 2025-09',
+    'INFO',
+    'REPORT',
+    'report_monthly_2025_09',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 5 DAY));
+
+-- Día -6
+INSERT INTO notifications
+    (usuario_id, organizacion_id, type, title, body, severity, resource_type, resource_id, is_read, created_at)
+VALUES
+(@USUARIO_ID, @ORGANIZACION_ID,
+    'REMINDER_CUSTOM',
+    'Recordatorios',
+    'Llamar a proveedores por compra de insumos.',
+    'INFO',
+    'SYSTEM',
+    'reminders_seed_002',
+    FALSE,
+    DATE_SUB(NOW(), INTERVAL 6 DAY));
+
