@@ -513,6 +513,172 @@ INSERT INTO registro_db.registro (
 );
 
 
+-- FEBRERO 2026 (nuevos movimientos solicitados)
+
+-- Documento + Registro vinculado (Ingreso ARS)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '8451902764',
+    '2026-02-21', 5180000, 'ARS', 'Implementacion ERP Regional',
+    'Original', '2026-02-21', '2026-02-21',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Vendedor',
+    'Grupo Nexo Empresarial SA', '30-77889944-1', 'Responsable Inscripto', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Ingreso', 5180000, '2026-02-21 11:36:18', 'Implementacion ERP Regional',
+    'Grupo Nexo Empresarial SA', '30-77889944-1', 'MyCFO SRL', '30-99999999-7',
+    'Implementacion y parametrizacion ERP febrero 2026', '2026-02-21', '2026-02-21',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'ARS',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+-- Documento + Registro vinculado (Ingreso USD)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '7364029158',
+    '2026-02-25', 4850, 'USD', 'Planeamiento Fiscal Offshore',
+    'Original', '2026-02-25', '2026-02-25',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Vendedor',
+    'BluePeak Holdings LLC', '98-77441122-9', 'No Responsable', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Ingreso', 4850, '2026-02-25 14:20:51', 'Planeamiento Fiscal Offshore',
+    'BluePeak Holdings LLC', '98-77441122-9', 'MyCFO SRL', '30-99999999-7',
+    'Servicio de planeamiento fiscal internacional febrero 2026', '2026-02-25', '2026-02-25',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+-- Documento + Registro vinculado (Egreso ARS)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '5629074183',
+    '2026-02-22', 2072000, 'ARS', 'Infraestructura Tecnologica',
+    'Original', '2026-02-22', '2026-02-22',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'InfraOps Argentina SA', '30-66554433-2', 'Responsable Inscripto', 'Direccion Vendedor',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Egreso', -2072000, '2026-02-22 10:12:37', 'Infraestructura Tecnologica',
+    'MyCFO SRL', '30-99999999-7', 'InfraOps Argentina SA', '30-66554433-2',
+    'Adquisicion y montaje de infraestructura tecnologica febrero 2026', '2026-02-22', '2026-02-22',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'ARS',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+-- Documento + Registro vinculado (Egreso USD)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '4983507261',
+    '2026-02-26', 1940, 'USD', 'Servicios Legales Internacionales',
+    'Original', '2026-02-26', '2026-02-26',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'Harbor Legal Advisors LLC', '98-33221144-8', 'No Responsable', 'Direccion Vendedor',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Egreso', -1940, '2026-02-26 18:08:44', 'Servicios Legales Internacionales',
+    'MyCFO SRL', '30-99999999-7', 'Harbor Legal Advisors LLC', '98-33221144-8',
+    'Honorarios legales para contratos internacionales febrero 2026', '2026-02-26', '2026-02-26',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
 -- ========================================
 -- FACTURAS SIN VINCULAR (Febrero 2026)
 -- Para conciliar manualmente

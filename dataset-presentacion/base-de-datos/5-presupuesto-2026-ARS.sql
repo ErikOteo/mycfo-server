@@ -31,8 +31,10 @@ VALUES
 -- Febrero
 (4, '2026-02-01', 'Ventas de Productos', 'INGRESO', 1300000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
 (4, '2026-02-01', 'Prestacion de Servicios', 'INGRESO', 1490000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
+(4, '2026-02-01', 'Implementacion ERP Regional', 'INGRESO', 4800000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
 (4, '2026-02-01', 'Capacitacion', 'EGRESO', 430000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
 (4, '2026-02-01', 'Alquiler Oficina', 'EGRESO', 402000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
+(4, '2026-02-01', 'Infraestructura Tecnologica', 'EGRESO', 1900000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
 
 -- Marzo
 (4, '2026-03-01', 'Consultoria', 'INGRESO', 620000.00, NULL, 'MANUAL', NULL, NOW(), NOW()),
