@@ -887,10 +887,12 @@ public class ExcelImportService {
         }
         try {
             ExcelLibreConfigDTO config = objectMapper.readValue(json, ExcelLibreConfigDTO.class);
-            if (config.getColumnMap() == null ||
-                !config.getColumnMap().containsKey("fecha") ||
-                !config.getColumnMap().containsKey("descripcion") ||
-                !config.getColumnMap().containsKey("monto")) {
+            Map<String, Integer> normalizedColumnMap = normalizeColumnMap(config.getColumnMap());
+            config.setColumnMap(normalizedColumnMap);
+
+            if (!normalizedColumnMap.containsKey("fecha") ||
+                !normalizedColumnMap.containsKey("descripcion") ||
+                !normalizedColumnMap.containsKey("monto")) {
                 throw new IllegalArgumentException("El mapeo debe incluir columnas para fecha, descripcion y monto.");
             }
             return config;
@@ -899,6 +901,39 @@ public class ExcelImportService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Config de excel-libre invalida: " + e.getMessage());
         }
+    }
+
+    /**
+     * Normaliza el mapeo de columnas a base 0.
+     * Soporta:
+     * - base 0 (0,1,2,...) para compatibilidad
+     * - base 1 (1,2,3,...) pensada para UX
+     */
+    private Map<String, Integer> normalizeColumnMap(Map<String, Integer> columnMap) {
+        if (columnMap == null || columnMap.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        int min = Integer.MAX_VALUE;
+        boolean hasNegative = false;
+        for (Integer value : columnMap.values()) {
+            if (value == null) continue;
+            if (value < min) min = value;
+            if (value < 0) hasNegative = true;
+        }
+
+        if (hasNegative) {
+            throw new IllegalArgumentException("Las columnas no pueden ser negativas.");
+        }
+
+        boolean oneBased = min >= 1;
+        Map<String, Integer> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : columnMap.entrySet()) {
+            Integer value = entry.getValue();
+            if (value == null) continue;
+            normalized.put(entry.getKey(), oneBased ? value - 1 : value);
+        }
+        return normalized;
     }
 
     private String getCellValue(Row fila, Integer colIdx, DataFormatter fmt) {
@@ -942,12 +977,32 @@ public class ExcelImportService {
     private String cleanDecimal(String raw, String decimalSeparator) {
         String s = raw.replace("$", "").replaceAll("\\s+", "");
         if (decimalSeparator != null && decimalSeparator.equals(",")) {
-            s = s.replace(".", "");
-            s = s.replace(",", ".");
-        } else if (s.contains(",") && !s.contains(".")) {
-            s = s.replace(",", ".");
+            if (s.contains(",")) {
+                // Formato esperado con coma decimal: 33.150,75 -> 33150.75
+                s = s.replace(".", "");
+                s = s.replace(",", ".");
+            } else if (s.contains(".")) {
+                // Si solo hay punto, distinguir miles vs decimal para evitar x100.
+                // Miles: 33.150 -> 33150
+                // Decimal: 33150.00 -> 33150.00
+                if (s.matches("^-?\\d{1,3}(\\.\\d{3})+$")) {
+                    s = s.replace(".", "");
+                }
+            }
         } else {
-            s = s.replace(",", "");
+            if (s.contains(".")) {
+                // Formato esperado con punto decimal: 33,150.75 -> 33150.75
+                s = s.replace(",", "");
+            } else if (s.contains(",")) {
+                // Si solo hay coma, distinguir miles vs decimal.
+                // Miles: 33,150 -> 33150
+                // Decimal: 33150,75 -> 33150.75
+                if (s.matches("^-?\\d{1,3}(,\\d{3})+$")) {
+                    s = s.replace(",", "");
+                } else {
+                    s = s.replace(",", ".");
+                }
+            }
         }
         return s;
     }
