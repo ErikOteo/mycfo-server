@@ -40227,6 +40227,173 @@ INSERT INTO registro_db.registro (
 );
 
 
+-- DICIEMBRE 2025
+
+-- Documento + Registro vinculado (Ingreso ARS)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '9485612037',
+    '2025-12-10', 5240000, 'ARS', 'Integracion de Sistemas',
+    'Original', '2025-12-10', '2025-12-10',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Vendedor',
+    'Consorcio Delta SA', '30-77441122-6', 'Responsable Inscripto', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Ingreso', 5240000, '2025-12-10 11:18:42', 'Integracion de Sistemas',
+    'Consorcio Delta SA', '30-77441122-6', 'MyCFO SRL', '30-99999999-7',
+    'Integracion de modulos financieros diciembre 2025', '2025-12-10', '2025-12-10',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'ARS',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+-- Documento + Registro vinculado (Ingreso USD)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '7351094628',
+    '2025-12-17', 5150, 'USD', 'Expansion Comercial Exterior',
+    'Original', '2025-12-17', '2025-12-17',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Vendedor',
+    'Atlantic Growth Partners LLC', '98-66554411-3', 'No Responsable', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Ingreso', 5150, '2025-12-17 15:09:31', 'Expansion Comercial Exterior',
+    'Atlantic Growth Partners LLC', '98-66554411-3', 'MyCFO SRL', '30-99999999-7',
+    'Asesoria para expansion comercial internacional diciembre 2025', '2025-12-17', '2025-12-17',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+-- Documento + Registro vinculado (Egreso ARS)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '4826701395',
+    '2025-12-20', 2096000, 'ARS', 'Modernizacion Operativa',
+    'Original', '2025-12-20', '2025-12-20',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'Optima Procesos SRL', '30-22331144-5', 'Responsable Inscripto', 'Direccion Vendedor',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Egreso', -2096000, '2025-12-20 10:44:15', 'Modernizacion Operativa',
+    'MyCFO SRL', '30-99999999-7', 'Optima Procesos SRL', '30-22331144-5',
+    'Proyecto de modernizacion operativa diciembre 2025', '2025-12-20', '2025-12-20',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'ARS',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+-- Documento + Registro vinculado (Egreso USD)
+INSERT INTO documento_comercial (
+    tipo_documento, numero_documento,
+    fecha_emision, monto_total, moneda, categoria,
+    version_documento, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id
+) VALUES (
+    'FACTURA', '6198452730',
+    '2025-12-22', 2060, 'USD', 'Cumplimiento Regulatorio Global',
+    'Original', '2025-12-22', '2025-12-22',
+    @USUARIO_ID, @ORGANIZACION_ID
+);
+SET @DOCUMENTO_ID = LAST_INSERT_ID();
+INSERT INTO factura (
+    id_documento, tipo_factura,
+    vendedor_nombre, vendedor_cuit, vendedor_condicioniva, vendedor_domicilio,
+    comprador_nombre, comprador_cuit, comprador_condicioniva, comprador_domicilio,
+    estado_pago
+) VALUES (
+    @DOCUMENTO_ID, 'A',
+    'North Compliance Advisors LLC', '98-44117722-5', 'No Responsable', 'Direccion Vendedor',
+    'MyCFO SRL', '30-99999999-7', 'Responsable Inscripto', 'Direccion Comprador',
+    'PAGADO'
+);
+INSERT INTO registro_db.registro (
+    tipo, monto_total, fecha_emision, categoria,
+    origen_nombre, origen_cuit, destino_nombre, destino_cuit,
+    descripcion, fecha_creacion, fecha_actualizacion,
+    usuario_id, organizacion_id, medio_pago, moneda,
+    fecha_vencimiento, monto_pagado, cantidad_cuotas,
+    cuotas_pagadas, monto_cuota, tasa_interes, periodicidad,
+    estado, id_documento
+) VALUES (
+    'Egreso', -2060, '2025-12-22 16:27:53', 'Cumplimiento Regulatorio Global',
+    'MyCFO SRL', '30-99999999-7', 'North Compliance Advisors LLC', '98-44117722-5',
+    'Auditoria de cumplimiento regulatorio internacional diciembre 2025', '2025-12-22', '2025-12-22',
+    @USUARIO_ID, @ORGANIZACION_ID, 'Transferencia', 'USD',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    'PAGADO', @DOCUMENTO_ID
+);
+
+
 -- ========================================
 -- FACTURAS SIN VINCULAR (Noviembre 2025)
 -- Para conciliar manualmente
