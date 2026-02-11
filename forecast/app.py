@@ -27,6 +27,8 @@ logging.getLogger("prophet").disabled = True
 INTERVAL_WIDTH = 0.95
 PERIODS_ADELANTE = 12          # meses a proyectar (por defecto)
 FREQ = "MS"                    # frecuencia mensual
+SMOOTH_WINDOW = 3               # ventana para suavizado (mediana movil)
+WINSOR_PCT = 0.05               # porcentaje para winsorizar picos
 DEFAULT_INCLUIR_GRAFICO = False  # 🔧 controlar si se devuelve el gráfico
 
 
@@ -47,6 +49,14 @@ def limpiar_y_preparar_datos(data):
     df["fecha"] = pd.to_datetime(dict(year=df["año"], month=df["mes"], day=1))
     df = df.sort_values("fecha").reset_index(drop=True)
 
+    # Normalizar signos: ingresos >= 0, egresos <= 0
+    df["ingresos"] = df["ingresos"].clip(lower=0)
+    df["egresos"] = df["egresos"].clip(upper=0)
+
+    # Suavizar series para reducir picos bruscos (enfatiza tendencia)
+    df["ingresos"] = suavizar_serie(df["ingresos"])
+    df["egresos"] = suavizar_serie(df["egresos"])
+
     # Calcular balance mensual
     df["balance"] = df["ingresos"] + df["egresos"]
 
@@ -55,6 +65,23 @@ def limpiar_y_preparar_datos(data):
     df_egr = df.rename(columns={"fecha": "ds", "egresos": "y"})[["ds", "y"]]
 
     return df, df_ing, df_egr
+
+
+def suavizar_serie(serie):
+    """Suaviza una serie con mediana movil y winsorizacion para evitar picos."""
+    s = pd.Series(serie).astype(float)
+
+    # Mediana movil para reducir outliers puntuales
+    if SMOOTH_WINDOW and SMOOTH_WINDOW > 1:
+        s = s.rolling(window=SMOOTH_WINDOW, center=True, min_periods=1).median()
+
+    # Winsorizar extremos para evitar picos bruscos
+    if WINSOR_PCT and 0 < WINSOR_PCT < 0.5:
+        low = s.quantile(WINSOR_PCT)
+        high = s.quantile(1 - WINSOR_PCT)
+        s = s.clip(lower=low, upper=high)
+
+    return s
 
 
 def convertir_tipos(obj):
@@ -110,7 +137,7 @@ def entrenar_modelo(df_prophet, tipo="balance"):
     # 🔹 3. Parámetros Prophet (VERSIÓN OPTIMIZADA)
     # ================================================
     # Mayor sensibilidad para evitar rectas
-    changepoint_scale = 0.15 if tendencia_estable else 0.25
+    changepoint_scale = 0.05 if tendencia_estable else 0.10
 
     # Estacionalidad reforzada
     seasonality_scale = 5.0 if hay_estacionalidad else 10.0
@@ -172,8 +199,12 @@ def entrenar_y_predecir(df, df_ing, df_egr, periodos_adelante):
     forecast_egr = m_egr.predict(m_egr.make_future_dataframe(periods=periodos_adelante, freq="MS"))
 
     # Tomar solo el tramo futuro
-    forecast_ing_future = forecast_ing[forecast_ing["ds"] > last_date]
-    forecast_egr_future = forecast_egr[forecast_egr["ds"] > last_date]
+    forecast_ing_future = forecast_ing[forecast_ing["ds"] > last_date].copy()
+    forecast_egr_future = forecast_egr[forecast_egr["ds"] > last_date].copy()
+
+    # Enforzar signos en predicciones
+    forecast_ing_future["yhat"] = forecast_ing_future["yhat"].clip(lower=0)
+    forecast_egr_future["yhat"] = forecast_egr_future["yhat"].clip(upper=0)
 
     # Calcular balance estimado (suma directa)
     forecast_balance = forecast_ing_future[["ds", "yhat"]].copy()
@@ -213,6 +244,19 @@ def generar_grafico(df, f_ing, f_egr, f_bal):
 
     # Línea de separación
     ax.axvline(x=df["fecha"].max(), color="gray", linestyle=":")
+    # Etiquetas para diferenciar datos reales vs pronosticados
+    y_max = max(
+        df["ingresos"].max(),
+        df["egresos"].max(),
+        df["balance"].max(),
+        f_ing["yhat"].max(),
+        f_egr["yhat"].max(),
+        f_bal["yhat"].max()
+    )
+    ax.text(df["fecha"].min(), y_max, "Datos reales", color="black",
+            verticalalignment="bottom", fontsize=9)
+    ax.text(f_ing["ds"].max(), y_max, "Datos pronosticados", color="black",
+            verticalalignment="bottom", fontsize=9, horizontalalignment="right")
     ax.set_title("Forecast de Ingresos, Egresos y Balance (Mensual)")
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Monto ($)")

@@ -229,6 +229,9 @@ export default function PronosticoFijoDetalle() {
     return chartData[splitPoint]?.mes;
   };
 
+  const splitPointMes = getSplitPointMes();
+  const firstMes = chartData && chartData.length > 0 ? chartData[0].mes : null;
+
   const formatearFecha = (fechaISO) => {
     if (!fechaISO) return '-';
     try {
@@ -393,19 +396,28 @@ export default function PronosticoFijoDetalle() {
               <YAxis width={70} />
               <Tooltip formatter={(value) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
               <Legend />
-              {getSplitPointMes() && (
+              {splitPointMes && (
                 <>
+                  {firstMes && firstMes !== splitPointMes && (
+                    <ReferenceArea
+                      x1={firstMes}
+                      x2={splitPointMes}
+                      fillOpacity={0}
+                      label={{ value: "Datos historicos", position: "insideBottom", fill: "#546e7a" }}
+                    />
+                  )}
                   <ReferenceLine
-                    x={getSplitPointMes()}
+                    x={splitPointMes}
                     stroke="#9e9e9e"
                     strokeWidth={2}
                     strokeDasharray="3 3"
                     label={{ value: "Estimado", position: "top", fill: "#9e9e9e" }}
                   />
                   <ReferenceArea
-                    x1={getSplitPointMes()}
+                    x1={splitPointMes}
                     fill="#e3f2fd"
                     fillOpacity={0.3}
+                    label={{ value: "Datos pronosticados", position: "insideBottom", fill: "#546e7a" }}
                   />
                 </>
               )}
