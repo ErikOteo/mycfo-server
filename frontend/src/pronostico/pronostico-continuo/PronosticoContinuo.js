@@ -236,6 +236,9 @@ export default function PronosticoContinuo() {
     return chartData[splitPoint]?.mes;
   };
 
+  const splitPointMes = getSplitPointMes();
+  const firstMes = chartData && chartData.length > 0 ? chartData[0].mes : null;
+
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', p: 3 }}>
       <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
@@ -345,19 +348,28 @@ export default function PronosticoContinuo() {
                 <YAxis width={70} />
                 <Tooltip formatter={(value) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
                 <Legend />
-                {getSplitPointMes() && (
+                {splitPointMes && (
                   <>
+                    {firstMes && firstMes !== splitPointMes && (
+                      <ReferenceArea
+                        x1={firstMes}
+                        x2={splitPointMes}
+                        fillOpacity={0}
+                        label={{ value: "Datos historicos", position: "insideBottom", fill: "#546e7a" }}
+                      />
+                    )}
                     <ReferenceLine
-                      x={getSplitPointMes()}
+                      x={splitPointMes}
                       stroke="#9e9e9e"
                       strokeWidth={2}
                       strokeDasharray="3 3"
                       label={{ value: "Estimado", position: "top", fill: "#9e9e9e" }}
                     />
                     <ReferenceArea
-                      x1={getSplitPointMes()}
+                      x1={splitPointMes}
                       fill="#e3f2fd"
                       fillOpacity={0.3}
+                      label={{ value: "Datos pronosticados", position: "insideBottom", fill: "#546e7a" }}
                     />
                   </>
                 )}
