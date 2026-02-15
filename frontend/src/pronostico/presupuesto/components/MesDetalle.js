@@ -724,7 +724,50 @@ export default function MesDetalle() {
     (acc, c) => acc + safeNumber(c.montoEstimado) * (c.tipo === 'Ingreso' ? 1 : -1),
     0
   );
-  const cumplimiento = Math.abs(estimadoTotal) > 0 ? (resultado / Math.abs(estimadoTotal)) : 0;
+
+  // Helper para semáforo (local)
+  const semaforoPorCumplimientoLocal = (pct) => {
+    if (pct < 0) return { label: 'Salud: Pendiente', color: 'default' };
+    if (pct >= 0.95) return { label: 'Salud: Verde', color: 'success' };
+    if (pct >= 0.8) return { label: 'Salud: Amarillo', color: 'warning' };
+    return { label: 'Salud: Rojo', color: 'error' };
+  };
+
+  const pctCumplimiento = React.useMemo(() => {
+    // 1. Chequeo de fechas: si es mes futuro, salud pendiente
+    if (ym) {
+      const now = new Date();
+      // Formato YYYY-MM
+      const currentYM = format(now, 'yyyy-MM');
+      if (ym > currentYM) return -1; // Futuro
+
+      // LÓGICA PROYECCIÓN LINEAL (Solo mes actual)
+      if (ym === currentYM) {
+        const base = Math.abs(estimadoTotal) > 0 ? Math.abs(estimadoTotal) : 0;
+        if (base === 0) return -1;
+
+        // Calcular factor de progreso (día actual / días total mes)
+        const day = now.getDate();
+        const totalDays = endOfMonth(now).getDate();
+        // Mínimo 10% de progreso para no dividir por algo muy chico al inicio
+        // O simplemente factor real. Si factor es 0.03 (día 1), exigencia es 3%.
+        const factor = Math.max(0.01, day / totalDays);
+
+        // Cumplimiento ajustado: Real / (Estimado * Factor)
+        // Ejemplo: Si día 15 (factor 0.5), y llevo 500 de 1000, 500 / (1000*0.5) = 1 (100% ok)
+        return Math.max(0, resultado / (base * factor));
+      }
+    }
+
+    const base = Math.abs(estimadoTotal) > 0 ? Math.abs(estimadoTotal) : 0;
+    if (base === 0) return -1; // Sin estimación
+
+    // Sin tope de 120%
+    return Math.max(0, resultado / base);
+  }, [ym, estimadoTotal, resultado]);
+
+  const salud = semaforoPorCumplimientoLocal(pctCumplimiento);
+  const cumplimiento = pctCumplimiento === -1 ? 0 : pctCumplimiento;
 
   const vencidosEstimados = lineas.filter(
     (c) => safeNumber(c.montoEstimado) !== 0 && safeNumber(c.real) === 0
@@ -745,6 +788,7 @@ export default function MesDetalle() {
         resultado,
         estimadoTotal,
         cumplimiento,
+        salud: salud.label,
         vencidosEstimados,
       },
       lineas: lineasCompleto.slice(0, 20),
@@ -759,6 +803,7 @@ export default function MesDetalle() {
       resultado,
       estimadoTotal,
       cumplimiento,
+      salud,
       vencidosEstimados,
       lineasCompleto,
     ]
@@ -1248,7 +1293,7 @@ export default function MesDetalle() {
       {tab === 0 && (
         <>
           <Grid container spacing={3} mb={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.ingresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'success.main', mx: 'auto', mb: 1 }}>+</Avatar>
                 <Typography variant="h6">Ingresos</Typography>
@@ -1259,7 +1304,7 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: kpiColors.egresos, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: 'error.main', mx: 'auto', mb: 1 }}>-</Avatar>
                 <Typography variant="h6">Egresos</Typography>
@@ -1270,40 +1315,100 @@ export default function MesDetalle() {
                 </Typography>
               </Paper>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 3, textAlign: 'center', bgcolor: resultado >= 0 ? kpiColors.resultadoPos : kpiColors.resultadoNeg, color: 'white', height: '100%' }}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'white', color: resultado >= 0 ? 'info.main' : 'warning.main', mx: 'auto', mb: 1 }}>
-                  {resultado >= 0 ? '?' : '?'}
+                  {resultado >= 0 ? '✓' : '⚠'}
                 </Avatar>
                 <Typography variant="h6">Resultado</Typography>
                 <Typography variant="h4" fontWeight="bold">{formatCurrency(resultado)}</Typography>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                  {resultado >= 0 ? 'Superávit' : 'Déficit'}
+                  Estimado: {formatCurrency(estimadoTotal)}
                 </Typography>
+                <Chip
+                  label={resultado >= 0 ? 'Superávit' : 'Déficit'}
+                  size="small"
+                  variant="outlined"
+                  sx={{ borderColor: 'rgba(255,255,255,0.7)', color: 'white', fontWeight: 600, mt: 1 }}
+                />
+              </Paper>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Paper sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="overline" gutterBottom>Marcador de salud</Typography>
+                <Stack alignItems="center" spacing={1}>
+                  <Chip label={`${salud.label}`} color={salud.color} />
+                  <Typography variant="body2" color="text.secondary">
+                    {pctCumplimiento === -1 ? 'Sin datos / Futuro' : `Cumplimiento: ${(pctCumplimiento * 100).toFixed(0)}%`}
+                  </Typography>
+                </Stack>
               </Paper>
             </Grid>
           </Grid>
 
           {/* Gráficos */}
-          {pieDataIngresos.length > 0 ? (
-            <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
-              <ResponsiveContainer width="100%" height={300} minWidth={0}>
-                <PieChart>
-                  <Pie data={pieDataIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {pieDataIngresos.map((_, i) => <Cell key={`ing-${i}`} fill={INGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
-                  </Pie>
-                  <RTooltip formatter={(value) => formatCurrency(value)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Paper>
-          ) : (
-            <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
-              <Typography color="text.secondary">No hay ingresos registrados este mes.</Typography>
-            </Paper>
-          )}
+          {/* Gráficos */}
+          {(() => {
+            const totalIngresosPie = pieDataIngresos.reduce((acc, curr) => acc + curr.value, 0);
+
+            if (pieDataIngresos.length > 0 && totalIngresosPie > 0) {
+              return (
+                <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
+                  <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
+                  <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                    <PieChart>
+                      <Pie data={pieDataIngresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        {pieDataIngresos.map((_, i) => <Cell key={`ing-${i}`} fill={INGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
+                      </Pie>
+                      <RTooltip formatter={(value) => formatCurrency(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Paper>
+              );
+            } else if (pieDataIngresos.length > 0) {
+              // Caso Futuro / Sin Datos: Mostrar gráfico gris "Pendiente"
+              return (
+                <Paper sx={{ p: 3, mb: 2 }} ref={ingresosPieRef}>
+                  <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Ingresos por Categoría</Typography>
+                  <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                    <PieChart>
+                      <Pie
+                        data={[{ name: 'Pendiente', value: 1 }]}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ cx, x, y }) => (
+                          <text
+                            x={x}
+                            y={y}
+                            fill={isLightMode ? '#212121' : '#ffffff'}
+                            textAnchor={x > cx ? 'start' : 'end'}
+                            dominantBaseline="central"
+                            style={{ fontWeight: 500 }}
+                          >
+                            Pendiente
+                          </text>
+                        )}
+                      >
+                        <Cell fill={isLightMode ? "#e0e0e0" : "#424242"} />
+                      </Pie>
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Paper>
+              );
+            } else {
+              return (
+                <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No hay ingresos registrados este mes.</Typography>
+                </Paper>
+              );
+            }
+          })()}
 
           {barDataIngresos.length > 0 && (
             <Paper sx={{ p: 3, mb: 2 }} ref={ingresosBarsRef}>
@@ -1370,25 +1475,66 @@ export default function MesDetalle() {
             </Paper>
           )}
 
-          {pieDataEgresos.length > 0 ? (
-            <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
-              <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
-              <ResponsiveContainer width="100%" height={300} minWidth={0}>
-                <PieChart>
-                  <Pie data={pieDataEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {pieDataEgresos.map((_, i) => <Cell key={`egr-${i}`} fill={EGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
-                  </Pie>
-                  <RTooltip formatter={(value) => formatCurrency(value)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Paper>
-          ) : (
-            <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
-              <Typography color="text.secondary">No hay egresos registrados este mes.</Typography>
-            </Paper>
-          )}
+          {(() => {
+            const totalEgresosPie = pieDataEgresos.reduce((acc, curr) => acc + curr.value, 0);
+
+            if (pieDataEgresos.length > 0 && totalEgresosPie > 0) {
+              return (
+                <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
+                  <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
+                  <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                    <PieChart>
+                      <Pie data={pieDataEgresos} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        {pieDataEgresos.map((_, i) => <Cell key={`egr-${i}`} fill={EGRESO_COLOR} opacity={0.7 + i * 0.1} />)}
+                      </Pie>
+                      <RTooltip formatter={(value) => formatCurrency(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Paper>
+              );
+            } else if (pieDataEgresos.length > 0) {
+              return (
+                <Paper sx={{ p: 3, mb: 2 }} ref={egresosPieRef}>
+                  <Typography variant="h6" gutterBottom fontWeight="600">Distribución de Egresos por Categoría</Typography>
+                  <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                    <PieChart>
+                      <Pie
+                        data={[{ name: 'Pendiente', value: 1 }]}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ cx, x, y }) => (
+                          <text
+                            x={x}
+                            y={y}
+                            fill={isLightMode ? '#212121' : '#ffffff'}
+                            textAnchor={x > cx ? 'start' : 'end'}
+                            dominantBaseline="central"
+                            style={{ fontWeight: 500 }}
+                          >
+                            Pendiente
+                          </text>
+                        )}
+                      >
+                        <Cell fill={isLightMode ? "#e0e0e0" : "#424242"} />
+                      </Pie>
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Paper>
+              );
+            } else {
+              return (
+                <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No hay egresos registrados este mes.</Typography>
+                </Paper>
+              );
+            }
+          })()}
 
           {barDataEgresos.length > 0 && (
             <Paper sx={{ p: 3 }} ref={egresosBarsRef}>
