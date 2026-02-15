@@ -13,6 +13,8 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
 import MuiCard from "@mui/material/Card";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 import { styled } from "@mui/material/styles";
 import ForgotPassword from "./components/ForgotPassword";
 import AppTheme from "../shared-theme/AppTheme";
@@ -110,6 +112,9 @@ export default function SignIn(props) {
   const [globalMsg, setGlobalMsg] = React.useState("");
   const [globalType, setGlobalType] = React.useState(null); // 'success' | 'error' | null
   const [open, setOpen] = React.useState(false);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
+
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const URL_ADMINISTRACION = API_CONFIG.ADMINISTRACION;
 
@@ -177,7 +182,46 @@ export default function SignIn(props) {
           sessionStorage.setItem("email", userData.email);
           sessionStorage.setItem("nombre", userData.nombre);
           sessionStorage.setItem("telefono", userData.telefono || "");
-          
+
+          // Guardar el rol bruto (fundamental para que usePermisos detecte ADMINISTRADOR)
+          sessionStorage.setItem("rol", userData.rol || 'COLABORADOR');
+
+          // --- Lógica de Permisos Granulares ---
+          let permisos = null;
+          if (userData.rol && userData.rol.includes('|PERM:')) {
+            try {
+              const parts = userData.rol.split('|PERM:');
+              // El JSON de permisos puede estar seguido por |COLOR: u otros metadatos
+              const permsJson = parts[1].split('|')[0];
+              permisos = JSON.parse(permsJson);
+            } catch (e) {
+              console.error("Error parseando permisos del rol:", e);
+            }
+          }
+
+          // Si es un administrador de legado (sin JSON) o no tiene permisos definidos,
+          // le damos acceso total si el rol empieza con ADMINISTRADOR
+          if (!permisos && userData.rol && userData.rol.startsWith("ADMINISTRADOR")) {
+            permisos = {
+              carga: { view: true, edit: true },
+              movs: { view: true, edit: true },
+              banco: { view: true, edit: true },
+              facts: { view: true, edit: true },
+              concil: { view: true, edit: true },
+              reps: { view: true, edit: true },
+              pron: { view: true, edit: true },
+              pres: { view: true, edit: true },
+              admin: { view: true, edit: true },
+            };
+          }
+
+          if (permisos) {
+            sessionStorage.setItem("permisos", JSON.stringify(permisos));
+          } else {
+            sessionStorage.removeItem("permisos");
+          }
+          // ------------------------------------
+
           // Guardar datos de la empresa (sin IDs)
           if (userData.empresaId) {
             sessionStorage.setItem("empresaNombre", userData.empresaNombre || "");
@@ -193,7 +237,7 @@ export default function SignIn(props) {
           setLoading(false);
 
           // Redirigir al home usando navigate
-          navigate("/");
+          navigate("/dashboard");
         } catch (err) {
           setLoading(false);
           console.error("Error loading user profile:", err);
@@ -262,7 +306,7 @@ export default function SignIn(props) {
               <TextField
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="******"
                 required
                 fullWidth
@@ -274,8 +318,14 @@ export default function SignIn(props) {
             </FormControl>
 
             <FormControlLabel
-              control={<Checkbox value="remember" color="primary" />}
-              label="Recordarme"
+              control={
+                <Checkbox
+                  checked={showPassword}
+                  onChange={() => setShowPassword(!showPassword)}
+                  color="primary"
+                />
+              }
+              label="Ver contraseña"
             />
 
             {globalMsg && (
@@ -284,13 +334,13 @@ export default function SignIn(props) {
                   mt: 1,
                   p: 1.5,
                   borderRadius: 1.5,
-                  bgcolor: "#FFF8E1",
-                  border: "1px solid #FFE082",
+                  bgcolor: "#FFDE70",
+                  border: "1px solid #F5C16C",
                 }}
               >
                 <Typography
                   variant="body2"
-                  sx={{ textAlign: "center", color: "text.primary" }}
+                  sx={{ textAlign: "center", color: "#000" }}
                 >
                   {globalMsg}
                 </Typography>
@@ -316,22 +366,22 @@ export default function SignIn(props) {
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {/*
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => alert("Iniciar sesión con Google")}
-              startIcon={<GoogleIcon />}
-            >
-              Iniciar sesión con Google
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => alert("Iniciar sesión con Facebook")}
-              startIcon={<FacebookIcon />}
-            >
-              Iniciar sesión con Facebook
-            </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => setSnackbar({ open: true, message: "Iniciar sesión con Google próximamente 🚀", severity: "info" })}
+                // startIcon={<GoogleIcon />}
+              >
+                Iniciar sesión con Google
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => setSnackbar({ open: true, message: "Iniciar sesión con Facebook próximamente 🚀", severity: "info" })}
+                // startIcon={<FacebookIcon />}
+              >
+                Iniciar sesión con Facebook
+              </Button>
             */}
             <Typography sx={{ textAlign: "center" }}>
               ¿No tienes una cuenta?{" "}
@@ -342,6 +392,21 @@ export default function SignIn(props) {
           </Box>
         </Card>
       </SignInContainer>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </AppTheme>
   );
 }

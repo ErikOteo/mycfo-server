@@ -13,8 +13,8 @@ public class VertexAiProperties {
 
     private String projectId;
     private String location = "us-central1";
-    private String model = "gemini-2.5-flash";
+    private String model = "gemini-2.5-pro";
     private String credentialsPath;
     private double temperature = 0.0;
-    private int maxOutputTokens = 1024;
+    private int maxOutputTokens = 50000;
 }

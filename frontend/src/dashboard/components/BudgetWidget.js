@@ -439,13 +439,13 @@ const BudgetWidget = ({
           <Stack spacing={2}>
             {budget.totals ? (
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.primary">
                   Saldo estimado:{" "}
                   {formatCurrencyByCode(budget.totals.saldoEstimado, currency)}
                 </Typography>
                 <Typography
                   variant="body2"
-                  color="text.secondary"
+                  color="text.primary"
                   fontWeight={600}
                 >
                   Saldo real: {formatCurrencyByCode(budget.totals.saldoReal, currency)}
@@ -476,7 +476,7 @@ const BudgetWidget = ({
                       justifyContent="space-between"
                       alignItems="center"
                     >
-                      <Typography variant="subtitle2">
+                      <Typography variant="subtitle2" fontWeight={600}>
                         {item.name}
                       </Typography>
                       <Chip
@@ -501,18 +501,18 @@ const BudgetWidget = ({
                         },
                       }}
                     />
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">
-                      Planificado: {formatCurrencyByCode(planned, currency)}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      fontWeight={600}
-                    >
-                      Ejecutado: {formatCurrencyByCode(actual, currency)}
-                    </Typography>
-                  </Stack>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2" color="text.primary">
+                        Planificado: {formatCurrencyByCode(planned, currency)}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.primary"
+                        fontWeight={600}
+                      >
+                        Ejecutado: {formatCurrencyByCode(actual, currency)}
+                      </Typography>
+                    </Stack>
                     <Divider sx={{ my: 0.5 }} />
                   </Box>
                 );
@@ -532,11 +532,14 @@ const BudgetWidget = ({
               <Button
                 variant="contained"
                 onClick={goToNew}
-                sx={isDarkMode ? { color: "#42897f" } : undefined}
+                sx={{
+                  lineHeight: 1.2,
+                  ...(isDarkMode && { color: "#42897f" }),
+                }}
               >
                 Nuevo presupuesto
               </Button>
-              <Button variant="text" onClick={goToList}>
+              <Button variant="text" onClick={goToList} sx={{ lineHeight: 1.2 }}>
                 Ver presupuestos
               </Button>
             </Stack>
@@ -550,17 +553,21 @@ const BudgetWidget = ({
               variant="contained"
               onClick={goToDetail}
               disabled={!budget?.slug}
+              sx={{ lineHeight: 1.2 }}
             >
               Ver más
             </Button>
             <Button
               variant="outlined"
               onClick={goToNew}
-              sx={isDarkMode ? { color: "#42897f" } : undefined}
+              sx={{
+                lineHeight: 1.2,
+                ...(isDarkMode && { color: "#42897f" }),
+              }}
             >
               Nuevo presupuesto
             </Button>
-            <Button variant="text" onClick={goToList}>
+            <Button variant="text" onClick={goToList} sx={{ lineHeight: 1.2 }}>
               Ver presupuestos
             </Button>
           </Stack>

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography, Paper, useTheme, useMediaQuery, Snackbar, Alert } from '@mui/material';
 import Filtros from './Filtros';
 import TablaDetalle from './TablaDetalle';
 import ExportadorSimple from '../../../shared-components/ExportadorSimple';
@@ -8,23 +8,38 @@ import {
 } from 'recharts';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 export default function MainGrid() {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
+    const [mobileMonthIndex, setMobileMonthIndex] = React.useState(new Date().getMonth());
     const [registros, setRegistros] = React.useState([]);
     const chartRef = React.useRef(null);
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
     const [currency, setCurrency] = usePreferredCurrency("ARS");
 
     // Formateo de moneda para tooltips y ejes
     const formatCurrency = React.useCallback(
-        (v) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: currency || 'ARS' }).format(Number(v) || 0),
+        (v) => {
+            const val = Number(v) || 0;
+            const isInteger = Number.isInteger(val);
+            return new Intl.NumberFormat('es-AR', {
+                style: 'currency',
+                currency: currency || 'ARS',
+                minimumFractionDigits: isInteger ? 0 : 2,
+                maximumFractionDigits: 2
+            }).format(val);
+        },
         [currency]
     );
 
@@ -123,7 +138,33 @@ export default function MainGrid() {
     saldoFinalMensual[0] = saldoInicial + netosMensual[0];
     for (let i = 1; i < 12; i++) saldoFinalMensual[i] = saldoFinalMensual[i - 1] + netosMensual[i];
 
-    const handleExportExcel = () => {
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "flujo-de-caja",
+            year: selectedYear,
+            currency,
+            ingresosMensuales: totalIngresosMensual,
+            egresosMensuales: totalEgresosMensual,
+            netosMensuales: netosMensual,
+            saldoFinalMensual,
+            topIngresosPorCategoria: ingresosPorCategoria.slice(0, 5),
+            topEgresosPorCategoria: egresosPorCategoria.slice(0, 5),
+        }),
+        [
+            selectedYear,
+            currency,
+            totalIngresosMensual,
+            totalEgresosMensual,
+            netosMensual,
+            saldoFinalMensual,
+            ingresosPorCategoria,
+            egresosPorCategoria,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
+
+    const handleExportExcel = async () => {
         const excelData = [];
         const numMesesVisibles = mesesVisibles.length;
 
@@ -188,12 +229,20 @@ export default function MainGrid() {
                 freezePane: { rowSplit: 3, colSplit: 2 },
             }
         );
+
+        await sendReportGenerated({
+            reportType: "CASH_FLOW",
+            reportName: "Flujo de caja (Excel)",
+            period: `${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
         const chartElement = chartRef.current;
         if (!chartElement) {
-            alert("No se encontró el grafico para exportar.");
+            setSnackbar({ open: true, message: "No se encontró el gráfico para exportar.", severity: "warning" });
             return;
         }
 
@@ -230,15 +279,37 @@ export default function MainGrid() {
                     ],
                 },
             });
+
+            await sendReportGenerated({
+                reportType: "CASH_FLOW",
+                reportName: "Flujo de caja (PDF)",
+                period: `${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
+            });
         } catch (e) {
             console.error("Error al exportar PDF de cash flow:", e);
-            alert("No se pudo generar el PDF. Intente nuevamente.");
+            setSnackbar({ open: true, message: "No se pudo generar el PDF. Intente nuevamente.", severity: "error" });
         } finally {
             setExportingPdf(false);
         }
     };
 
-    const dataGrafico = meses.map((mes, i) => ({ mes, Ingresos: totalIngresosMensual[i], Egresos: totalEgresosMensual[i] }));
+    const dataGraficoCompleto = meses.map((mes, i) => ({ mes, Ingresos: totalIngresosMensual[i], Egresos: totalEgresosMensual[i] }));
+
+    // Logic for 3-month window on mobile
+    let dataGrafico = dataGraficoCompleto;
+    if (isMobile) {
+        let start = mobileMonthIndex - 1;
+        // Adjust if at edges to always show 3 months
+        if (mobileMonthIndex === 0) start = 0; // Show 0, 1, 2 (Jan, Feb, Mar)
+        else if (mobileMonthIndex === 11) start = 9; // Show 9, 10, 11 (Oct, Nov, Dec)
+
+        // Ensure bounds
+        if (start < 0) start = 0;
+
+        dataGrafico = dataGraficoCompleto.slice(start, start + 3);
+    }
 
     const ingresosTabla = registros.filter(r => r.tipo === 'Ingreso').map(r => ({ id: r.id, categoria: r.categoria, monto: r.montoTotal, fecha: r.fechaEmision }));
     const egresosTabla = registros.filter(r => r.tipo === 'Egreso').map(r => ({ id: r.id, categoria: r.categoria, monto: r.montoTotal, fecha: r.fechaEmision }));
@@ -272,13 +343,15 @@ export default function MainGrid() {
                 ingresos={ingresosTabla}
                 egresos={egresosTabla}
                 saldoInicial={saldoInicial}
+                mobileMonthIndex={mobileMonthIndex}
+                onMonthChange={setMobileMonthIndex}
             />
 
             <div ref={chartRef}>
                 <Paper variant="outlined" sx={{ mt: 4, p: 2 }}>
                     <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.primary' }}>Comparativo mensual de Flujo de Caja</Typography>
                     <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={dataGrafico} margin={{ top: 8, right: 16, bottom: 8, left: 56 }}>
+                        <BarChart data={dataGrafico} margin={{ top: 8, right: 16, bottom: 8, left: 15 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                             <XAxis dataKey="mes" />
                             <YAxis tickFormatter={(v) => formatCurrency(v)} width={80} />
@@ -290,6 +363,22 @@ export default function MainGrid() {
                     </ResponsiveContainer>
                 </Paper>
             </div>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: "100%", borderRadius: 2 }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
 
         </Box>
     );

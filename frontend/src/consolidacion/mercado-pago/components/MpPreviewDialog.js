@@ -12,9 +12,11 @@ import {
   Typography,
   Paper,
   LinearProgress,
-  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
-import { mpApi } from "../mpApi";
 import MpPaymentsTable from "./MpPaymentsTable";
 
 export default function MpPreviewDialog({
@@ -26,18 +28,40 @@ export default function MpPreviewDialog({
 }) {
   const [selected, setSelected] = React.useState([]);
   const [importing, setImporting] = React.useState(false);
+  const [filterDuplicados, setFilterDuplicados] = React.useState("todos"); // "todos" | "duplicados" | "validos"
+  const [filterTipo, setFilterTipo] = React.useState("todos"); // "todos" | "ingreso" | "egreso"
 
-  // Reset selection when dialog opens/closes
   React.useEffect(() => {
     if (open) {
       setSelected([]);
+      setFilterDuplicados("todos");
+      setFilterTipo("todos");
     }
   }, [open]);
 
+  const filteredData = React.useMemo(() => {
+    const byDup = (() => {
+      switch (filterDuplicados) {
+        case "duplicados":
+          return previewData.filter((p) => p.esDuplicado);
+        case "validos":
+          return previewData.filter((p) => !p.esDuplicado);
+        default:
+          return previewData;
+      }
+    })();
+
+    if (filterTipo === "todos") return byDup;
+    const esIngreso = filterTipo === "ingreso";
+    return byDup.filter(
+      (p) =>
+        (p.tipo || "Ingreso").toLowerCase() ===
+        (esIngreso ? "ingreso" : "egreso")
+    );
+  }, [previewData, filterDuplicados, filterTipo]);
+
   const handleImportSelected = async () => {
-    if (selected.length === 0) {
-      return;
-    }
+    if (selected.length === 0) return;
 
     setImporting(true);
     try {
@@ -52,16 +76,16 @@ export default function MpPreviewDialog({
   };
 
   const handleSelectAll = () => {
-    if (selected.length === previewData.length) {
+    if (selected.length === filteredData.length) {
       setSelected([]);
     } else {
-      setSelected(previewData.map((p) => p.mpPaymentId).filter(Boolean));
+      setSelected(
+        filteredData.map((p, idx) => p.id || p.mpPaymentId || `row-${idx}`)
+      );
     }
   };
 
-  // Contar duplicados y válidos
   const duplicadosCount = previewData.filter((p) => p.esDuplicado).length;
-  const validosCount = previewData.length - duplicadosCount;
 
   return (
     <Dialog
@@ -101,17 +125,67 @@ export default function MpPreviewDialog({
                 </Alert>
               )}
 
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 2,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Stack direction="row" spacing={2} flexWrap="wrap">
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel>Filtrar movimientos</InputLabel>
+                    <Select
+                      value={filterDuplicados}
+                      label="Filtrar movimientos"
+                      onChange={(e) => setFilterDuplicados(e.target.value)}
+                    >
+                      <MenuItem value="todos">
+                        Todos ({previewData.length})
+                      </MenuItem>
+                      <MenuItem value="validos">
+                        Validos (
+                        {previewData.filter((r) => !r.esDuplicado).length})
+                      </MenuItem>
+                      <MenuItem value="duplicados">
+                        Duplicados (
+                        {previewData.filter((r) => r.esDuplicado).length})
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl size="small" sx={{ minWidth: 170 }}>
+                    <InputLabel sx={{ whiteSpace: "normal" }}>Tipo</InputLabel>
+                    <Select
+                      value={filterTipo}
+                      label="Tipo"
+                      onChange={(e) => setFilterTipo(e.target.value)}
+                    >
+                      <MenuItem value="todos">Todos</MenuItem>
+                      <MenuItem value="ingreso">Ingresos</MenuItem>
+                      <MenuItem value="egreso">Egresos</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
+
+                <Typography variant="body2" color="text.secondary">
+                  Mostrando {filteredData.length} de {previewData.length} pagos
+                </Typography>
+              </Box>
+
               <Paper variant="outlined" sx={{ borderRadius: 2 }}>
                 <MpPaymentsTable
-                  rows={previewData}
+                  rows={filteredData}
                   loading={false}
                   page={0}
-                  pageSize={previewData.length}
-                  total={previewData.length}
+                  pageSize={filteredData.length}
+                  total={filteredData.length}
                   selected={selected}
                   onSelectChange={setSelected}
-                  onPageChange={() => {}}
-                  onPageSizeChange={() => {}}
+                  onPageChange={() => { }}
+                  onPageSizeChange={() => { }}
                 />
               </Paper>
 
@@ -123,15 +197,16 @@ export default function MpPreviewDialog({
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  {selected.length} de {previewData.length} pagos seleccionados
+                  {selected.length} de {filteredData.length} pagos seleccionados
                 </Typography>
                 <Button
                   variant="outlined"
                   size="small"
                   onClick={handleSelectAll}
-                  disabled={previewData.length === 0}
+                  disabled={filteredData.length === 0}
+                  sx={{ lineHeight: 1.2 }}
                 >
-                  {selected.length === previewData.length
+                  {selected.length === filteredData.length
                     ? "Deseleccionar todos"
                     : "Seleccionar todos"}
                 </Button>
@@ -142,13 +217,14 @@ export default function MpPreviewDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={importing}>
+        <Button onClick={onClose} disabled={importing} sx={{ lineHeight: 1.2 }}>
           Cancelar
         </Button>
         <Button
           variant="contained"
           onClick={handleImportSelected}
           disabled={selected.length === 0 || importing}
+          sx={{ lineHeight: 1.2 }}
         >
           {importing
             ? "Importando..."

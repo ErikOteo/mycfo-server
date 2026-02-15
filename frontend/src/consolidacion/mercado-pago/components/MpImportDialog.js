@@ -186,10 +186,10 @@ export default function MpImportDialog({ open, onClose, onImport }) {
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={busy}>
+        <Button onClick={onClose} disabled={busy} sx={{ lineHeight: 1.2 }}>
           Cancelar
         </Button>
-        <Button variant="contained" onClick={submit} disabled={busy}>
+        <Button variant="contained" onClick={submit} disabled={busy} sx={{ lineHeight: 1.2 }}>
           {busy ? "Buscando…" : "Vista Previa"}
         </Button>
       </DialogActions>

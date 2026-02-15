@@ -40,6 +40,7 @@ export default function ExcelPreviewDialog({
   const [importing, setImporting] = React.useState(false);
   const [editedCategories, setEditedCategories] = React.useState({});
   const [filterDuplicados, setFilterDuplicados] = React.useState("todos"); // "todos", "duplicados", "validos"
+  const [filterTipo, setFilterTipo] = React.useState("todos"); // "todos", "ingreso", "egreso"
 
   // Reset selection when dialog opens/closes
   React.useEffect(() => {
@@ -47,20 +48,31 @@ export default function ExcelPreviewDialog({
       setSelected([]);
       setEditedCategories({});
       setFilterDuplicados("todos");
+      setFilterTipo("todos");
     }
   }, [open]);
 
-  // Filtrar registros según el filtro seleccionado
+  // Filtrar registros según los filtros seleccionados
   const registrosFiltrados = React.useMemo(() => {
-    switch (filterDuplicados) {
-      case "duplicados":
-        return previewData.filter((r) => r.esDuplicado);
-      case "validos":
-        return previewData.filter((r) => !r.esDuplicado);
-      default:
-        return previewData;
-    }
-  }, [previewData, filterDuplicados]);
+    const filtradosDuplicados = (() => {
+      switch (filterDuplicados) {
+        case "duplicados":
+          return previewData.filter((r) => r.esDuplicado);
+        case "validos":
+          return previewData.filter((r) => !r.esDuplicado);
+        default:
+          return previewData;
+      }
+    })();
+
+    if (filterTipo === "todos") return filtradosDuplicados;
+    const esIngreso = filterTipo === "ingreso";
+    return filtradosDuplicados.filter(
+      (r) =>
+        (r.tipo || "Ingreso").toLowerCase() ===
+        (esIngreso ? "ingreso" : "egreso"),
+    );
+  }, [previewData, filterDuplicados, filterTipo]);
 
   const handleImportSelected = async () => {
     if (selected.length === 0) {
@@ -97,7 +109,7 @@ export default function ExcelPreviewDialog({
     } else {
       // Mapear índices filtrados a índices originales
       const indicesOriginales = registrosFiltrados.map((registro) =>
-        previewData.findIndex((r) => r === registro)
+        previewData.findIndex((r) => r === registro),
       );
       setSelected(indicesOriginales);
     }
@@ -129,7 +141,18 @@ export default function ExcelPreviewDialog({
 
   const formatDate = (date) => {
     if (!date) return "";
-    return new Date(date).toLocaleDateString("es-AR");
+
+    // Evitar saltos de día por husos horarios: si viene como ISO date (YYYY-MM-DD...),
+    // usamos solo la parte de fecha sin crear un Date que ajuste la zona horaria.
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+      const onlyDate = date.slice(0, 10); // YYYY-MM-DD
+      const [y, m, d] = onlyDate.split("-");
+      return `${d}/${m}/${y}`;
+    }
+
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return String(date);
+    return parsed.toLocaleDateString("es-AR");
   };
 
   return (
@@ -164,12 +187,12 @@ export default function ExcelPreviewDialog({
                 const duplicadosEnBD = previewData.filter(
                   (r) =>
                     r.esDuplicado &&
-                    r.motivoDuplicado?.includes("base de datos")
+                    r.motivoDuplicado?.includes("base de datos"),
                 ).length;
                 const duplicadosEnExcel = previewData.filter(
                   (r) =>
                     r.esDuplicado &&
-                    !r.motivoDuplicado?.includes("base de datos")
+                    !r.motivoDuplicado?.includes("base de datos"),
                 ).length;
 
                 if (duplicadosEnBD > 0 || duplicadosEnExcel > 0) {
@@ -189,34 +212,49 @@ export default function ExcelPreviewDialog({
                 return null;
               })()}
 
-              {/* Filtros de duplicados */}
+              {/* Filtros de duplicados y tipo */}
               <Box
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  gap: 2,
+                  flexWrap: "wrap",
                 }}
               >
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel>Filtrar movimientos</InputLabel>
-                  <Select
-                    value={filterDuplicados}
-                    label="Filtrar movimientos"
-                    onChange={(e) => setFilterDuplicados(e.target.value)}
-                  >
-                    <MenuItem value="todos">
-                      Todos ({previewData.length})
-                    </MenuItem>
-                    <MenuItem value="validos">
-                      Válidos (
-                      {previewData.filter((r) => !r.esDuplicado).length})
-                    </MenuItem>
-                    <MenuItem value="duplicados">
-                      Duplicados (
-                      {previewData.filter((r) => r.esDuplicado).length})
-                    </MenuItem>
-                  </Select>
-                </FormControl>
+                <Stack direction="row" spacing={2} flexWrap="wrap">
+                  <FormControl size="small" sx={{ minWidth: 230 }}>
+                    <Select
+                      value={filterDuplicados}
+                      label="Filtrar movimientos"
+                      onChange={(e) => setFilterDuplicados(e.target.value)}
+                    >
+                      <MenuItem value="todos">
+                        Todos ({previewData.length})
+                      </MenuItem>
+                      <MenuItem value="validos">
+                        Válidos (
+                        {previewData.filter((r) => !r.esDuplicado).length})
+                      </MenuItem>
+                      <MenuItem value="duplicados">
+                        Duplicados (
+                        {previewData.filter((r) => r.esDuplicado).length})
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl size="small" sx={{ minWidth: 170 }}>
+                    <Select
+                      value={filterTipo}
+                      label="Tipo"
+                      onChange={(e) => setFilterTipo(e.target.value)}
+                    >
+                      <MenuItem value="todos">Ingresos/Egresos</MenuItem>
+                      <MenuItem value="ingreso">Ingresos</MenuItem>
+                      <MenuItem value="egreso">Egresos</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
 
                 <Typography variant="body2" color="text.secondary">
                   Mostrando {registrosFiltrados.length} de {previewData.length}{" "}
@@ -277,7 +315,7 @@ export default function ExcelPreviewDialog({
 
                       {registrosFiltrados.map((registro, indexOriginal) => {
                         const index = previewData.findIndex(
-                          (r) => r === registro
+                          (r) => r === registro,
                         );
                         const fecha = formatDate(registro.fechaEmision);
                         const currentCategory =
@@ -343,7 +381,7 @@ export default function ExcelPreviewDialog({
                               >
                                 {formatAmount(
                                   registro.montoTotal,
-                                  registro.tipo === "Egreso"
+                                  registro.tipo === "Egreso",
                                 )}
                               </span>
                             </TableCell>
@@ -367,7 +405,7 @@ export default function ExcelPreviewDialog({
                                   size="small"
                                   label={
                                     registro.motivoDuplicado?.includes(
-                                      "base de datos"
+                                      "base de datos",
                                     )
                                       ? "Registrado"
                                       : "Duplicado en Excel"
@@ -375,18 +413,18 @@ export default function ExcelPreviewDialog({
                                   sx={{
                                     backgroundColor:
                                       registro.motivoDuplicado?.includes(
-                                        "base de datos"
+                                        "base de datos",
                                       )
                                         ? "#ffebee"
                                         : "#fff3e0",
                                     color: registro.motivoDuplicado?.includes(
-                                      "base de datos"
+                                      "base de datos",
                                     )
                                       ? "#d32f2f"
                                       : "#f57c00",
                                     fontWeight: "bold",
                                     border: registro.motivoDuplicado?.includes(
-                                      "base de datos"
+                                      "base de datos",
                                     )
                                       ? "1px solid #d32f2f"
                                       : "1px solid #f57c00",

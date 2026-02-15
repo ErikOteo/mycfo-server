@@ -10,8 +10,8 @@ import registro.cargarDatos.models.Movimiento;
 import registro.cargarDatos.dtos.MovementCreatedEvent;
 
 import java.math.BigDecimal;
+import java.net.UnknownHostException;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 
 @Service
 public class MovimientoEventService {
@@ -42,7 +42,8 @@ public class MovimientoEventService {
                     ? movimiento.getFechaEmision().atZone(ZoneId.systemDefault()).toInstant()
                     : java.time.Instant.now(),
                 BigDecimal.valueOf(movimiento.getMontoTotal()),
-                movimiento.getDescripcion() != null ? movimiento.getDescripcion() : ""
+                movimiento.getDescripcion() != null ? movimiento.getDescripcion() : "",
+                movimiento.getMoneda() != null ? movimiento.getMoneda().name() : "ARS"
             );
 
             // Enviar al servicio de notificaciones
@@ -50,12 +51,18 @@ public class MovimientoEventService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             
             HttpEntity<MovementCreatedEvent> request = new HttpEntity<>(event, headers);
-            
-            restTemplate.postForObject(
-                notificacionServiceUrl + "/api/events/movements",
-                request,
-                Void.class
-            );
+            String url = notificacionServiceUrl + "/api/events/movements";
+            try {
+                restTemplate.postForObject(url, request, Void.class);
+            } catch (Exception ex) {
+                if (ex.getCause() instanceof UnknownHostException) {
+                    String fallback = "http://localhost:8084/api/events/movements";
+                    System.err.println("Host 'notificacion' no resuelve, usando fallback: " + fallback);
+                    restTemplate.postForObject(fallback, request, Void.class);
+                } else {
+                    throw ex;
+                }
+            }
             
         } catch (Exception e) {
             // Log error pero no fallar la operación principal

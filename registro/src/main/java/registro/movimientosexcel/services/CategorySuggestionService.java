@@ -135,7 +135,7 @@ public class CategorySuggestionService {
         // TRANSPORTE (Muy importante distinguir Uber/SUBE)
         patronesEgresos.put(CAT_TRANSPORTE, List.of(
             new PatronCategoria(List.of("uber", "cabify", "didi", "beat"), 10),
-            new PatronCategoria(List.of("sube", "transporte publico", "colectivo", "subte"), 10),
+            new PatronCategoria(List.of("sube", "recarga sube", "transporte publico", "colectivo", "subte"), 10),
             new PatronCategoria(List.of("ypf", "shell", "axion", "puma", "combustible", "nafta", "gasoil"), 10),
             new PatronCategoria(List.of("peaje", "autopista", "estacionamiento", "parking", "cochera"), 9),
             new PatronCategoria(List.of("taxi", "remis", "viaje", "transporte"), 8),
@@ -158,7 +158,7 @@ public class CategorySuggestionService {
             new PatronCategoria(List.of("metrogas", "gas natural", "camuzzi", "gas"), 10),
             new PatronCategoria(List.of("aysa", "absa", "agua corriente", "aguas"), 10),
             new PatronCategoria(List.of("telecom", "fibertel", "movistar", "claro", "personal", "internet"), 9),
-            new PatronCategoria(List.of("telefono", "celular", "mobile"), 8),
+            new PatronCategoria(List.of("telefono", "celular", "mobile", "recarga celular", "prepago"), 8),
             new PatronCategoria(List.of("cable", "directv", "flow"), 7)
         ));
         
@@ -211,9 +211,9 @@ public class CategorySuggestionService {
         
         // SERVICIOS FINANCIEROS
         patronesEgresos.put(CAT_SERVICIOS_FINANCIEROS, List.of(
-            new PatronCategoria(List.of("comision", "banco", "bancaria", "mantenimiento cuenta"), 10),
+            new PatronCategoria(List.of("comision", "banco", "bancaria", "mantenimiento cuenta", "fee mp", "comision mp", "ajuste mp", "bank transfer fee"), 10),
             new PatronCategoria(List.of("tarjeta credito", "resumen tarjeta", "visa", "mastercard"), 9),
-            new PatronCategoria(List.of("prestamo", "cuota", "financiacion"), 8),
+            new PatronCategoria(List.of("prestamo", "cuota", "financiacion", "transfer out", "bank transfer"), 8),
             new PatronCategoria(List.of("seguro", "insurance"), 7)
         ));
         
@@ -231,14 +231,14 @@ public class CategorySuggestionService {
         patronesIngresos.put(CAT_VENTAS_PRODUCTOS, List.of(
             new PatronCategoria(List.of("venta producto", "venta mercaderia", "venta articulo"), 10),
             new PatronCategoria(List.of("venta", "cobro venta"), 8),
-            new PatronCategoria(List.of("producto vendido", "item vendido"), 7)
+            new PatronCategoria(List.of("producto vendido", "item vendido", "producto de"), 7)
         ));
         
         // PRESTACIÓN DE SERVICIOS
         patronesIngresos.put(CAT_PRESTACION_SERVICIOS, List.of(
             new PatronCategoria(List.of("prestacion servicio", "honorario", "consultor"), 10),
             new PatronCategoria(List.of("servicio profesional", "trabajo realizado"), 9),
-            new PatronCategoria(List.of("facturacion servicio", "cobro servicio"), 8)
+            new PatronCategoria(List.of("facturacion servicio", "cobro servicio", "suscripcion", "abono"), 8)
         ));
         
         // COBRANZAS
@@ -250,8 +250,8 @@ public class CategorySuggestionService {
         
         // TRANSFERENCIAS RECIBIDAS
         patronesIngresos.put(CAT_TRANSFERENCIAS_RECIBIDAS, List.of(
-            new PatronCategoria(List.of("transferencia recibida", "deposito", "acreditacion"), 10),
-            new PatronCategoria(List.of("transferencia", "envio dinero"), 7)
+            new PatronCategoria(List.of("transferencia recibida", "deposito", "acreditacion", "cbu", "alias", "bank transfer", "bank transfer in"), 10),
+            new PatronCategoria(List.of("transferencia", "envio dinero", "payout", "mp", "mercado pago", "link de pago", "qr", "pos", "transfer in", "transferencia banco"), 8)
         ));
         
         // INVERSIONES

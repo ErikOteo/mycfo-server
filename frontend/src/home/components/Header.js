@@ -42,7 +42,7 @@ const Header = React.memo(function Header({ onToggleSidebar }) {
             alignItems="center"
             spacing={1}
             sx={{
-              display: { xs: 'inline-flex', md: 'none' },
+              display: { xs: 'inline-flex', lg: 'none' },
               textDecoration: 'none',
               color: 'inherit',
             }}
@@ -51,7 +51,7 @@ const Header = React.memo(function Header({ onToggleSidebar }) {
           </Stack>
         )}
         {/* Desktop: breadcrumbs */}
-        <NavbarBreadcrumbs sx={{ display: { xs: 'none', md: 'flex' } }} />
+        <NavbarBreadcrumbs sx={{ display: { xs: 'none', lg: 'flex' } }} />
       </Stack>
 
       {/* Columna derecha */}
@@ -69,46 +69,8 @@ const Header = React.memo(function Header({ onToggleSidebar }) {
           // Modo desktop: theme, perfil, organización, notificaciones
           <>
             <ColorModeIconDropdown />
-            <Tooltip title="Perfil">
-              <IconButton
-                size="small"
-                color="primary"
-                sx={{
-                  transition: 'color 0.2s, background-color 0.2s',
-                  color: 'text.primary',
-                  '&:hover': {
-                    backgroundColor:
-                      (theme.vars || theme).palette.mode === 'light'
-                        ? '#fff'
-                        : 'rgba(255,255,255,0.08)',
-                    color: 'text.primary',
-                  },
-                }}
-                onClick={() => navigate('/perfil')}
-              >
-                <PersonRoundedIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Organización">
-              <IconButton
-                size="small"
-                color="primary"
-                sx={{
-                  transition: 'color 0.2s, background-color 0.2s',
-                  color: 'text.primary',
-                  '&:hover': {
-                    backgroundColor:
-                      (theme.vars || theme).palette.mode === 'light'
-                        ? '#fff'
-                        : 'rgba(255,255,255,0.08)',
-                    color: 'text.primary',
-                  },
-                }}
-                onClick={() => navigate('/organizacion')}
-              >
-                <ApartmentIcon />
-              </IconButton>
-            </Tooltip>
+            {/* Botón Perfil eliminado en Desktop - movido al sidebar */}
+            {/* Botón Organización eliminado en Desktop - movido al sidebar */}
             <NotificationButton />
           </>
         )}

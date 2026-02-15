@@ -1,11 +1,11 @@
 import React from "react";
 import {
   Box,
-  Grid,
   TextField,
   MenuItem,
   Button,
 } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 
 const TIPOS_FACTURA = ["A", "B", "C", "E", "M"];
 const ESTADOS_PAGO = [
@@ -26,7 +26,7 @@ const FacturaFilters = ({ values, onChange, onReset }) => {
   return (
     <Box sx={{ mb: 3 }}>
       <Grid container spacing={2}>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField
             label="Desde"
             type="date"
@@ -37,7 +37,7 @@ const FacturaFilters = ({ values, onChange, onReset }) => {
             InputLabelProps={{ shrink: true }}
           />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField
             label="Hasta"
             type="date"
@@ -48,7 +48,7 @@ const FacturaFilters = ({ values, onChange, onReset }) => {
             InputLabelProps={{ shrink: true }}
           />
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField
             select
             label="Tipo de factura"
@@ -65,7 +65,7 @@ const FacturaFilters = ({ values, onChange, onReset }) => {
             ))}
           </TextField>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <TextField
             select
             label="Estado de pago"

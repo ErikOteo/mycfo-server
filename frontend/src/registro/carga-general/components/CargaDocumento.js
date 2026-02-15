@@ -6,16 +6,25 @@ import {
   ListItem,
   ListItemText,
   Typography,
+  Paper,
+  Stack,
+  Tabs,
+  Tab,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
+import UploadIcon from "@mui/icons-material/Upload";
 import DropzoneUploader from "../../../shared-components/DropzoneUploader";
 import CustomButton from "../../../shared-components/CustomButton";
-import axios from "axios";
+import http from "../../../api/http";
 
-export default function CargaDocumento({ tipoDoc, endpoint }) {
+export default function CargaDocumento({ tipoDoc, endpoint, onResultado, onFallback }) {
   const [archivo, setArchivo] = useState(null);
   const [error, setError] = useState("");
   const [subiendo, setSubiendo] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const handleFileSelected = (file) => {
     setArchivo(file);
@@ -25,7 +34,7 @@ export default function CargaDocumento({ tipoDoc, endpoint }) {
 
   const handleSubmit = async () => {
     if (!archivo) {
-      setError("Seleccioná un archivo Excel o CSV antes de continuar.");
+      setError("Seleccioná un archivo antes de continuar.");
       return;
     }
 
@@ -33,7 +42,6 @@ export default function CargaDocumento({ tipoDoc, endpoint }) {
       setError("No se encontró el endpoint de carga para este tipo.");
       return;
     }
-
     const usuarioSub = sessionStorage.getItem("sub");
     if (!usuarioSub) {
       setError(
@@ -45,10 +53,6 @@ export default function CargaDocumento({ tipoDoc, endpoint }) {
     try {
       setSubiendo(true);
       setError("");
-
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[CargaDocumento] Subiendo archivo a:", endpoint);
-      }
 
       const formData = new FormData();
       formData.append("file", archivo);
@@ -68,17 +72,24 @@ export default function CargaDocumento({ tipoDoc, endpoint }) {
         "X-Usuario-Sub": usuarioSub,
       };
 
-      const { data } = await axios.post(endpoint, formData, { headers });
+      const { data } = await http.post(endpoint, formData, { headers });
 
+      if (data?.campos && typeof onResultado === "function") {
+        onResultado(data);
+        return;
+      }
       setResultado(data);
     } catch (err) {
-      console.error("❌ Error en envío:", err);
+      console.error("Error en envio de documento:", err);
       const mensaje =
         err.response?.data?.mensaje ||
         err.response?.data?.error ||
         err.message ||
-        "Ocurrió un error al procesar el archivo.";
+        "OcurriÃ³ un error al procesar el archivo.";
       setError(mensaje);
+      if (typeof onFallback === "function") {
+        onFallback({ origen: "documento", mensaje, detalle: err });
+      }
     } finally {
       setSubiendo(false);
     }
@@ -88,24 +99,34 @@ export default function CargaDocumento({ tipoDoc, endpoint }) {
     typeof tipoDoc === "string" && tipoDoc.length
       ? tipoDoc.charAt(0).toUpperCase() + tipoDoc.slice(1)
       : "registro";
+  const esFactura = (tipoDoc || "").toLowerCase() === "factura";
+  const acceptTypes = esFactura
+    ? {
+        "application/pdf": [],
+        "application/msword": [],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+          [],
+      }
+    : {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [],
+        "application/vnd.ms-excel": [],
+        "text/csv": [],
+        "application/csv": [],
+      };
 
-  return (
-    <Box sx={{ mt: 3 }}>
+  const formContent = (
+    <>
       <Typography variant="subtitle1" sx={{ mb: 1 }}>
-        Cargá un archivo Excel o CSV con tus {tipoDocLabel}
+        {esFactura
+          ? "Cargá un archivo PDF o Word (DOC/DOCX) con tu factura"
+          : `Cargá un archivo de tu ${tipoDocLabel}`}
       </Typography>
 
       <DropzoneUploader
         onFileSelected={handleFileSelected}
         width="100%"
         height={140}
-        accept={{
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-            [],
-          "application/vnd.ms-excel": [],
-          "text/csv": [],
-          "application/csv": [],
-        }}
+        accept={acceptTypes}
       />
 
       <CustomButton
@@ -161,6 +182,28 @@ export default function CargaDocumento({ tipoDoc, endpoint }) {
           )}
         </Box>
       )}
+    </>
+  );
+
+  if ((tipoDoc || "").toLowerCase() !== "factura") {
+    return <Box sx={{ mt: 3 }}>{formContent}</Box>;
+  }
+
+  return (
+    <Box sx={{ mt: 3 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 2 }}
+      >
+      </Stack>
+
+
+
+      <Paper variant="outlined" sx={{ borderRadius: 2, p: 3 }}>
+        {formContent}
+      </Paper>
     </Box>
   );
 }

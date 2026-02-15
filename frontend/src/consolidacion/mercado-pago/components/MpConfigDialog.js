@@ -209,14 +209,15 @@ export default function MpConfigDialog({ open, onClose, onSaved, onUnlink }) {
             color="inherit"
             onClick={onUnlink}
             disabled={saving || loading}
+            sx={{ lineHeight: 1.2 }}
           >
             Desvincular
           </Button>
         )}
-        <Button onClick={onClose} disabled={saving}>
+        <Button onClick={onClose} disabled={saving} sx={{ lineHeight: 1.2 }}>
           Cerrar
         </Button>
-        <Button variant="contained" onClick={save} disabled={saving || loading}>
+        <Button variant="contained" onClick={save} disabled={saving || loading} sx={{ lineHeight: 1.2 }}>
           {saving ? "Guardando…" : "Guardar"}
         </Button>
       </DialogActions>

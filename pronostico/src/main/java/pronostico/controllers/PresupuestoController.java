@@ -22,6 +22,7 @@ import pronostico.repositories.PresupuestoLineaRepository;
 import pronostico.services.AdministracionService;
 import pronostico.services.PresupuestoService;
 import pronostico.services.PresupuestoService.ListStatus;
+import pronostico.services.PresupuestoEventService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -43,6 +44,7 @@ public class PresupuestoController {
     private final PresupuestoService service;
     private final PresupuestoLineaRepository presupuestoLineaRepository;
     private final AdministracionService administracionService;
+    private final PresupuestoEventService presupuestoEventService;
 
     private static final DateTimeFormatter YM = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final Pattern YM_PATTERN = Pattern.compile("^(\\d{4})-(\\d{1,2})(?:-(\\d{1,2}))?$");
@@ -264,7 +266,7 @@ public class PresupuestoController {
     ) {
         RequestContext ctx = resolveContext(usuarioSubHeader, jwt);
         Presupuesto presupuesto = service.mustOwn(id, ctx.sub(), ctx.organizacionId());
-        return upsertLinea(presupuesto, ym, lineaId, req, true);
+        return upsertLinea(ctx, presupuesto, ym, lineaId, req, true);
     }
 
     @PutMapping("/presupuestos/{id}/mes/{ym}/lineas/{lineaId}")
@@ -278,7 +280,7 @@ public class PresupuestoController {
     ) {
         RequestContext ctx = resolveContext(usuarioSubHeader, jwt);
         Presupuesto presupuesto = service.mustOwn(id, ctx.sub(), ctx.organizacionId());
-        return upsertLinea(presupuesto, ym, lineaId, req, false);
+        return upsertLinea(ctx, presupuesto, ym, lineaId, req, false);
     }
 
     @DeleteMapping("/presupuestos/{id}/mes/{ym}/lineas/{lineaId}")
@@ -304,6 +306,7 @@ public class PresupuestoController {
     }
 
     private ResponseEntity<Map<String, Object>> upsertLinea(
+        RequestContext ctx,
         Presupuesto presupuesto,
         String ym,
         Long lineaId,
@@ -337,6 +340,31 @@ public class PresupuestoController {
         }
 
         PresupuestoLinea saved = presupuestoLineaRepository.save(linea);
+
+        // Notificación de presupuesto excedido si el real supera el estimado
+        if (saved.getMontoEstimado() != null
+                && saved.getMontoReal() != null
+                && saved.getMontoReal().compareTo(saved.getMontoEstimado()) > 0) {
+            presupuestoEventService.sendBudgetExceededEvent(presupuesto, saved, ctx.sub());
+        }
+
+        // Chequeo anual de egresos totales
+        try {
+            BigDecimal totalEstimadoEgreso = presupuestoLineaRepository.sumEstimadoEgreso(presupuesto.getId());
+            BigDecimal totalRealEgreso = presupuestoLineaRepository.sumRealEgreso(presupuesto.getId());
+            if (totalEstimadoEgreso != null
+                    && totalRealEgreso != null
+                    && totalRealEgreso.compareTo(totalEstimadoEgreso) > 0) {
+                presupuestoEventService.sendBudgetExceededAnnual(
+                        presupuesto,
+                        totalEstimadoEgreso,
+                        totalRealEgreso,
+                        ctx.sub());
+            }
+        } catch (Exception e) {
+            System.err.println("Error evaluando excedente anual: " + e.getMessage());
+        }
+
         return ResponseEntity.ok(toLineaDTO(saved));
     }
 

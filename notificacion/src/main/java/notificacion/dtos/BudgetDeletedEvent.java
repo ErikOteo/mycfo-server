@@ -3,7 +3,7 @@ package notificacion.dtos;
 import jakarta.validation.constraints.NotNull;
 
 public record BudgetDeletedEvent(
-        @NotNull Long userId,
+        @NotNull String userId,
         @NotNull Long companyId,
         @NotNull Long budgetId,
         @NotNull String budgetName,

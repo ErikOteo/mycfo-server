@@ -155,6 +155,8 @@ public class MovimientoController {
             @RequestParam(required = false) Boolean conciliado,
             @RequestParam(required = false) String nombreRelacionado,
             @RequestParam(required = false) String moneda,
+            @RequestParam(required = false) Double montoMin,
+            @RequestParam(required = false) Double montoMax,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchDate,
             @RequestParam(defaultValue = "0") int page,
@@ -189,6 +191,8 @@ public class MovimientoController {
                     conciliado,
                     nombreRelacionado,
                     monedaEnum,
+                    montoMin,
+                    montoMax,
                     search,
                     searchDate,
                     pageable
@@ -214,6 +218,8 @@ public class MovimientoController {
             @RequestParam(required = false) Boolean conciliado,
             @RequestParam(required = false) String nombreRelacionado,
             @RequestParam(required = false) String moneda,
+            @RequestParam(required = false) Double montoMin,
+            @RequestParam(required = false) Double montoMax,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate searchDate) {
 
@@ -241,6 +247,8 @@ public class MovimientoController {
                     conciliado,
                     nombreRelacionado,
                     monedaEnum,
+                    montoMin,
+                    montoMax,
                     search,
                     searchDate
             );
@@ -417,6 +425,8 @@ public class MovimientoController {
                     null,
                     null,
                     monedaEnum,
+                    null,
+                    null,
                     null,
                     null,
                     movimientosPageable

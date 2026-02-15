@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { getNotifications, getUnreadCount } from "../services/notificationsApi";
 
-export function usePollingNotifications(userId, pollingInterval = 10000) {
+export function usePollingNotifications(userId, pollingInterval = 60000) {
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);

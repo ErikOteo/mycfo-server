@@ -16,7 +16,7 @@ public class MpAccountLink {
 
     @Setter
     @Getter
-    @Column(nullable=false) private Long userIdApp;
+    @Column(nullable=false, length=64) private String userIdApp;
 
     @Setter
     @Getter

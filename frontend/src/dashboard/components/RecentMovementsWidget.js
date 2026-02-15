@@ -189,7 +189,10 @@ const RecentMovementsWidget = ({
                       </TableCell>
                       {!isMobile ? (
                         <TableCell>
-                          <Typography variant="body2" sx={{ color: secondaryTextColor }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: primaryTextColor, fontWeight: 500 }}
+                          >
                             {categoria}
                           </Typography>
                         </TableCell>

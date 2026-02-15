@@ -1,137 +1,183 @@
 import React from 'react';
-import {
-  Box, Typography, Grid, Paper,
-  TableContainer, Table, TableHead, TableRow, TableCell, TableBody
-} from '@mui/material';
+import { Box, Typography, Grid, Paper, useTheme } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
 const TablaDetalle = ({ ingresos, egresos, topRightActions }) => {
+  const theme = useTheme();
+
   const totalIngresos = ingresos.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
   const totalEgresos = egresos.reduce((acc, curr) => acc + Math.abs(Number(curr.total) || 0), 0);
   const balance = totalIngresos - totalEgresos;
+
+  const currencyFormatter = (value) => {
+    return `$${Number(value).toLocaleString()}`;
+  };
+
+  const columnsIngresos = [
+    { field: 'id', headerName: 'N°', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'categoria', headerName: 'Categoría', flex: 1, align: 'center', headerAlign: 'center' },
+    {
+      field: 'total',
+      headerName: 'Monto',
+      width: 150,
+      align: 'center',
+      headerAlign: 'center',
+      valueFormatter: (value) => currencyFormatter(value),
+    },
+  ];
+
+  const columnsEgresos = [
+    { field: 'id', headerName: 'N°', width: 70, align: 'center', headerAlign: 'center' },
+    { field: 'categoria', headerName: 'Categoría', flex: 1, align: 'center', headerAlign: 'center' },
+    {
+      field: 'total',
+      headerName: 'Monto',
+      width: 150,
+      align: 'center',
+      headerAlign: 'center',
+      valueFormatter: (value) => currencyFormatter(Math.abs(value)),
+    },
+  ];
+
+  // Styles copied EXACTLY from TablaRegistrosV2.js to ensure 100% parity
+  const dataGridStyles = {
+    backgroundColor: "background.paper",
+    borderRadius: 2,
+    border: (theme) => `1px solid ${theme.palette.divider}`,
+    "& .MuiDataGrid-cell": {
+      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+      display: "flex",
+      alignItems: "center",
+      fontSize: "0.875rem", // Match default size
+    },
+    "& .MuiDataGrid-columnHeaders": {
+      backgroundColor: (theme) =>
+        theme.palette.mode === "dark"
+          ? "rgba(255, 255, 255, 0.05)"
+          : "#f5f5f5",
+      color: "text.primary",
+      borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+    },
+    "& .MuiDataGrid-columnHeader": {
+      "&:focus": { outline: "none" },
+    },
+    "& .MuiDataGrid-sortIcon": {
+      display: "none",
+    },
+    "& .MuiDataGrid-menuIcon": {
+      display: "none",
+    },
+    "& .MuiDataGrid-iconButtonContainer": {
+      display: "none",
+    },
+    "& .MuiDataGrid-row:hover": {
+      backgroundColor: (theme) => theme.palette.action.hover,
+    },
+    "& .MuiDataGrid-footerContainer": {
+      borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+    }
+  };
+
+  // Add IDs for DataGrid
+  const rowsIngresos = ingresos.map((row, index) => ({
+    id: index + 1,
+    ...row,
+    categoria: row.categoria && String(row.categoria).trim().length ? row.categoria : "Sin categoría",
+    total: Number(row.total) || 0
+  }));
+
+  const rowsEgresos = egresos.map((row, index) => ({
+    id: index + 1,
+    ...row,
+    categoria: row.categoria && String(row.categoria).trim().length ? row.categoria : "Sin categoría",
+    total: Number(row.total) || 0
+  }));
 
   return (
     <Box sx={{ width: '100%', px: 0, py: 2 }}>
       {/* Totales arriba */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Ingresos</Typography>
             <Typography variant="h6" color="green">
-              ${totalIngresos.toLocaleString()}
+              {currencyFormatter(totalIngresos)}
             </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Egresos</Typography>
             <Typography variant="h6" color="red">
-              ${totalEgresos.toLocaleString()}
+              {currencyFormatter(totalEgresos)}
             </Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, border: (theme) => `1px solid ${theme.palette.divider}`, borderRadius: 2, boxShadow: 'none' }}>
             <Typography variant="subtitle1">Balance</Typography>
             <Typography variant="h6" color={balance >= 0 ? 'green' : 'red'}>
-              ${balance.toLocaleString()}
+              {currencyFormatter(balance)}
             </Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* Acciones arriba de la tabla */}
-      <Typography variant="h6" gutterBottom>
-        Detalle de Ingresos
-      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        {/* Columna Ingresos */}
+        <Box sx={{ flex: '1 1 450px', minWidth: 0 }}>
+          <Typography variant="h6" gutterBottom>
+            Detalle de Ingresos
+          </Typography>
 
-      {topRightActions && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-          {topRightActions}
+          {topRightActions && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              {topRightActions}
+            </Box>
+          )}
+
+          <Box sx={{ width: '100%', mb: 4 }}>
+            <DataGrid
+              rows={rowsIngresos}
+              columns={columnsIngresos}
+              density="standard"
+              autoHeight
+              hideFooter
+              disableColumnMenu
+              disableColumnResize
+              disableRowSelectionOnClick
+              sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: () => <CustomNoRowsOverlay message="No hay ingresos registrados este mes" />,
+              }}
+            />
+          </Box>
         </Box>
-      )}
 
-      {/* Tabla de ingresos */}
-      <TableContainer component={Paper} sx={{ mb: 4, maxHeight: 360, overflowY: 'auto', overflowX: 'auto' }}>
-        <Table
-          stickyHeader
-          sx={{
-            '& .MuiTableCell-root': {
-              border: '1px solid rgba(224, 224, 224, 1)',
-            },
-            '& .MuiTableHead-root .MuiTableCell-root': {
-              fontWeight: 700,
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell>N°</TableCell>
-              <TableCell>Categoría</TableCell>
-              <TableCell align="right">Monto</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {ingresos.map((row, index) => (
-              <TableRow
-                key={index}
-                sx={{
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    cursor: 'pointer',
-                  },
-                }}
-              >
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{(row.categoria && String(row.categoria).trim().length) ? row.categoria : 'Sin categoría'}</TableCell>
-                <TableCell align="right">${(Number(row.total) || 0).toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Tabla de egresos */}
-      <Typography variant="h6" gutterBottom>
-        Detalle de Egresos
-      </Typography>
-      <TableContainer component={Paper} sx={{ maxHeight: 360, overflowY: 'auto', overflowX: 'auto' }}>
-        <Table
-          stickyHeader
-          sx={{
-            '& .MuiTableCell-root': {
-              border: '1px solid rgba(224, 224, 224, 1)',
-            },
-            '& .MuiTableHead-root .MuiTableCell-root': {
-              fontWeight: 700,
-            },
-          }}
-        >
-          <TableHead>
-            <TableRow>
-              <TableCell>N°</TableCell>
-              <TableCell>Categoría</TableCell>
-              <TableCell align="right">Monto</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {egresos.map((row, index) => (
-              <TableRow
-                key={index}
-                sx={{
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    cursor: 'pointer',
-                  },
-                }}
-              >
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{(row.categoria && String(row.categoria).trim().length) ? row.categoria : 'Sin categoría'}</TableCell>
-                <TableCell align="right">${Math.abs(Number(row.total) || 0).toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+        {/* Columna Egresos */}
+        <Box sx={{ flex: '1 1 450px', minWidth: 0 }}>
+          <Typography variant="h6" gutterBottom>
+            Detalle de Egresos
+          </Typography>
+          <Box sx={{ width: '100%' }}>
+            <DataGrid
+              rows={rowsEgresos}
+              columns={columnsEgresos}
+              density="standard"
+              autoHeight
+              hideFooter
+              disableColumnMenu
+              disableColumnResize
+              disableRowSelectionOnClick
+              sx={dataGridStyles}
+              slots={{
+                noRowsOverlay: () => <CustomNoRowsOverlay message="No hay egresos registrados este mes" />,
+              }}
+            />
+          </Box>
+        </Box>
+      </Box>
     </Box>
   );
 };

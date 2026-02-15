@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Paper, IconButton, Alert, CircularProgress, Typography } from "@mui/material";
+import { Box, Paper, IconButton, Alert, CircularProgress } from "@mui/material";
 import { Mic, Close, Delete } from "@mui/icons-material";
 import CustomButton from "../../../shared-components/CustomButton";
 import http from "../../../api/http";
@@ -29,16 +29,18 @@ const tipoMovimientoMap = {
   Factura: "Factura",
 };
 
-export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback }) {
+export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback, onNewCapture }) {
   const [grabando, setGrabando] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [audioFile, setAudioFile] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [parseWarning, setParseWarning] = useState(null);
 
   const startRecording = async () => {
+    if (onNewCapture) {
+      onNewCapture();
+    }
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
     let chunks = [];
@@ -51,7 +53,8 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
       stream.getTracks().forEach((t) => t.stop());
     };
 
-    setParseWarning(null);
+    setAudioUrl(null);
+    setAudioFile(null);
     setError(null);
     setMediaRecorder(recorder);
     recorder.start();
@@ -69,7 +72,6 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
     setAudioUrl(null);
     setAudioFile(null);
     setError(null);
-    setParseWarning(null);
   };
 
   const handleSubmit = async () => {
@@ -82,7 +84,6 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
 
     setCargando(true);
     setError(null);
-    setParseWarning(null);
     const archivo = audioFile;
     const fd = new FormData();
     fd.append("file", archivo);
@@ -123,7 +124,6 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
           message: "No se pudo interpretar el audio. Por favor grabalo nuevamente procurando mayor claridad.",
           transcript: fallbackTranscript || "Sin transcripción disponible.",
         };
-        setParseWarning(warningPayload);
         console.warn("Procesamiento de audio sin campos detectados.", { transcript, warnings });
         if (onFallback) {
           onFallback({
@@ -207,16 +207,6 @@ export default function CargaAudio({ tipoDoc, endpoint, onResultado, onFallback 
           </Alert>
         )}
 
-        {parseWarning && (
-          <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setParseWarning(null)}>
-            <Typography sx={{ fontWeight: 600, mb: 1 }}>
-              {parseWarning.message}
-            </Typography>
-            <Typography variant="body2">
-              Transcripción detectada: {parseWarning.transcript}
-            </Typography>
-          </Alert>
-        )}
       </Box>
     </Box>
   );

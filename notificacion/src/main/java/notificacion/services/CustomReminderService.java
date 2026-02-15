@@ -49,7 +49,24 @@ public class CustomReminderService {
             reminder.initializeNextTrigger();
         }
 
-        return reminderRepository.save(reminder);
+        CustomReminder saved = reminderRepository.save(reminder);
+
+        // Notificación de recordatorio creado
+        Notification notification = new Notification();
+        notification.setOrganizacionId(organizacionId);
+        notification.setUsuarioId(usuarioId);
+        notification.setType(NotificationType.REMINDER_CREATED);
+        notification.setTitle("Nuevo recordatorio creado");
+        notification.setBody("%s - %s".formatted(
+                title != null ? title : "Recordatorio",
+                message != null ? message : ""));
+        notification.setSeverity(Severity.INFO);
+        notification.setResourceType(notificacion.models.ResourceType.SYSTEM);
+        notification.setResourceId("reminder_created_" + saved.getId());
+        notification.setCreatedAt(Instant.now());
+        notificationService.create(notification);
+
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -141,6 +158,7 @@ public class CustomReminderService {
 
         notificationService.create(notification);
 
+        // Enviamos el mail específico de recordatorio (sujeto "Recordatorio: <titulo>")
         try {
             emailService.sendReminderEmail(reminder.getOrganizacionId(), reminder.getUsuarioId(), reminder);
         } catch (Exception e) {

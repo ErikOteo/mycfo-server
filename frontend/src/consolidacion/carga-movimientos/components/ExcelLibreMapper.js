@@ -4,19 +4,21 @@ import {
   Grid,
   TextField,
   Typography,
-  MenuItem,
   Paper,
-  Divider,
+  IconButton,
+  Tooltip,
+  MenuItem,
 } from "@mui/material";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
 const numberFieldProps = {
   type: "number",
-  inputProps: { min: 0, step: 1 },
+  inputProps: { min: 1, step: 1 },
   fullWidth: true,
   size: "small",
 };
 
-export default function ExcelLibreMapper({ value = {}, onChange }) {
+export default function ExcelLibreMapper({ value = {}, onChange, onOpenHelp }) {
   const handleChange = (key, newValue) => {
     onChange?.({
       ...value,
@@ -33,64 +35,92 @@ export default function ExcelLibreMapper({ value = {}, onChange }) {
 
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-        Mapeo de columnas
-      </Typography>
+      <Box
+        sx={{
+          mb: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          Mapeo de columnas
+        </Typography>
+        <Tooltip title="Guia de mapeo libre">
+          <IconButton
+            onClick={onOpenHelp}
+            size="small"
+            color="primary"
+            sx={{
+              bgcolor: "action.hover",
+              border: "1px solid",
+              borderColor: "divider",
+              "&:hover": { bgcolor: "action.selected" },
+            }}
+          >
+            <HelpOutlineIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Indicá qué columna corresponde a cada campo. Ej: si la fecha está en la
-        columna A, usá 0; B es 1; C es 2.
+        Indica que columna corresponde a cada campo. El conteo es desde 1:
+        columna A = 1, B = 2, C = 3.
       </Typography>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={4}>
+      <Grid container spacing={2} sx={{ mb: 2 }} justifyContent="center">
+        <Grid
+          item
+          xs={12}
+          sm={4}
+          sx={{ display: "flex", justifyContent: "center" }}
+        >
           <TextField
             label="Fecha *"
             {...numberFieldProps}
             value={columnMap.fecha ?? ""}
             onChange={(e) => updateColumn("fecha", e.target.value)}
+            sx={{ maxWidth: 320 }}
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid
+          item
+          xs={12}
+          sm={4}
+          sx={{ display: "flex", justifyContent: "center" }}
+        >
           <TextField
-            label="Descripción *"
+            label="Descripcion *"
             {...numberFieldProps}
             value={columnMap.descripcion ?? ""}
             onChange={(e) => updateColumn("descripcion", e.target.value)}
+            sx={{ maxWidth: 320 }}
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid
+          item
+          xs={12}
+          sm={4}
+          sx={{ display: "flex", justifyContent: "center" }}
+        >
           <TextField
             label="Monto *"
             {...numberFieldProps}
             value={columnMap.monto ?? ""}
             onChange={(e) => updateColumn("monto", e.target.value)}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={3}>
-          <TextField
-            label="Medio de pago"
-            {...numberFieldProps}
-            value={columnMap.mediopago ?? ""}
-            onChange={(e) => updateColumn("mediopago", e.target.value)}
-          />
-        </Grid>
-        <Grid item xs={12} sm={3}>
-          <TextField
-            label="Origen/Referencia"
-            {...numberFieldProps}
-            value={columnMap.origen ?? ""}
-            onChange={(e) => updateColumn("origen", e.target.value)}
+            sx={{ maxWidth: 320 }}
           />
         </Grid>
       </Grid>
 
-      <Divider sx={{ my: 2 }} />
-
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={4}>
+      <Grid container spacing={2} justifyContent="center">
+        <Grid
+          item
+          xs={12}
+          sm={4}
+          sx={{ display: "flex", justifyContent: "center" }}
+        >
           <TextField
-            label="Fila de inicio de datos (1 = primera)"
+            label="Fila donde empiezan los datos *"
             {...numberFieldProps}
             value={value.dataStartRow ?? 2}
             onChange={(e) =>
@@ -99,29 +129,28 @@ export default function ExcelLibreMapper({ value = {}, onChange }) {
                 e.target.value ? Number(e.target.value) : undefined,
               )
             }
+            sx={{ maxWidth: 320 }}
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid
+          item
+          xs={12}
+          sm={4}
+          sx={{ display: "flex", justifyContent: "center" }}
+        >
           <TextField
+            select
             label="Formato de fecha"
-            placeholder="dd/MM/yyyy"
             fullWidth
             size="small"
             value={value.dateFormat ?? "dd/MM/yyyy"}
             onChange={(e) => handleChange("dateFormat", e.target.value)}
-          />
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <TextField
-            select
-            label="Separador decimal"
-            fullWidth
-            size="small"
-            value={value.decimalSeparator ?? ","}
-            onChange={(e) => handleChange("decimalSeparator", e.target.value)}
+            sx={{ maxWidth: 320 }}
           >
-            <MenuItem value=",">Coma (,)</MenuItem>
-            <MenuItem value=".">Punto (.)</MenuItem>
+            <MenuItem value="dd/MM/yyyy">dd/MM/yyyy (31/01/2026)</MenuItem>
+            <MenuItem value="dd-MM-yyyy">dd-MM-yyyy (31-01-2026)</MenuItem>
+            <MenuItem value="yyyy-MM-dd">yyyy-MM-dd (2026-01-31)</MenuItem>
+            <MenuItem value="MM/dd/yyyy">MM/dd/yyyy (01/31/2026)</MenuItem>
           </TextField>
         </Grid>
       </Grid>

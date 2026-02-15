@@ -34,6 +34,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
             AND (:tipoFactura IS NULL OR f.tipoFactura = :tipoFactura)
             AND (:estadoPago IS NULL OR f.estadoPago = :estadoPago)
             AND (:moneda IS NULL OR f.moneda = :moneda)
+            AND (:montoMin IS NULL OR COALESCE(f.montoTotal, 0) >= :montoMin)
+            AND (:montoMax IS NULL OR COALESCE(f.montoTotal, 0) <= :montoMax)
             AND (:search IS NULL OR
                  LOWER(f.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%')) OR
                  LOWER(COALESCE(f.tipoFactura, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
@@ -51,6 +53,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
                                  @Param("tipoFactura") String tipoFactura,
                                  @Param("estadoPago") registro.cargarDatos.models.EstadoPago estadoPago,
                                  @Param("moneda") TipoMoneda moneda,
+                                 @Param("montoMin") Double montoMin,
+                                 @Param("montoMax") Double montoMax,
                                  @Param("search") String search,
                                  @Param("searchDate") java.time.LocalDate searchDate,
                                  Pageable pageable);
@@ -64,6 +68,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
             AND (:tipoFactura IS NULL OR f.tipoFactura = :tipoFactura)
             AND (:estadoPago IS NULL OR f.estadoPago = :estadoPago)
             AND (:moneda IS NULL OR f.moneda = :moneda)
+            AND (:montoMin IS NULL OR COALESCE(f.montoTotal, 0) >= :montoMin)
+            AND (:montoMax IS NULL OR COALESCE(f.montoTotal, 0) <= :montoMax)
             AND (:search IS NULL OR
                  LOWER(f.numeroDocumento) LIKE LOWER(CONCAT('%', :search, '%')) OR
                  LOWER(COALESCE(f.tipoFactura, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR
@@ -81,6 +87,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
                                  @Param("tipoFactura") String tipoFactura,
                                  @Param("estadoPago") registro.cargarDatos.models.EstadoPago estadoPago,
                                  @Param("moneda") TipoMoneda moneda,
+                                 @Param("montoMin") Double montoMin,
+                                 @Param("montoMax") Double montoMax,
                                  @Param("search") String search,
                                  @Param("searchDate") java.time.LocalDate searchDate);
 }

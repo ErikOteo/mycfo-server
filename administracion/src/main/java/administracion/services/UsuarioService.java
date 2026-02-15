@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 import administracion.dtos.ActualizarUsuarioDTO;
 import administracion.dtos.UsuarioDTO;
 import administracion.models.Empresa;
-import administracion.models.Rol;
 import administracion.models.Usuario;
 import administracion.repositories.EmpresaRepository;
 import administracion.repositories.UsuarioRepository;
@@ -59,26 +58,29 @@ public class UsuarioService {
     public UsuarioDTO crearOActualizarUsuario(UsuarioDTO usuarioDTO) {
         Usuario usuario = usuarioRepository.findBySub(usuarioDTO.getSub())
                 .orElse(new Usuario());
-        
+
         usuario.setSub(usuarioDTO.getSub());
         usuario.setNombre(usuarioDTO.getNombre());
         usuario.setEmail(usuarioDTO.getEmail());
         usuario.setTelefono(usuarioDTO.getTelefono());
-        
+
         // REGLA: Solo asignar rol ADMINISTRADOR si viene explícitamente y es válido
         // Por defecto, todos los usuarios nuevos empiezan como NORMAL
         if (usuarioDTO.getRol() != null) {
             usuario.setRol(usuarioDTO.getRol());
         } else {
-            usuario.setRol(Rol.NORMAL); // Rol por defecto para usuarios nuevos
+            usuario.setRol("COLABORADOR"); // Rol por defecto para usuarios nuevos
         }
-        
+
         usuario.setActivo(true);
 
         if (usuarioDTO.getEmpresaId() != null) {
-            Empresa empresa = empresaRepository.findById(usuarioDTO.getEmpresaId())
-                    .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
-            usuario.setEmpresa(empresa);
+            Long empId = usuarioDTO.getEmpresaId();
+            if (empId != null) {
+                Empresa empresa = empresaRepository.findById(empId)
+                        .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                usuario.setEmpresa(empresa);
+            }
         }
 
         Usuario guardado = usuarioRepository.save(usuario);
@@ -90,20 +92,63 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findBySub(sub)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
+        String oldRol = usuario.getRol();
+
         usuario.setNombre(dto.getNombre());
         usuario.setEmail(dto.getEmail());
         usuario.setTelefono(dto.getTelefono());
 
+        if (dto.getRol() != null) {
+            // Seguridad: No permitir que el usuario cambie su rol base (ej: de COLABORADOR
+            // a ADMINISTRADOR)
+            // El formato es ROL_BASE|PERM:JSON|COLOR:#HEX
+            String baseRolViejo = (oldRol != null && oldRol.contains("|")) ? oldRol.split("\\|")[0]
+                    : (oldRol != null ? oldRol : "COLABORADOR");
+            String baseRolNuevo = dto.getRol().contains("|") ? dto.getRol().split("\\|")[0] : dto.getRol();
+
+            if (baseRolViejo.equals(baseRolNuevo)) {
+                usuario.setRol(dto.getRol());
+            } else {
+                // Si el base es distinto, forzamos el base original pero permitimos el resto de
+                // la cadena (permisos/color)
+                String[] partesNuevas = dto.getRol().split("\\|");
+                StringBuilder rolReconstruido = new StringBuilder(baseRolViejo);
+                for (int i = 1; i < partesNuevas.length; i++) {
+                    rolReconstruido.append("|").append(partesNuevas[i]);
+                }
+                usuario.setRol(rolReconstruido.toString());
+            }
+        }
+
         if (dto.getEmpresaId() != null) {
-            Empresa empresa = empresaRepository.findById(dto.getEmpresaId())
-                    .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
-            usuario.setEmpresa(empresa);
+            Long empId = dto.getEmpresaId();
+            if (empId != null) {
+                Empresa empresa = empresaRepository.findById(empId)
+                        .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+                usuario.setEmpresa(empresa);
+            }
         }
 
         Usuario actualizado = usuarioRepository.save(usuario);
         cognitoService.actualizarUsuarioEnCognito(sub, dto.getNombre(), dto.getEmail(), dto.getTelefono());
 
         return convertirADTO(actualizado);
+    }
+
+    @Transactional
+    public void vincularUsuarioAEmpresa(String sub, Long empresaId, String rol) {
+        Usuario usuario = usuarioRepository.findBySub(sub)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        Empresa empresa = empresaRepository.findById(empresaId)
+                .orElseThrow(() -> new RuntimeException("Empresa no encontrada"));
+
+        usuario.setEmpresa(empresa);
+        // Validar rol básico
+        usuario.setRol(rol != null ? rol : "COLABORADOR");
+
+        usuarioRepository.save(usuario);
+        // Opcional: Actualizar en Cognito si el rol se guarda ahí
     }
 
     @Transactional
@@ -114,26 +159,32 @@ public class UsuarioService {
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
-        if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
+
+        if (usuarioActual.getRol() == null || !usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
             throw new RuntimeException("Solo los administradores pueden actualizar empleados");
+        }
+
+        // 🛡️ Protección de Propietario: Nadie puede modificar al dueño excepto él
+        // mismo vía perfil
+        if (Boolean.TRUE.equals(usuario.getEsPropietario()) && !subEmpleado.equals(subUsuarioActual)) {
+            throw new RuntimeException("No se puede modificar la cuenta del Propietario de la empresa.");
         }
 
         usuario.setNombre(dto.getNombre());
         usuario.setEmail(dto.getEmail());
         usuario.setTelefono(dto.getTelefono());
-        
+
         // Solo un administrador puede asignar rol de administrador
         if (dto.getRol() != null) {
-            if (dto.getRol() == Rol.ADMINISTRADOR && usuarioActual.getRol() != Rol.ADMINISTRADOR) {
+            if (dto.getRol().startsWith("ADMINISTRADOR") && !usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
                 throw new RuntimeException("Solo un administrador puede asignar el rol de administrador");
             }
-            
+
             // Validación adicional: no permitir que un usuario normal cambie roles
-            if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
+            if (!usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
                 throw new RuntimeException("Solo los administradores pueden cambiar roles de usuarios");
             }
-            
+
             usuario.setRol(dto.getRol());
         }
 
@@ -151,24 +202,54 @@ public class UsuarioService {
 
     @Transactional
     public void eliminarEmpleado(String subEmpleado, String subUsuarioActual) {
-        // Verificar que no se está eliminando a sí mismo
+        // Verificar que no se está desvinculando a sí mismo
         if (subEmpleado.equals(subUsuarioActual)) {
-            throw new RuntimeException("No puedes eliminar tu propia cuenta. Debe hacerlo otro administrador.");
+            throw new RuntimeException(
+                    "No puedes quitarte a ti mismo de la organización. Debe hacerlo otro administrador.");
         }
 
         Usuario usuario = usuarioRepository.findBySub(subEmpleado)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
+        // 🛡️ Protección de Propietario: Nadie puede desvincular al dueño
+        if (Boolean.TRUE.equals(usuario.getEsPropietario())) {
+            throw new RuntimeException(
+                    "No se puede desvincular al Propietario de la empresa. Primero debe ceder su rol de propietario.");
+        }
+
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
-        if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
-            throw new RuntimeException("Solo los administradores pueden eliminar empleados");
+
+        if (usuarioActual.getRol() == null || !usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
+            throw new RuntimeException("Solo los administradores pueden quitar miembros de la organización");
         }
 
-        usuarioRepository.delete(usuario);
-        cognitoService.eliminarUsuarioEnCognito(subEmpleado);
+        // DESVINCULACIÓN: En lugar de borrar, limpiamos los datos de pertenencia
+        usuario.setEmpresa(null);
+        usuario.setRol("COLABORADOR");
+        usuario.setEsPropietario(false);
+
+        usuarioRepository.save(usuario);
+        // NO se borra de Cognito para que el usuario pueda seguir usando su cuenta en
+        // MyCFO
+    }
+
+    @Transactional
+    public void abandonarEmpresa(String subUsuario) {
+        Usuario usuario = usuarioRepository.findBySub(subUsuario)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // DESVINCULACIÓN (Permitido para propietarios también, dejando la empresa
+        // acéfala si era el único)
+        // La validación de negocio se hace en el Frontend o se asume riesgo aceptado
+
+        // DESVINCULACIÓN
+        usuario.setEmpresa(null);
+        usuario.setRol("COLABORADOR");
+        usuario.setEsPropietario(false);
+
+        usuarioRepository.save(usuario);
     }
 
     @Transactional
@@ -181,11 +262,16 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findBySub(subEmpleado)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
+        // 🛡️ Protección de Propietario: Nadie puede desactivar al dueño
+        if (Boolean.TRUE.equals(usuario.getEsPropietario())) {
+            throw new RuntimeException("No se puede desactivar la cuenta del Propietario de la empresa.");
+        }
+
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
-        if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
+
+        if (usuarioActual.getRol() == null || !usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
             throw new RuntimeException("Solo los administradores pueden desactivar empleados");
         }
 
@@ -204,8 +290,8 @@ public class UsuarioService {
         // Verificar que el usuario actual es administrador
         Usuario usuarioActual = usuarioRepository.findBySub(subUsuarioActual)
                 .orElseThrow(() -> new RuntimeException("Usuario actual no encontrado"));
-        
-        if (usuarioActual.getRol() != Rol.ADMINISTRADOR) {
+
+        if (usuarioActual.getRol() == null || !usuarioActual.getRol().startsWith("ADMINISTRADOR")) {
             throw new RuntimeException("Solo los administradores pueden activar empleados");
         }
 
@@ -224,7 +310,8 @@ public class UsuarioService {
         dto.setTelefono(usuario.getTelefono());
         dto.setRol(usuario.getRol());
         dto.setActivo(usuario.getActivo());
-        
+        dto.setEsPropietario(usuario.getEsPropietario());
+
         if (usuario.getEmpresa() != null) {
             dto.setEmpresaId(usuario.getEmpresa().getId());
             dto.setEmpresaNombre(usuario.getEmpresa().getNombre());
@@ -232,7 +319,15 @@ public class UsuarioService {
             dto.setEmpresaCondicionIVA(usuario.getEmpresa().getCondicionIVA());
             dto.setEmpresaDomicilio(usuario.getEmpresa().getDomicilio());
         }
-        
+
         return dto;
+    }
+
+    public void cambiarPassword(String token, String oldPassword, String newPassword) {
+        String accessToken = token;
+        if (token != null && token.startsWith("Bearer ")) {
+            accessToken = token.substring(7);
+        }
+        cognitoService.cambiarPassword(accessToken, oldPassword, newPassword);
     }
 }

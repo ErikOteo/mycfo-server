@@ -123,6 +123,7 @@ export default function MpToolbar({
                   color: "text.primary",
                   bgcolor: "background.paper",
                   minWidth: 0,
+                  lineHeight: 1.2,
                   "&:hover": {
                     borderColor: "primary.main",
                     bgcolor: "action.hover",
@@ -200,6 +201,7 @@ export default function MpToolbar({
             py: 1.4,
             fontSize: "1rem",
             ml: 0,
+            lineHeight: 1.2,
           }}
         >
           Importar

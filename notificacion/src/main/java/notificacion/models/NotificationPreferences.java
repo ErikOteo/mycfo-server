@@ -73,6 +73,12 @@ public class NotificationPreferences {
     @Column(name = "digest_time")
     private LocalTime digestTime = LocalTime.of(9, 0); // 9:00 AM por defecto
 
+    @Column(name = "movement_high_threshold")
+    private java.math.BigDecimal movementHighThreshold;
+
+    @Column(name = "movement_high_threshold_usd")
+    private java.math.BigDecimal movementHighThresholdUsd;
+
     // Email del usuario (configurable)
     @Column(name = "user_email")
     private String userEmail;

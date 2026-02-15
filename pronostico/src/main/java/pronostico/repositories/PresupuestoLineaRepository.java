@@ -15,4 +15,10 @@ public interface PresupuestoLineaRepository extends JpaRepository<PresupuestoLin
   @Modifying
   @Query("DELETE FROM PresupuestoLinea pl WHERE pl.presupuesto.id IN :presupuestoIds")
   void deleteByPresupuestoIds(@Param("presupuestoIds") List<Long> presupuestoIds);
+
+  @Query("SELECT COALESCE(SUM(pl.montoEstimado),0) FROM PresupuestoLinea pl WHERE pl.presupuesto.id = :presupuestoId AND pl.tipo = 'EGRESO'")
+  java.math.BigDecimal sumEstimadoEgreso(@Param("presupuestoId") Long presupuestoId);
+
+  @Query("SELECT COALESCE(SUM(pl.montoReal),0) FROM PresupuestoLinea pl WHERE pl.presupuesto.id = :presupuestoId AND pl.tipo = 'EGRESO'")
+  java.math.BigDecimal sumRealEgreso(@Param("presupuestoId") Long presupuestoId);
 }

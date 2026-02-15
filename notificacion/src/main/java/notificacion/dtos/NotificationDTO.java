@@ -7,6 +7,7 @@ public record NotificationDTO(
         Long id,
         String title,
         String body,
+        String type,      // código original del tipo
         String badge,      // etiqueta para UI
         boolean is_read,
         Instant date,

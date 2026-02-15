@@ -39,7 +39,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 2️⃣ Versión + Intereses + Cláusula */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Versión *</FormLabel>
           <CustomSelect
@@ -81,7 +81,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 3️⃣ Monto total + Moneda + Fecha vencimiento */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
           <OutlinedInput
@@ -125,7 +125,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 4️⃣ Datos del deudor */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre deudor *</FormLabel>
           <OutlinedInput
@@ -155,7 +155,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 5️⃣ Datos del beneficiario */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre beneficiario *</FormLabel>
           <OutlinedInput
@@ -199,7 +199,7 @@ export default function FormPagare({ formData, setFormData, errors = {} }) {
       </Box>
 
       {/* 7️⃣ Factura asociada */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Factura asociada</FormLabel>
           <CustomSelect

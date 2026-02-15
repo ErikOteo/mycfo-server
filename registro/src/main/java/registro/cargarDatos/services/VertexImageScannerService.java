@@ -81,7 +81,7 @@ public class VertexImageScannerService {
 
             log.info("Respuesta recibida de Vertex AI en {} ms", nanosToMillis(requestEnd - requestStart));
             String raw = extractTextFromResponse(response.getBody());
-            log.info("Respuesta raw de Vertex (recortada): {}", truncate(raw, 2000));
+            log.info("Respuesta raw de Vertex (completa): {}", raw);
             long parseStart = System.nanoTime();
             Map<String, Object> schema = expectedSchema(scanType);
             Map<String, Object> normalized = extractAndFixJson(raw, schema);
@@ -97,6 +97,68 @@ public class VertexImageScannerService {
         } catch (Exception ex) {
             log.error("Error consultando Vertex AI", ex);
             throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al procesar la imagen.");
+        }
+    }
+
+    public ImageScanResult scanText(String text, ScanType scanType) {
+        long totalStart = System.nanoTime();
+        if (!StringUtils.hasText(text)) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "No se recibio contenido de texto.");
+        }
+        if (!StringUtils.hasText(properties.getProjectId())) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "vertex.ai.project-id no esta configurado.");
+        }
+        if (!StringUtils.hasText(properties.getLocation())) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "vertex.ai.location no esta configurado.");
+        }
+
+        String prompt = buildPromptForText(scanType);
+        log.info("Prompt seleccionado para {}:\n{}", scanType, prompt);
+        String endpoint = String.format(
+                "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+                properties.getLocation(),
+                properties.getProjectId(),
+                properties.getLocation(),
+                properties.getModel()
+        );
+
+        String token = resolveAccessToken();
+        Map<String, Object> requestBody = buildRequestBodyForText(prompt, text);
+
+        try {
+            long requestStart = System.nanoTime();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            String payload = objectMapper.writeValueAsString(requestBody);
+            log.info("Enviando texto a Vertex AI. Tipo: {}, Endpoint: {}", scanType, endpoint);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    endpoint,
+                    HttpMethod.POST,
+                    new HttpEntity<>(payload, headers),
+                    String.class
+            );
+            long requestEnd = System.nanoTime();
+
+            log.info("Respuesta recibida de Vertex AI en {} ms", nanosToMillis(requestEnd - requestStart));
+            String raw = extractTextFromResponse(response.getBody());
+            log.info("Respuesta raw de Vertex (completa): {}", raw);
+            long parseStart = System.nanoTime();
+            Map<String, Object> schema = expectedSchema(scanType);
+            Map<String, Object> normalized = extractAndFixJson(raw, schema);
+            List<String> warnings = buildWarnings(normalized, requiredFields(scanType));
+            long parseEnd = System.nanoTime();
+
+            log.info("Parseo de respuesta completado en {} ms", nanosToMillis(parseEnd - parseStart));
+            log.info("Escaneo total completado en {} ms", nanosToMillis(parseEnd - totalStart));
+            return new ImageScanResult(raw, normalized, warnings);
+        } catch (RestClientResponseException ex) {
+            log.error("Vertex AI respondio con error HTTP {}: {}", ex.getRawStatusCode(), ex.getResponseBodyAsString());
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al consultar Vertex AI.");
+        } catch (Exception ex) {
+            log.error("Error consultando Vertex AI", ex);
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Error al procesar el texto.");
         }
     }
 
@@ -144,6 +206,26 @@ public class VertexImageScannerService {
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", properties.getTemperature());
         generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
+        generationConfig.put("responseMimeType", "application/json");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("contents", List.of(content));
+        body.put("generationConfig", generationConfig);
+        return body;
+    }
+
+    private Map<String, Object> buildRequestBodyForText(String prompt, String text) {
+        Map<String, Object> textPart = new LinkedHashMap<>();
+        textPart.put("text", prompt + "\n\n" + text);
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("role", "user");
+        content.put("parts", List.of(textPart));
+
+        Map<String, Object> generationConfig = new LinkedHashMap<>();
+        generationConfig.put("temperature", properties.getTemperature());
+        generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
+        generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("contents", List.of(content));
@@ -156,18 +238,39 @@ public class VertexImageScannerService {
             return "";
         }
         JsonNode root = objectMapper.readTree(json);
-        JsonNode textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
-        if (textNode.isMissingNode()) {
+        JsonNode candidates = root.path("candidates");
+        if (!candidates.isArray()) {
             return "";
         }
-        return textNode.asText();
+        StringBuilder combined = new StringBuilder();
+        for (JsonNode candidate : candidates) {
+            JsonNode parts = candidate.path("content").path("parts");
+            if (!parts.isArray()) {
+                continue;
+            }
+            for (JsonNode part : parts) {
+                JsonNode textNode = part.path("text");
+                if (textNode.isMissingNode()) {
+                    continue;
+                }
+                String text = textNode.asText();
+                if (text == null || text.isBlank()) {
+                    continue;
+                }
+                if (!combined.isEmpty()) {
+                    combined.append("\n");
+                }
+                combined.append(text);
+            }
+        }
+        return combined.toString();
     }
 
     private Map<String, Object> expectedSchema(ScanType type) {
         return switch (type) {
             case FACTURA -> buildSchema(
                     "numeroDocumento", "versionDocumento", "tipoFactura", "fechaEmision", "montoTotal", "moneda",
-                    "categoria", "vendedorNombre", "vendedorCuit", "vendedorCondicionIVA", "vendedorDomicilio",
+                    "categoria", "descripcion", "vendedorNombre", "vendedorCuit", "vendedorCondicionIVA", "vendedorDomicilio",
                     "compradorNombre", "compradorCuit", "compradorCondicionIVA", "compradorDomicilio"
             );
             case INGRESO -> buildSchema(
@@ -221,6 +324,10 @@ public class VertexImageScannerService {
         String sanitized = FENCE_PATTERN.matcher(text).replaceAll("").replace("```", "").trim();
         int start = sanitized.indexOf('{');
         if (start < 0) {
+            Map<String, Object> fallback = extractByKeys(sanitized, schema);
+            if (!fallback.isEmpty()) {
+                return normalizeSchema(fallback, schema);
+            }
             return normalizeSchema(Collections.emptyMap(), schema);
         }
         String candidate = sanitized.substring(start);
@@ -250,7 +357,31 @@ public class VertexImageScannerService {
         if (parsed != null) {
             return normalizeSchema(parsed, schema);
         }
+        Map<String, Object> fallback = extractByKeys(repaired, schema);
+        if (!fallback.isEmpty()) {
+            return normalizeSchema(fallback, schema);
+        }
         return normalizeSchema(Collections.emptyMap(), schema);
+    }
+
+    private Map<String, Object> extractByKeys(String text, Map<String, Object> schema) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (!StringUtils.hasText(text) || schema == null || schema.isEmpty()) {
+            return result;
+        }
+        for (String key : schema.keySet()) {
+            Pattern pattern = Pattern.compile("(?i)\"?" + Pattern.quote(key) + "\"?\\s*:\\s*(\"([^\"]*)\"|([^,}\\n]+))");
+            java.util.regex.Matcher matcher = pattern.matcher(text);
+            if (!matcher.find()) {
+                continue;
+            }
+            String value = matcher.group(2) != null ? matcher.group(2) : matcher.group(3);
+            if (value != null) {
+                value = value.trim();
+            }
+            result.put(key, value);
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -272,9 +403,6 @@ public class VertexImageScannerService {
             Object normalized = normalizeValue(key, value);
             result.put(key, normalized);
         }
-        if (result.containsKey("moneda") && result.get("moneda") == null) {
-            result.put("moneda", "ARS");
-        }
         return result;
     }
 
@@ -284,11 +412,18 @@ public class VertexImageScannerService {
         }
         if (value instanceof String str) {
             String trimmed = str.trim();
-            if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed)) {
+            if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed) || isPlaceholderValue(trimmed)) {
                 return null;
             }
+            if (isLimitedOptionField(key)) {
+                return normalizeLimitedOption(key, trimmed);
+            }
             if (isNumericField(key)) {
-                return normalizeNumberString(trimmed);
+                String normalized = normalizeNumberString(trimmed);
+                if (!StringUtils.hasText(normalized)) {
+                    return null;
+                }
+                return normalized;
             }
             return trimmed;
         }
@@ -296,6 +431,89 @@ public class VertexImageScannerService {
             return number;
         }
         return value;
+    }
+
+    private boolean isLimitedOptionField(String key) {
+        return Set.of("tipoFactura", "versionDocumento", "medioPago", "periodicidad", "moneda").contains(key);
+    }
+
+    private boolean isPlaceholderValue(String value) {
+        return "monto".equalsIgnoreCase(value);
+    }
+
+    private String normalizeLimitedOption(String key, String raw) {
+        String lower = raw.toLowerCase();
+        return switch (key) {
+            case "moneda" -> {
+                if (lower.contains("usd") || lower.contains("dolar") || lower.contains("dólar") || lower.contains("u$s")) {
+                    yield "USD";
+                }
+                if (lower.contains("ars") || lower.contains("peso")) {
+                    yield "ARS";
+                }
+                yield null;
+            }
+            case "tipoFactura" -> {
+                java.util.regex.Matcher matcher = Pattern.compile("(?i)\\b([ABC])\\b").matcher(raw);
+                if (matcher.find()) {
+                    yield matcher.group(1).toUpperCase();
+                }
+                yield null;
+            }
+            case "versionDocumento" -> {
+                if (lower.contains("original")) {
+                    yield "Original";
+                }
+                if (lower.contains("duplicado") || lower.contains("dup") || lower.contains("copia")) {
+                    yield "Duplicado";
+                }
+                yield null;
+            }
+            case "medioPago" -> {
+                if (lower.contains("efectivo") || containsWord(lower, "cash")) {
+                    yield "Efectivo";
+                }
+                if (lower.contains("transferencia") || lower.contains("transf") || lower.contains("banco") || lower.contains("cbu")) {
+                    yield "Transferencia";
+                }
+                if (lower.contains("cheque")) {
+                    yield "Cheque";
+                }
+                if (lower.contains("tarjeta") || lower.contains("debito") || lower.contains("débito") || lower.contains("credito") || lower.contains("crédito")) {
+                    yield "Tarjeta";
+                }
+                if (lower.contains("mercadopago") || lower.contains("mercado pago") || containsWord(lower, "mp")) {
+                    yield "MercadoPago";
+                }
+                if (lower.contains("otro")) {
+                    yield "Otro";
+                }
+                yield null;
+            }
+            case "periodicidad" -> {
+                if (lower.contains("mensual")) {
+                    yield "Mensual";
+                }
+                if (lower.contains("bimestral")) {
+                    yield "Bimestral";
+                }
+                if (lower.contains("trimestral")) {
+                    yield "Trimestral";
+                }
+                if (lower.contains("semestral")) {
+                    yield "Semestral";
+                }
+                if (lower.contains("anual")) {
+                    yield "Anual";
+                }
+                yield null;
+            }
+            default -> null;
+        };
+    }
+
+    private boolean containsWord(String text, String word) {
+        return Pattern.compile("(?i)\\b" + Pattern.quote(word) + "\\b").matcher(text).find();
     }
 
     private List<String> buildWarnings(Map<String, Object> campos, Set<String> required) {
@@ -353,58 +571,39 @@ public class VertexImageScannerService {
     private String buildPrompt(ScanType type) {
         return switch (type) {
             case FACTURA -> """
-                Sos un sistema experto en extracción de datos fiscales de Argentina.
+                Sos un sistema experto en extraccion de datos fiscales de Argentina.
 
-                Analizá la imagen de una FACTURA y devolvé exclusivamente un JSON válido con esta estructura exacta:
+                Analiza la imagen de una FACTURA y devolve exclusivamente un JSON valido con esta estructura exacta:
 
                 {
-                "numeroDocumento": "",
-                "versionDocumento": "",
-                "tipoFactura": "",
-                "fechaEmision": "",
                 "montoTotal": "",
                 "moneda": "",
                 "categoria": "",
-                "vendedorNombre": "",
-                "vendedorCuit": "",
-                "vendedorCondicionIVA": "",
-                "vendedorDomicilio": "",
+                "descripcion":"",
+                "versionDocumento": "",
                 "compradorNombre": "",
-                "compradorCuit": "",
+                "vendedorNombre": "",
+                "vendedorCondicionIVA": "",
                 "compradorCondicionIVA": "",
-                "compradorDomicilio": ""
+                "vendedorCuit": "",
+                "vendedorDomicilio": "",
+                "compradorCuit": "",
+                "compradorDomicilio": "",
+                "numeroDocumento": "",
+                "fechaEmision": "",
                 }
 
                 REGLAS GENERALES:
                 - No agregar texto fuera del JSON.
-                - Si un dato no está presente, usar null.
-                - Interpretar sinónimos cuando tenga sentido.
+                - Si un dato no esta presente, usar null.
+                - Interpretar sinonimos cuando tenga sentido.
                 - No inventar datos.
 
-                REGLAS ESPECÍFICAS:
-
-                TIPO DE FACTURA:
-                - tipoFactura solo puede ser A, B, C, M o null.
-                - versionDocumento solo puede ser Original, Duplicado o null.
-
-                FECHA:
-                - fechaEmision debe estar en formato YYYY-MM-DDTHH:mm:ss.
-                - Si no hay hora, usar 00:00:00.
-
-                MONEDA:
-                - Si no se indica otra moneda, usar ARS.
-
-                MONTO TOTAL (MUY IMPORTANTE):
-                - El montoTotal es el importe final que debe pagarse.
-                - Puede aparecer como: TOTAL, TOTAL A PAGAR, IMPORTE TOTAL, IMPORTE, SUBTOTAL, NETO u otros sinónimos.
-                - Si hay más de un importe monetario:
-                - Elegir el MAYOR valor numérico asociado a la factura.
-                - Si hay subtotal + IVA:
-                - Usar el valor final resultante.
-                - Si solo hay un importe monetario visible:
-                - Ese es el montoTotal.
-                - Ignorar porcentajes, CUIT, números de factura y fechas.
-                - El monto debe ser numérico, con punto decimal (ej: 12345.67).
+                REGLAS ESPECIFICAS:
+                - versionDocumento solo puede ser Original si se menciona que compre algo, Duplicado si se menciona que vendi algo.
+                - fechaEmision debe estar en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
+                - montoTotal debe ser numerico con punto decimal.
+                - Si hay varios importes, usar el mayor correspondiente al total a pagar.
                 """;
             case INGRESO -> """
                 Sos un sistema de extraccion de datos para un movimiento de INGRESO.
@@ -423,13 +622,14 @@ public class VertexImageScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
                 - Si no hay algun campo especifico, interprentar siempre que tenga sentido (ya que puede haber sinonimos)
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
                 - montoTotal debe ser numero con punto decimal.
                 - medioPago debe ser uno de: Efectivo, Transferencia, Cheque, Tarjeta, MercadoPago, Otro.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en la imagen; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en la imagen.
                 """;
             case EGRESO -> """
                 Sos un sistema de extraccion de datos para un movimiento de EGRESO.
@@ -448,13 +648,14 @@ public class VertexImageScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
                 - Si no hay algun campo especifico, interprentar siempre que tenga sentido (ya que puede haber sinonimos)
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
                 - montoTotal debe ser numero con punto decimal.
                 - medioPago debe ser uno de: Efectivo, Transferencia, Cheque, Tarjeta, MercadoPago, Otro.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en la imagen; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en la imagen.
                 """;
             case DEUDA -> """
                 Sos un sistema de extraccion de datos para un movimiento de DEUDA.
@@ -478,7 +679,7 @@ public class VertexImageScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
                 - Si no hay algun campo especifico, interprentar siempre que tenga sentido (ya que puede haber sinonimos)
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
@@ -486,7 +687,8 @@ public class VertexImageScannerService {
                 - montoTotal y montoCuota deben ser numeros con punto decimal.
                 - tasaInteres es porcentaje (ej: 45.5).
                 - periodicidad debe ser: Mensual, Bimestral, Trimestral, Semestral, Anual.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en la imagen; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en la imagen.
                 """;
             case ACREENCIA -> """
                 Sos un sistema de extraccion de datos para un movimiento de ACREENCIA.
@@ -510,7 +712,7 @@ public class VertexImageScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
                 - Si no hay algun campo especifico, interprentar siempre que tenga sentido (ya que puede haber sinonimos)
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
@@ -518,7 +720,8 @@ public class VertexImageScannerService {
                 - montoTotal y montoCuota deben ser numeros con punto decimal.
                 - tasaInteres es porcentaje (ej: 45.5).
                 - periodicidad debe ser: Mensual, Bimestral, Trimestral, Semestral, Anual.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en la imagen; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en la imagen.
                 """;
             case MOVIMIENTO -> """
                 Sos un sistema de extraccion de datos para un movimiento general.
@@ -538,14 +741,58 @@ public class VertexImageScannerService {
                 }
 
                 Reglas:
-                - Si un dato no esta presente, usar null.
+                - Si un dato no esta presente, dejar null (no completar ni inventar).
                 - Si no hay algun campo especifico, interprentar siempre que tenga sentido (ya que puede haber sinonimos)
                 - No agregar texto fuera del JSON.
                 - fechaEmision en formato YYYY-MM-DD.
                 - montoTotal debe ser numero con punto decimal.
                 - medioPago debe ser uno de: Efectivo, Transferencia, Cheque, Tarjeta, MercadoPago, Otro.
-                - moneda en ARS si no se identifica otra.
+                - moneda solo si se identifica explicitamente en la imagen; si no, null.
+                - descripcion: resumir el concepto principal; si no aparece, podés inferir una descripcion breve y creativa basada en la imagen.
                 """;
+        };
+    }
+
+    private String buildPromptForText(ScanType type) {
+        return switch (type) {
+            case FACTURA -> """
+                Sos un sistema experto en extraccion de datos fiscales de Argentina.
+
+                Analiza el TEXTO EXTRAIDO de una FACTURA (PDF/DOC/DOCX) y devolve SOLO un JSON valido con esta estructura exacta:
+
+                {
+                "montoTotal": "",
+                "moneda": "",
+                "categoria": "",
+                "tipoFactura": "",
+                "versionDocumento": "",
+                "compradorNombre": "",
+                "vendedorNombre": "",
+                "vendedorCondicionIVA": "",
+                "compradorCondicionIVA": "",
+                "vendedorCuit": "",
+                "vendedorDomicilio": "",
+                "compradorCuit": "",
+                "compradorDomicilio": "",
+                "numeroDocumento": "",
+                "fechaEmision": "",
+                "descripcion": ""
+                }
+
+                REGLAS GENERALES:
+                - No agregar texto fuera del JSON.
+                - Si un dato no esta presente, usar null.
+                - Interpretar sinonimos cuando tenga sentido.
+                - No inventar datos.
+
+                REGLAS ESPECIFICAS:
+                - versionDocumento: "Original" si el texto indica que YO compre; "Duplicado" si el texto indica que YO vendi. Si no se puede inferir, null.
+                - tipoFactura: "A", "B" o "C" segun el texto. Si no se puede inferir, null.
+                - fechaEmision en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
+                - montoTotal numerico con punto decimal. Si hay varios importes, usar el total a pagar.
+                - descripcion: si no aparece, inferi una descripcion breve y creativa basada en el texto.
+                """;
+            default -> buildPrompt(type);
         };
     }
 

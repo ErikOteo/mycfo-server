@@ -11,4 +11,7 @@ import java.util.List;
 public interface ReciboRepository extends JpaRepository<Recibo, Long> {
 
     List<Recibo> findByMoneda(TipoMoneda moneda);
+
+    List<Recibo> findByOrganizacionId(Long organizacionId);
+    List<Recibo> findByOrganizacionIdAndMoneda(Long organizacionId, TipoMoneda moneda);
 }

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, IconButton, Box, TextField, Typography, InputAdornment
+  Paper, IconButton, Box, TextField, Typography, InputAdornment, Snackbar, Alert
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
@@ -18,22 +17,17 @@ export default function TablaRegistros() {
   const [valoresEditados, setValoresEditados] = useState({});
   const [categorias, setCategorias] = useState([]);
   const [filtros, setFiltros] = useState({
-    tipo: "",
-    monto: "",
-    fechaEmision: "",
-    categoria: "",
-    origen: "",
-    destino: "",
     medioPago: ""
   });
-  
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
+
   // Opciones de categorías (pueden venir de backend o estar hardcodeadas)
-  const categorias = ["Transporte", "Educación", "Ocio", "Salud", "Alimentación"];
+  const categoriasHardcoded = ["Transporte", "Educación", "Ocio", "Salud", "Alimentación"];
   const tipos = ["Ingreso", "Gasto"];
   const mediosPago = ["Efectivo", "Tarjeta", "Transferencia"];
 
   useEffect(() => {
-    fetch(`${API_CONFIG.registro}/registros`) 
+    fetch(`${API_CONFIG.registro}/registros`)
       .then((res) => res.json())
       .then((data) => setRegistros(data))
       .catch((err) => console.error("Error cargando registros:", err));
@@ -83,7 +77,7 @@ export default function TablaRegistros() {
       setValoresEditados({});
     } catch (err) {
       console.error(err);
-      alert("Error al guardar el registro");
+      setSnackbar({ open: true, message: "Error al guardar el registro", severity: "error" });
     }
   };
 
@@ -98,7 +92,7 @@ export default function TablaRegistros() {
   const registrosFiltrados = registros.filter(registro => {
     return Object.entries(filtros).every(([campo, valor]) => {
       if (!valor) return true;
-      
+
       const valorRegistro = String(registro[campo] || "").toLowerCase();
       return valorRegistro.includes(valor.toLowerCase());
     });
@@ -109,12 +103,12 @@ export default function TablaRegistros() {
       <Typography variant="h4" component="h1" gutterBottom>
         Registros Financieros
       </Typography>
-      
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
-            
-            
+
+
             {/* Fila de encabezados */}
             <TableRow>
               <TableCell>Tipo</TableCell>
@@ -147,7 +141,7 @@ export default function TablaRegistros() {
                     row.tipo
                   )}
                 </TableCell>
-                
+
                 {/* Monto */}
                 <TableCell>
                   {editandoId === row.id ? (
@@ -166,7 +160,7 @@ export default function TablaRegistros() {
                     row.montoTotal
                   )}
                 </TableCell>
-                
+
                 {/* Fecha Emisión */}
                 <TableCell>
                   {editandoId === row.id ? (
@@ -183,12 +177,12 @@ export default function TablaRegistros() {
                     row.fechaEmision
                   )}
                 </TableCell>
-                
+
                 {/* Categoría */}
                 <TableCell>
                   {editandoId === row.id ? (
                     <CategoriaAutoComplete
-                      options={categorias}
+                      options={categoriasHardcoded}
                       value={valoresEditados.categoria}
                       onChange={(v) =>
                         setValoresEditados((prev) => ({
@@ -201,7 +195,7 @@ export default function TablaRegistros() {
                     row.categoria
                   )}
                 </TableCell>
-                
+
                 {/* Origen */}
                 <TableCell>
                   {editandoId === row.id ? (
@@ -219,7 +213,7 @@ export default function TablaRegistros() {
                     row.origen
                   )}
                 </TableCell>
-                
+
                 {/* Destino */}
                 <TableCell>
                   {editandoId === row.id ? (
@@ -237,7 +231,7 @@ export default function TablaRegistros() {
                     row.destino
                   )}
                 </TableCell>
-                
+
                 {/* Medio Pago */}
                 <TableCell>
                   {editandoId === row.id ? (
@@ -255,7 +249,7 @@ export default function TablaRegistros() {
                     row.medioPago
                   )}
                 </TableCell>
-                
+
                 {/* Acciones */}
                 <TableCell align="right">
                   {editandoId === row.id ? (
@@ -278,6 +272,21 @@ export default function TablaRegistros() {
           </TableBody>
         </Table>
       </TableContainer>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

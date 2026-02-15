@@ -121,6 +121,9 @@ export const mpApi = {
   importPaymentsByMonth: ({ month, year }) =>
     request("/api/mp/import", { method: "POST", body: { month, year } }),
 
+  importWalletByMonth: ({ month, year }) =>
+    request("/api/mp/import/wallet", { method: "POST", body: { month, year } }),
+
   importPaymentById: (paymentId) =>
     request("/api/mp/import", { method: "POST", body: { paymentId } }),
 

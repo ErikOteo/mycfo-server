@@ -38,7 +38,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
     }
 
     @Override
-    public int importRange(Long userIdApp, LocalDate from, LocalDate to) {
+    public int importRange(String userIdApp, LocalDate from, LocalDate to) {
         MpAccountLink link = requireLink(userIdApp);
 
         ZoneId zone = ZoneId.systemDefault();
@@ -56,10 +56,14 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
 
             boolean reachedOlder = false;
             for (Map<String,Object> m : data) {
-                Instant when = parseInstant(coalesce(
-                        m.get("date"), m.get("date_event"), m.get("posted_date"), m.get("created")
-                ));
-                if (when == null || when.isBefore(fromI)) { reachedOlder = true; continue; }
+                Instant when = extractMovementInstant(m);
+                if (when == null) {
+                    // Algunos movimientos no traen fecha en claves estándar; no cortamos paginado por eso.
+                    upsertMovement(m, link);
+                    imported++;
+                    continue;
+                }
+                if (when.isBefore(fromI)) { reachedOlder = true; continue; }
                 if (when.isBefore(toI)) {
                     upsertMovement(m, link);
                     imported++;
@@ -71,7 +75,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
     }
 
     @Override
-    public int importByMovementId(Long userIdApp, String movementId) {
+    public int importByMovementId(String userIdApp, String movementId) {
         MpAccountLink link = requireLink(userIdApp);
 
         // Probamos endpoints por ID
@@ -96,7 +100,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
 
     /* ============================ helpers ============================ */
 
-    private MpAccountLink requireLink(Long userIdApp) {
+    private MpAccountLink requireLink(String userIdApp) {
         return linkRepo.findByUserIdApp(userIdApp)
                 .orElseThrow(() -> new IllegalStateException("No hay cuenta vinculada de Mercado Pago"));
     }
@@ -210,7 +214,15 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
     }
 
     private void upsertMovement(Map<String,Object> m, MpAccountLink link) {
-        String id = asString(coalesce(m.get("id"), m.get("movement_id"), m.get("transaction_id"), m.get("uuid")));
+        String id = asString(coalesce(
+                m.get("id"),
+                m.get("movement_id"),
+                m.get("transaction_id"),
+                m.get("operation_id"),
+                m.get("operationId"),
+                m.get("uuid"),
+                m.get("number")
+        ));
         if (id == null || id.isBlank()) return;
 
         MpWalletMovement wm = repo.findByMpMovementId(id).orElseGet(MpWalletMovement::new);
@@ -219,7 +231,7 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
         wm.setAccountLink(link);
         wm.setMpMovementId(id);
 
-        Instant when = parseInstant(coalesce(m.get("date"), m.get("date_event"), m.get("posted_date"), m.get("created")));
+        Instant when = extractMovementInstant(m);
         wm.setDateEvent(when);
 
         wm.setAmount(asBigDecimal(coalesce(m.get("amount"), m.get("transaction_amount"), m.get("net_amount"))));
@@ -238,6 +250,22 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
 
     /* ===== utils ===== */
     private Object coalesce(Object... xs) { for (Object x : xs) if (x != null) return x; return null; }
+    private Instant extractMovementInstant(Map<String,Object> m) {
+        return parseInstant(coalesce(
+                m.get("date"),
+                m.get("date_event"),
+                m.get("posted_date"),
+                m.get("created"),
+                m.get("date_created"),
+                m.get("created_at"),
+                m.get("creation_date"),
+                m.get("operation_date"),
+                m.get("last_updated"),
+                m.get("date_last_updated"),
+                m.get("datetime"),
+                m.get("timestamp")
+        ));
+    }
     private String enc(String s){ return URLEncoder.encode(s, StandardCharsets.UTF_8); }
     private String asString(Object o){ return o==null?null:String.valueOf(o); }
     private BigDecimal asBigDecimal(Object o){
@@ -247,6 +275,13 @@ public class MpWalletMovementImportServiceImpl implements MpWalletMovementImport
     }
     private Instant parseInstant(Object o){
         if (o==null) return null;
+        if (o instanceof Number n) {
+            long v = n.longValue();
+            try {
+                if (Math.abs(v) > 10_000_000_000L) return Instant.ofEpochMilli(v);
+                return Instant.ofEpochSecond(v);
+            } catch(Exception ignored){}
+        }
         String s = String.valueOf(o);
         try { return OffsetDateTime.parse(s).toInstant(); } catch(Exception ignored){}
         try { return Instant.parse(s); } catch(Exception ignored){}

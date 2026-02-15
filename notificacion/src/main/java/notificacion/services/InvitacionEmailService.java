@@ -35,7 +35,8 @@ public class InvitacionEmailService {
 
     /**
      * Envía invitaciones a una lista de emails
-     * @param emails Lista de emails a los que enviar invitaciones
+     * 
+     * @param emails              Lista de emails a los que enviar invitaciones
      * @param subUsuarioInvitador Sub del usuario que envía las invitaciones
      */
     public void enviarInvitaciones(List<String> emails, String subUsuarioInvitador) {
@@ -43,18 +44,18 @@ public class InvitacionEmailService {
             System.out.println("🚀 [INVITACIONES] Iniciando proceso de invitaciones");
             System.out.println("📧 [INVITACIONES] Emails a procesar: " + emails);
             System.out.println("👤 [INVITACIONES] Usuario invitador: " + subUsuarioInvitador);
-            
+
             // 1. Obtener nombre de empresa desde administración
             String nombreEmpresa = obtenerNombreEmpresa(subUsuarioInvitador);
             System.out.println("🏢 [INVITACIONES] Nombre de empresa obtenido: " + nombreEmpresa);
-            
+
             // 2. Enviar email a cada dirección
             for (String email : emails) {
                 enviarEmailInvitacion(email, nombreEmpresa, subUsuarioInvitador);
             }
-            
+
             System.out.println("✅ [INVITACIONES] Proceso completado exitosamente");
-            
+
         } catch (Exception e) {
             System.err.println("❌ [INVITACIONES] Error en proceso de invitaciones: " + e.getMessage());
             e.printStackTrace();
@@ -68,15 +69,15 @@ public class InvitacionEmailService {
     private String obtenerNombreEmpresa(String subUsuario) {
         try {
             System.out.println("🔍 [EMPRESA] Obteniendo nombre de empresa para usuario: " + subUsuario);
-            
+
             String url = administracionUrl + "/api/empresas/nombre-por-usuario/" + subUsuario;
             System.out.println("🔗 [EMPRESA] URL: " + url);
-            
+
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
+
             System.out.println("📊 [EMPRESA] Response status: " + response.getStatusCode());
             System.out.println("📄 [EMPRESA] Response body: " + response.getBody());
-            
+
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 String nombreEmpresa = (String) response.getBody().get("nombreEmpresa");
                 System.out.println("✅ [EMPRESA] Nombre obtenido: " + nombreEmpresa);
@@ -84,7 +85,7 @@ public class InvitacionEmailService {
             } else {
                 throw new RuntimeException("Error obteniendo nombre de empresa: " + response.getStatusCode());
             }
-            
+
         } catch (Exception e) {
             System.err.println("❌ [EMPRESA] Error obteniendo nombre de empresa: " + e.getMessage());
             e.printStackTrace();
@@ -100,14 +101,14 @@ public class InvitacionEmailService {
             System.out.println("📧 [EMAIL-INDIVIDUAL] Preparando email para: " + email);
             System.out.println("🏢 [EMAIL-INDIVIDUAL] Empresa: " + empresaNombre);
             System.out.println("📤 [EMAIL-INDIVIDUAL] From email: " + fromEmail);
-            
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromEmail);
             helper.setTo(email);
             helper.setSubject("Invitación para unirse a " + empresaNombre + " en MyCFO");
-            
+
             System.out.println("📝 [EMAIL-INDIVIDUAL] Subject: " + helper.getMimeMessage().getSubject());
 
             // Crear contexto para el template
@@ -115,29 +116,40 @@ public class InvitacionEmailService {
             context.setVariable("empresaNombre", empresaNombre);
             context.setVariable("email", email);
             context.setVariable("frontendUrl", frontendUrl);
-            
-            // Crear link de invitación (sin token por ahora, solo con empresa)
-            String invitacionLink = frontendUrl + "/#/signup?empresa=" + empresaNombre.replaceAll(" ", "%20");
+
+            // Asegurar que frontendUrl no tenga una barra al final para concatenar
+            // limpiamente
+            String baseUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1)
+                    : frontendUrl;
+
+            // Crear link de invitación absoluto
+            String invitacionLink = baseUrl + "/#/signup?empresa=" + empresaNombre.replaceAll(" ", "%20");
             context.setVariable("invitacionLink", invitacionLink);
-            
-            System.out.println("🔗 [EMAIL-INDIVIDUAL] Link de invitación: " + invitacionLink);
+
+            System.out.println("🔗 [EMAIL-INDIVIDUAL] Link de invitación generado: " + invitacionLink);
+            if (!invitacionLink.startsWith("http")) {
+                System.err.println("⚠️ [EMAIL-INDIVIDUAL] WARNING: El link generado no parece una URL absoluta: "
+                        + invitacionLink);
+            }
 
             // Procesar template
             String htmlContent = templateEngine.process("invitacion-email", context);
             helper.setText(htmlContent, true);
-            
+
             System.out.println("📄 [EMAIL-INDIVIDUAL] HTML content length: " + htmlContent.length());
 
             // Enviar email
             mailSender.send(message);
             System.out.println("✅ [EMAIL-INDIVIDUAL] Email de invitación enviado exitosamente a: " + email);
-            
+
         } catch (MessagingException e) {
-            System.err.println("❌ [EMAIL-INDIVIDUAL] Error enviando email de invitación a " + email + ": " + e.getMessage());
+            System.err.println(
+                    "❌ [EMAIL-INDIVIDUAL] Error enviando email de invitación a " + email + ": " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Error enviando email a " + email + ": " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("❌ [EMAIL-INDIVIDUAL] Error inesperado enviando email a " + email + ": " + e.getMessage());
+            System.err
+                    .println("❌ [EMAIL-INDIVIDUAL] Error inesperado enviando email a " + email + ": " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Error inesperado enviando email a " + email + ": " + e.getMessage());
         }

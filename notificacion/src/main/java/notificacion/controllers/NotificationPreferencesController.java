@@ -22,13 +22,20 @@ public class NotificationPreferencesController {
         this.administracionService = administracionService;
     }
 
+    private String resolveUsuarioSub(String pathUserId, String headerUsuarioSub) {
+        return (headerUsuarioSub != null && !headerUsuarioSub.isBlank())
+                ? headerUsuarioSub
+                : pathUserId;
+    }
+
     @GetMapping
     public ResponseEntity<NotificationPreferences> getPreferences(
             @PathVariable String userId,
             @RequestHeader("X-Usuario-Sub") String usuarioSub) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
         // Siempre devolver preferencias: si no existen, se crean con valores por defecto
-        NotificationPreferences prefs = preferencesService.getOrCreatePreferences(empresaId, usuarioSub);
+        NotificationPreferences prefs = preferencesService.getOrCreatePreferences(empresaId, currentSub);
         return ResponseEntity.ok(prefs);
     }
 
@@ -37,8 +44,9 @@ public class NotificationPreferencesController {
             @PathVariable String userId,
             @RequestHeader("X-Usuario-Sub") String usuarioSub,
             @RequestBody NotificationPreferences preferences) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        NotificationPreferences updated = preferencesService.updatePreferences(empresaId, usuarioSub, preferences);
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        NotificationPreferences updated = preferencesService.updatePreferences(empresaId, currentSub, preferences);
         return ResponseEntity.ok(updated);
     }
 
@@ -49,12 +57,13 @@ public class NotificationPreferencesController {
             @PathVariable NotificationType type,
             @RequestBody Map<String, Boolean> preferences) {
 
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
         boolean enabled = preferences.getOrDefault("enabled", true);
         boolean emailEnabled = preferences.getOrDefault("emailEnabled", true);
         boolean inAppEnabled = preferences.getOrDefault("inAppEnabled", true);
 
-        preferencesService.updateTypePreference(empresaId, usuarioSub, type, enabled, emailEnabled, inAppEnabled);
+        preferencesService.updateTypePreference(empresaId, currentSub, type, enabled, emailEnabled, inAppEnabled);
         return ResponseEntity.noContent().build();
     }
 
@@ -64,12 +73,13 @@ public class NotificationPreferencesController {
             @RequestHeader("X-Usuario-Sub") String usuarioSub,
             @PathVariable NotificationType type) {
 
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
 
-        boolean enabled = preferencesService.isNotificationEnabled(empresaId, usuarioSub, type);
-        boolean emailEnabled = preferencesService.isEmailEnabled(empresaId, usuarioSub, type);
-        boolean inAppEnabled = preferencesService.isInAppEnabled(empresaId, usuarioSub, type);
-        boolean inQuietHours = preferencesService.isInQuietHours(empresaId, usuarioSub);
+        boolean enabled = preferencesService.isNotificationEnabled(empresaId, currentSub, type);
+        boolean emailEnabled = preferencesService.isEmailEnabled(empresaId, currentSub, type);
+        boolean inAppEnabled = preferencesService.isInAppEnabled(empresaId, currentSub, type);
+        boolean inQuietHours = preferencesService.isInQuietHours(empresaId, currentSub);
 
         return ResponseEntity.ok(Map.of(
             "enabled", enabled,

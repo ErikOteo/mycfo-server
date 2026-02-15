@@ -7,11 +7,15 @@ class WebSocketService {
     this.connected = false;
     this.subscriptions = new Map();
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = API_CONFIG.WEBSOCKET ? 5 : 0;
     this.reconnectDelay = 1000; // 1 segundo
   }
 
   connect(userId) {
+    // Si no hay endpoint WebSocket configurado, no intentamos conectar
+    if (!API_CONFIG.WEBSOCKET) {
+      return Promise.resolve();
+    }
     if (this.connected) {
       return Promise.resolve();
     }

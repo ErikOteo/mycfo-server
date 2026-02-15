@@ -84,8 +84,8 @@ export default function NotificationButton(props) {
         // Solo programamos la SIGUIENTE llamada cuando la actual terminó.
         // Y solo si el componente sigue montado (signal no abortada).
         if (!controller.signal.aborted) {
-            // Aumentado a 15 segundos para dar respiro al servidor
-            timeoutId = setTimeout(fetchNotifications, 15000); 
+            // 60 segundos para reducir parpadeos y carga
+            timeoutId = setTimeout(fetchNotifications, 60000); 
         }
       }
     };

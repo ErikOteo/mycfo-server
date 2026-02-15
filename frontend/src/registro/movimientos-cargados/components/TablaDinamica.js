@@ -2,6 +2,7 @@ import * as React from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import { Chip } from '@mui/material';
 import dayjs from 'dayjs';
+import CustomNoRowsOverlay from '../../../shared-components/CustomNoRowsOverlay';
 
 function calcularAnchoTexto(texto) {
   const promedioPxPorCaracter = 8; // aproximación Roboto
@@ -104,76 +105,59 @@ export default function TablaDinamica({
       pageSizeOptions={[10, 20, 50]}
       disableColumnResize
       density="compact"
+      slots={{
+        noRowsOverlay: () => <CustomNoRowsOverlay message="No hay registros para mostrar" />,
+      }}
+      localeText={{
+        columnMenuSortAsc: "Ordenar Ascendente",
+        columnMenuSortDesc: "Ordenar Descendente",
+        columnMenuFilter: "Filtrar",
+        columnMenuHideColumn: "Ocultar columna",
+        columnMenuManageColumns: "Administrar columnas",
+      }}
       sx={{
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-        '& .MuiDataGrid-cell': {
-          borderBottom: '1px solid #e0e0e0',
-          borderRight: '1px solid #e0e0e0',
-          display: 'flex',
-          alignItems: 'center',
+        backgroundColor: "background.paper",
+        borderRadius: 2,
+        border: "none",
+        "& .MuiDataGrid-cell": {
+          borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+          display: "flex",
+          alignItems: "center",
         },
-        '& .MuiDataGrid-cell:last-of-type': {
-          borderRight: 'none',
+        "& .MuiDataGrid-columnHeaders": {
+          backgroundColor: (theme) =>
+            theme.palette.mode === "dark"
+              ? "rgba(255, 255, 255, 0.05)"
+              : "#f5f5f5",
+          color: "text.primary",
+          borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
         },
-        '& .MuiDataGrid-columnHeaders': {
-          backgroundColor: '#f5f5f5',
-          fontSize: '0.95rem',
-          borderTop: '1px solid #e0e0e0',
-          borderBottom: '1px solid #e0e0e0',
+        "& .MuiDataGrid-columnHeader": {
+          "&:focus": { outline: "none" },
         },
-        '& .MuiDataGrid-columnHeader': {
-          borderLeft: '1px solid #e0e0e0',
-          borderRight: '1px solid #e0e0e0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          boxSizing: 'border-box',
+        "& .MuiDataGrid-sortIcon": {
+          display: "none",
         },
-        '& .MuiDataGrid-columnHeader:first-of-type': {
-          borderLeft: 'none',
+        "& .MuiDataGrid-iconButtonContainer": {
+          visibility: "hidden",
         },
-        '& .MuiDataGrid-columnHeader:last-of-type': {
-          borderRight: 'none',
+        "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer": {
+          visibility: "visible",
         },
-        '& .MuiDataGrid-columnHeaderTitle': {
-          fontWeight: 700,
+        "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
+        {
+          display: "none",
         },
-        '& .MuiDataGrid-columnSeparator': {
-          opacity: 1,
-          visibility: 'visible',
-          color: '#d5d5d5',
+        "& .MuiDataGrid-row:hover": {
+          backgroundColor: (theme) => theme.palette.action.hover,
         },
-        '& .MuiDataGrid-row:hover': {
-          backgroundColor: 'rgba(0, 0, 0, 0.02)',
-        },
-        '& .MuiDataGrid-sortIcon': {
-          display: 'none',
-        },
-        '& .MuiDataGrid-columnHeaderTitleContainer': {
-          paddingRight: '8px',
-          display: 'flex',
-          alignItems: 'center',
-        },
-        '& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer': {
-          width: '24px',
-          height: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        '& .MuiDataGrid-columnHeader .MuiIconButton-root': {
-          padding: '4px',
-          fontSize: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        '& .MuiDataGrid-menuIcon': {
-          fontSize: '16px',
-          display: 'block !important',
-        },
-        '& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*="menu"])': {
-          display: 'none',
+        "& .MuiDataGrid-row.Mui-selected": {
+          backgroundColor: (theme) =>
+            `${theme.palette.primary.main}15 !important`,
+          "&:hover": {
+            backgroundColor: (theme) =>
+              `${theme.palette.primary.main}25 !important`,
+          },
         },
       }}
     />

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -10,6 +10,7 @@ import {
   Alert,
   Button,
   CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import { CameraAlt, Check, Close, Delete } from "@mui/icons-material";
 import Webcam from "react-webcam";
@@ -25,7 +26,7 @@ const tipoMovimientoMap = {
   Acreencia: "Acreencia",
 };
 
-export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen }) {
+export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen, onNewCapture }) {
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
   const [capturando, setCapturando] = useState(true);
@@ -35,8 +36,26 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [usarCamaraDefault, setUsarCamaraDefault] = useState(false);
+
+  const esMobile = useMemo(
+    () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""),
+    []
+  );
+
+  const videoConstraints = useMemo(() => {
+    if (!esMobile || usarCamaraDefault) {
+      return undefined;
+    }
+    return { facingMode: { ideal: "environment" } };
+  }, [esMobile, usarCamaraDefault]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const tomarFoto = () => {
+    if (onNewCapture) {
+      onNewCapture();
+    }
+    setError(null);
     const img = webcamRef.current.getScreenshot();
     setFotoTemporal(img);
     setCapturando(false);
@@ -62,6 +81,10 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
   const seleccionarArchivo = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (onNewCapture) {
+      onNewCapture();
+    }
+    setError(null);
     const reader = new FileReader();
     reader.onload = () => {
       setFotoFinal(reader.result);
@@ -144,7 +167,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
       if (onResultado) {
         onResultado(response.data);
       } else {
-        alert("Fotos enviadas!");
+        setSnackbar({ open: true, message: "¡Fotos enviadas con éxito! 📸✅", severity: "success" });
       }
       setFotoFinal(null);
       setFotoNombre(null);
@@ -152,6 +175,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
     } catch (err) {
       console.error("❌ Error en envío de foto:", err);
       const mensaje = err.response?.data?.message || err.message || "Error al procesar las fotos.";
+      setSnackbar({ open: true, message: mensaje, severity: "error" });
       setError(mensaje);
       if (onFallback) {
         onFallback({
@@ -179,7 +203,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
 
   return (
     <Box sx={{ mt: 3 }}>
-      
+
       <Box
         sx={{
           position: "relative",
@@ -193,6 +217,12 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
             ref={webcamRef}
             audio={false}
             screenshotFormat="image/jpeg"
+            videoConstraints={videoConstraints}
+            onUserMediaError={() => {
+              if (!usarCamaraDefault) {
+                setUsarCamaraDefault(true);
+              }
+            }}
             style={{ width: "100%" }}
           />
         ) : (
@@ -313,6 +343,21 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
           )}
         </DialogContent>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

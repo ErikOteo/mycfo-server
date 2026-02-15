@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "forecast")
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class Forecast {
 
@@ -41,6 +43,9 @@ public class Forecast {
     @Column(name = "mes_fin_pronostico", nullable = false, length = 10)
     private String mesFinPronostico; // Mes hasta donde llega el pronóstico (YYYY-MM)
 
+    @Column(name = "moneda", length = 3)
+    private String moneda; // ARS, USD, etc.
+
     @Column(name = "creado_por", nullable = false, length = 64)
     private String creadoPor; // Sub del usuario o "SISTEMA" si es automático
 
@@ -58,4 +63,3 @@ public class Forecast {
     @Column(name = "eliminado_por", length = 64)
     private String eliminadoPor;
 }
-

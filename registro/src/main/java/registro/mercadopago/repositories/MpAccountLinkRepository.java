@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.*;
 import java.util.Optional;
 
 public interface MpAccountLinkRepository extends JpaRepository<MpAccountLink, Long> {
-    Optional<MpAccountLink> findByUserIdApp(Long userIdApp);
+    Optional<MpAccountLink> findByUserIdApp(String userIdApp);
+    Optional<MpAccountLink> findByMpUserId(String mpUserId);
 }
 

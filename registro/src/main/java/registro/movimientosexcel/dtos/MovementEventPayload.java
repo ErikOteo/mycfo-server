@@ -1,12 +1,12 @@
 package registro.movimientosexcel.dtos;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 public record MovementEventPayload(
-        Long userId,
+        String userId,
         String refId,
         Instant date,
         Double amount,
-        String description
+        String description,
+        String currency
 ) {}

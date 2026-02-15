@@ -29,7 +29,8 @@ public class CashflowService {
         String url = registroUrl + "/registros";
         RegistroDTO[] registros = restTemplate.getForObject(url, RegistroDTO[].class);
 
-        if (registros == null) return List.of();
+        if (registros == null)
+            return List.of();
 
         // Filtrar solo ingresos y egresos válidos para el año
         List<String> mediosValidos = List.of("Efectivo", "Transferencia", "MercadoPago");
@@ -38,9 +39,9 @@ public class CashflowService {
                 .filter(r -> r.getFechaEmision() != null
                         && r.getFechaEmision().toLocalDate().getYear() == anio
                         && r.getTipo() != null
-                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo()))
-                        && r.getMedioPago() != null
-                        && mediosValidos.contains(r.getMedioPago()))
+                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo())))
+                // && r.getMedioPago() != null
+                // && mediosValidos.contains(r.getMedioPago()))
                 .collect(Collectors.toList());
     }
 
@@ -77,8 +78,8 @@ public class CashflowService {
                     url,
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
-                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {}
-            );
+                    new ParameterizedTypeReference<reporte.dtos.PageResponse<RegistroDTO>>() {
+                    });
         } catch (HttpClientErrorException e) {
             var status = e.getStatusCode();
             if (status.value() == HttpStatus.UNAUTHORIZED.value() || status.value() == HttpStatus.FORBIDDEN.value()) {
@@ -97,11 +98,51 @@ public class CashflowService {
                 .filter(r -> r.getFechaEmision() != null
                         && r.getFechaEmision().toLocalDate().getYear() == anio
                         && r.getTipo() != null
-                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo()))
-                        && r.getMedioPago() != null
-                        && mediosValidos.contains(r.getMedioPago()))
+                        && ("Ingreso".equalsIgnoreCase(r.getTipo()) || "Egreso".equalsIgnoreCase(r.getTipo())))
+                // && r.getMedioPago() != null
+                // && mediosValidos.contains(r.getMedioPago()))
                 .collect(Collectors.toList());
     }
 
-    // No category filtering in Cashflow (by product decision)
+    public reporte.dtos.CashflowDTO obtenerResumenAnual(int anio, String userSub, String moneda, String authorization) {
+        List<RegistroDTO> movimientos = obtenerRegistrosPorAnio(anio, userSub, moneda, authorization);
+
+        double saldoInicial = 0.0; // En una versión futura esto podría venir de un balance inicial configurado
+        List<reporte.dtos.MesCashflowDTO> meses = new ArrayList<>();
+
+        double saldoAcumulado = saldoInicial;
+
+        for (int m = 1; m <= 12; m++) {
+            final int mesActual = m;
+            List<RegistroDTO> movsMes = movimientos.stream()
+                    .filter(r -> r.getFechaEmision() != null
+                            && r.getFechaEmision().toLocalDate().getMonthValue() == mesActual)
+                    .collect(Collectors.toList());
+
+            final String targetMoneda = (moneda != null && !moneda.isBlank()) ? moneda : "ARS";
+
+            double ingresos = movsMes.stream()
+                    .filter(r -> "Ingreso".equalsIgnoreCase(r.getTipo()))
+                    .filter(r -> targetMoneda.equalsIgnoreCase(r.getMoneda()))
+                    .mapToDouble(r -> r.getMontoTotal() != null ? Math.abs(r.getMontoTotal()) : 0.0)
+                    .sum();
+
+            double egresos = movsMes.stream()
+                    .filter(r -> "Egreso".equalsIgnoreCase(r.getTipo()))
+                    .filter(r -> targetMoneda.equalsIgnoreCase(r.getMoneda()))
+                    .mapToDouble(r -> r.getMontoTotal() != null ? Math.abs(r.getMontoTotal()) : 0.0)
+                    .sum();
+
+            double netCashFlow = ingresos - egresos;
+            double cashOnHandInicio = saldoAcumulado;
+            double cashOnHandFin = cashOnHandInicio + netCashFlow;
+
+            meses.add(new reporte.dtos.MesCashflowDTO(m, ingresos, egresos, netCashFlow, cashOnHandInicio,
+                    cashOnHandFin));
+
+            saldoAcumulado = cashOnHandFin;
+        }
+
+        return new reporte.dtos.CashflowDTO(anio, saldoInicial, meses);
+    }
 }

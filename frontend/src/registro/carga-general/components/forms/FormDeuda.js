@@ -26,7 +26,7 @@ export default function FormDeuda({
       sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}
     >
       {/* 1️⃣ Monto total + Moneda */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Monto total *</FormLabel>
           <OutlinedInput
@@ -57,7 +57,7 @@ export default function FormDeuda({
       </Box>
 
       {/* 2️⃣ Fecha emisión (con hora) + Fecha vencimiento */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Fecha emisión *</FormLabel>
           <CustomDateTimePicker
@@ -84,7 +84,7 @@ export default function FormDeuda({
 
 
       {/* Datos del acreedor (destino) */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Nombre del acreedor (a quien le debemos)</FormLabel>
           <OutlinedInput
@@ -110,7 +110,7 @@ export default function FormDeuda({
       </Box>
 
       {/* 4️⃣ Información de cuotas y financiamiento */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Cantidad de cuotas</FormLabel>
           <OutlinedInput
@@ -150,7 +150,7 @@ export default function FormDeuda({
       </Box>
 
       {/* 5️⃣ Tasa de interés y periodicidad */}
-      <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, width: "100%" }}>
         <Box sx={{ flex: 1 }}>
           <FormLabel>Tasa de interés anual (%)</FormLabel>
           <OutlinedInput

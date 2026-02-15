@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import administracion.dtos.*;
 import administracion.models.Empresa;
-import administracion.models.Rol;
 import administracion.models.Usuario;
 import administracion.repositories.EmpresaRepository;
 import administracion.repositories.UsuarioRepository;
@@ -25,6 +24,7 @@ public class AuthController {
     private final UsuarioService usuarioService;
     private final UsuarioRepository usuarioRepository;
     private final EmpresaRepository empresaRepository;
+    private final administracion.services.SolicitudAccesoService solicitudAccesoService;
 
     /**
      * Registra un nuevo usuario completo (Cognito + BD)
@@ -36,56 +36,87 @@ public class AuthController {
             // 1. Verificar si el email ya existe en la base de datos
             if (usuarioService.existeEmailEnBD(dto.getEmail())) {
                 Map<String, String> error = new HashMap<>();
-                error.put("error", "Este correo electrónico ya está registrado. Por favor, ingresa un correo diferente o inicia sesión.");
+                error.put("error",
+                        "Este correo electrónico ya está registrado. Por favor, ingresa un correo diferente o inicia sesión.");
                 return ResponseEntity.badRequest().body(error);
             }
 
-            // 2. (ELIMINADO) Verificar si el email ya existe en Cognito
-            // Se elimina esta verificación previa porque requiere permisos de administrador (AdminGetUser)
-            // que fallan en local si no hay credenciales AWS válidas.
-            // Dejamos que cognitoService.registrarUsuario falle con UsernameExistsException si ya existe.
+            // 2. Verificar si el email ya existe en Cognito
+            if (cognitoService.existeUsuarioEnCognito(dto.getEmail())) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error",
+                        "Este correo electrónico ya está registrado en el sistema. Por favor, ingresa un correo diferente o inicia sesión.");
+                return ResponseEntity.badRequest().body(error);
+            }
 
             // 3. PRIMERO: Crear usuario en Cognito con todos los atributos
             String sub = cognitoService.registrarUsuario(
-                dto.getEmail(), 
-                dto.getPassword(),
-                dto.getNombre(),
-                dto.getApellido(),
-                dto.getNombreEmpresa()
-            );
+                    dto.getEmail(),
+                    dto.getPassword(),
+                    dto.getNombre(),
+                    dto.getApellido(),
+                    dto.getNombreEmpresa());
 
-            // 4. SEGUNDO: Buscar o crear empresa en BD
-            Empresa empresa = empresaRepository.findByNombreIgnoreCase(dto.getNombreEmpresa())
-                    .orElseGet(() -> {
-                        Empresa nuevaEmpresa = new Empresa();
-                        nuevaEmpresa.setNombre(dto.getNombreEmpresa());
-                        nuevaEmpresa.setDescripcion("Empresa creada desde registro");
-                        return empresaRepository.save(nuevaEmpresa);
-                    });
+            // 4. SEGUNDO: Verificar si la empresa ya existe
+            java.util.Optional<Empresa> empresaExistente = empresaRepository
+                    .findByNombreIgnoreCase(dto.getNombreEmpresa());
 
-            // 5. TERCERO: Crear usuario en BD
+            // 5. Crear usuario en BD
             Usuario usuario = new Usuario();
             usuario.setSub(sub);
             usuario.setNombre(dto.getNombre() + " " + dto.getApellido());
             usuario.setEmail(dto.getEmail());
-            
-            // Determinar rol: ADMINISTRADOR si es el primer usuario de la empresa, NORMAL si es invitación
-            boolean esPrimerUsuario = usuarioRepository.countByEmpresa(empresa) == 0;
-            boolean esInvitacion = dto.getEsInvitacion() != null && dto.getEsInvitacion();
-            
-            if (esPrimerUsuario && !esInvitacion) {
-                usuario.setRol(Rol.ADMINISTRADOR); // Primer usuario de empresa nueva es administrador
-            } else {
-                usuario.setRol(Rol.NORMAL); // Usuarios invitados siempre son NORMAL
-            }
-            
             usuario.setActivo(true);
-            usuario.setEmpresa(empresa);
-            usuarioRepository.save(usuario);
+
+            boolean esInvitacion = dto.getEsInvitacion() != null && dto.getEsInvitacion();
+
+            if (empresaExistente.isPresent()) {
+                // CASO 1: Empresa EXISTE -> Crear usuario huerfano + Solicitud de Acceso
+                // A MENOS que sea una invitacion explicita, en cuyo caso lo unimos directo
+
+                if (esInvitacion) {
+                    // Si es invitación, lo unimos directo como COLABORADOR
+                    usuario.setRol("COLABORADOR");
+                    usuario.setEsPropietario(false);
+                    usuario.setEmpresa(empresaExistente.get());
+                    usuarioRepository.save(usuario);
+                } else {
+                    // Si NO es invitación (se unió por buscador), creamos solicitud
+                    usuario.setRol("COLABORADOR");
+                    usuario.setEsPropietario(false);
+                    usuario.setEmpresa(null); // Sin empresa asignada aún
+                    usuarioRepository.save(usuario);
+
+                    // Crear solicitud de acceso
+                    try {
+                        solicitudAccesoService.crearSolicitud(
+                                usuario.getSub(),
+                                usuario.getNombre(),
+                                usuario.getEmail(),
+                                empresaExistente.get().getId());
+                    } catch (Exception ex) {
+                        System.err.println("Error creando solicitud automática: " + ex.getMessage());
+                        // No fallamos el registro, el usuario podrá pedirla manualmente después
+                    }
+                }
+
+            } else {
+                // CASO 2: Empresa NUEVA -> Crear empresa + Usuario ADMIN
+                Empresa nuevaEmpresa = new Empresa();
+                nuevaEmpresa.setNombre(dto.getNombreEmpresa());
+                nuevaEmpresa.setDescripcion("Empresa creada desde registro");
+                Empresa empresaGuardada = empresaRepository.save(nuevaEmpresa);
+
+                usuario.setRol("ADMINISTRADOR");
+                usuario.setEsPropietario(true);
+                usuario.setEmpresa(empresaGuardada);
+                usuarioRepository.save(usuario);
+            }
 
             // 6. Retornar éxito (código enviado automáticamente por Cognito)
             Map<String, String> response = new HashMap<>();
-            response.put("mensaje", "Usuario registrado exitosamente. Verifica tu email para obtener el código de confirmación.");
+            response.put("mensaje",
+                    "Usuario registrado exitosamente. Verifica tu email para obtener el código de confirmación.");
             response.put("email", dto.getEmail());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -98,7 +129,8 @@ public class AuthController {
     }
 
     /**
-     * Normaliza los mensajes técnicos de Cognito en el registro a textos claros en español.
+     * Normaliza los mensajes técnicos de Cognito en el registro a textos claros en
+     * español.
      *
      * Nota: se basa en fragmentos del mensaje original, pero siempre devuelve algo
      * entendible para el usuario final y sin IDs ni detalles internos.
@@ -133,7 +165,7 @@ public class AuthController {
         }
 
         // Fallback genérico
-        return "No pudimos crear la cuenta. Revisá los datos e intentá nuevamente. Error: " + raw;
+        return "No pudimos crear la cuenta. Revisá los datos e intentá nuevamente.";
     }
 
     /**
@@ -144,7 +176,7 @@ public class AuthController {
         try {
             String email = body.get("email");
             cognitoService.reenviarCodigoConfirmacion(email);
-            
+
             Map<String, String> response = new HashMap<>();
             response.put("mensaje", "Código de confirmación reenviado exitosamente");
             return ResponseEntity.ok(response);
@@ -162,7 +194,7 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> confirmar(@RequestBody ConfirmarCodigoDTO dto) {
         try {
             cognitoService.confirmarRegistro(dto.getEmail(), dto.getCodigo());
-            
+
             Map<String, String> response = new HashMap<>();
             response.put("mensaje", "Cuenta confirmada exitosamente. Ya puedes iniciar sesión.");
             return ResponseEntity.ok(response);
@@ -172,7 +204,6 @@ public class AuthController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-
 
     /**
      * Verifica si un usuario tiene perfil completo

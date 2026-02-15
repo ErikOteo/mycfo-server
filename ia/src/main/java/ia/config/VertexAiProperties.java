@@ -14,8 +14,8 @@ public class VertexAiProperties {
     private String projectId;
     private String location = "us-central1";
     private String model = "gemini-2.5-flash";
-    private String embeddingModel = "textembedding-gecko@003";
     private String credentialsPath;
-    private double temperature = 0.0;
-    private int maxOutputTokens = 1024;
+    private double temperature = 0.55;
+    private double topP = 0.9;
+    private int maxOutputTokens = 2048;
 }
