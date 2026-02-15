@@ -95,7 +95,6 @@ export default function DropzoneUploader({
             justifyContent: "space-between",
             border: "2px solid",
             borderColor: "primary.main",
-            bgcolor: theme.palette.mode === "dark" ? "action.hover" : "grey.50",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, overflow: "hidden" }}>
