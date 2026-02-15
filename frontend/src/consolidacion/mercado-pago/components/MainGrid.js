@@ -25,6 +25,7 @@ export default function MainGrid({ status, onRefreshStatus }) {
   const [importOpen, setImportOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewData, setPreviewData] = React.useState([]);
+  const [lastPreviewPeriod, setLastPreviewPeriod] = React.useState(null);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [configOpen, setConfigOpen] = React.useState(false);
   const [unlinking, setUnlinking] = React.useState(false);
@@ -145,8 +146,10 @@ export default function MainGrid({ status, onRefreshStatus }) {
       let previewResponse;
       if (args.mode === "preview") {
         if (args.paymentId) {
+          setLastPreviewPeriod(null);
           previewResponse = await mpApi.previewPaymentById(args.paymentId);
         } else {
+          setLastPreviewPeriod({ month: Number(args.month), year: Number(args.year) });
           previewResponse = await mpApi.previewPaymentsByMonth({
             month: args.month,
             year: args.year,
@@ -199,9 +202,19 @@ export default function MainGrid({ status, onRefreshStatus }) {
   const handleImportSelected = async (selectedPaymentIds) => {
     try {
       await mpApi.importSelectedPayments(selectedPaymentIds);
-      notify(`${selectedPaymentIds.length} pagos importados exitosamente`);
+      let walletImportados = 0;
+      if (lastPreviewPeriod?.month && lastPreviewPeriod?.year) {
+        const walletResp = await mpApi.importWalletByMonth({
+          month: lastPreviewPeriod.month,
+          year: lastPreviewPeriod.year,
+        });
+        walletImportados = Number(walletResp?.importados || 0);
+      }
+      const walletMsg = walletImportados > 0 ? ` + ${walletImportados} movimientos de billetera` : "";
+      notify(`${selectedPaymentIds.length} pagos importados exitosamente${walletMsg}`);
       setPreviewOpen(false);
       setPreviewData([]);
+      setLastPreviewPeriod(null);
       setPage(0);
       await loadPayments();
     } catch (e) {
@@ -416,6 +429,7 @@ export default function MainGrid({ status, onRefreshStatus }) {
         onClose={() => {
           setPreviewOpen(false);
           setPreviewData([]);
+          setLastPreviewPeriod(null);
         }}
         previewData={previewData}
         loading={previewLoading}

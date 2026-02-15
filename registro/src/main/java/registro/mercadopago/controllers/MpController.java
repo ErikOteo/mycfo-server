@@ -218,6 +218,19 @@ public class MpController {
         return Map.of("importados", cant);
     }
 
+    @PostMapping("/import/wallet")
+    public Map<String, Object> importWalletByMonth(
+            @RequestBody ImportRequest req,
+            @RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        if (req.getMonth() == null || req.getYear() == null) {
+            throw new IllegalArgumentException("Debes indicar month/year");
+        }
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
+        final String uid = usuarioActual;
+        int cant = importer.importWalletByMonth(uid, req.getMonth(), req.getYear(), usuarioActual);
+        return Map.of("importados", cant);
+    }
+
     /* ======================
        Listado de PAGOS (desde Registro)
        ====================== */
@@ -369,7 +382,11 @@ public class MpController {
             dto.setId(mp.getRegistroId());
             
             // ID del pago de MercadoPago
-            dto.setMpPaymentId(Long.valueOf(mp.getMpPaymentId()));
+            try {
+                dto.setMpPaymentId(Long.valueOf(mp.getMpPaymentId()));
+            } catch (Exception ignored) {
+                dto.setMpPaymentId(null);
+            }
             
             return dto;
         });
