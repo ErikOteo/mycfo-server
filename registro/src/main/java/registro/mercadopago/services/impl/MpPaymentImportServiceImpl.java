@@ -6,10 +6,13 @@ import registro.mercadopago.config.MpProperties;
 import registro.mercadopago.dtos.PaymentDTO;
 import registro.mercadopago.models.MpAccountLink;
 import registro.mercadopago.models.MpImportedPayment;
+import registro.mercadopago.models.MpWalletMovement;
 import registro.mercadopago.repositories.MpAccountLinkRepository;
 import registro.mercadopago.repositories.MpImportedPaymentRepository;
+import registro.mercadopago.repositories.MpWalletMovementRepository;
 import registro.mercadopago.services.MpDuplicateDetectionService;
 import registro.mercadopago.services.MpPaymentImportService;
+import registro.mercadopago.services.util.MpWalletMovementImportService;
 import registro.movimientosexcel.services.CategorySuggestionService;
 import registro.services.AdministracionService;
 import org.springframework.http.*;
@@ -29,6 +32,8 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     private final MovimientoRepository movimientoRepo;
     private final MpAccountLinkRepository linkRepo;
     private final MpImportedPaymentRepository mpImportedRepo;
+    private final MpWalletMovementRepository walletRepo;
+    private final MpWalletMovementImportService walletImporter;
     private final MpProperties props;
     private final CategorySuggestionService categorySuggestionService;
     private final MpDuplicateDetectionService duplicateDetectionService;
@@ -40,6 +45,8 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
             MovimientoRepository movimientoRepo,
             MpAccountLinkRepository linkRepo,
             MpImportedPaymentRepository mpImportedRepo,
+            MpWalletMovementRepository walletRepo,
+            MpWalletMovementImportService walletImporter,
             MpProperties props,
             CategorySuggestionService categorySuggestionService,
             MpDuplicateDetectionService duplicateDetectionService,
@@ -48,6 +55,8 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
         this.movimientoRepo = movimientoRepo;
         this.linkRepo = linkRepo;
         this.mpImportedRepo = mpImportedRepo;
+        this.walletRepo = walletRepo;
+        this.walletImporter = walletImporter;
         this.props = props;
         this.categorySuggestionService = categorySuggestionService;
         this.duplicateDetectionService = duplicateDetectionService;
@@ -104,6 +113,32 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
                 }
             }
             if (reachedOlder) break;
+        }
+        return imported;
+    }
+
+    @Override
+    public int importWalletByMonth(String userIdApp, int month, int year, String usuarioSub) {
+        TenantContext tenant = resolveTenant(usuarioSub);
+        MpAccountLink link = requireLink(userIdApp);
+
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate first = LocalDate.of(year, month, 1);
+        LocalDate last = first.withDayOfMonth(first.lengthOfMonth());
+        Instant from = first.atStartOfDay(zone).toInstant();
+        Instant to = last.plusDays(1).atStartOfDay(zone).toInstant();
+        Instant importStartedAt = Instant.now().minusSeconds(5);
+
+        walletImporter.importRange(userIdApp, first, last);
+
+        List<MpWalletMovement> walletMovements =
+                walletRepo.findImportablesForMonth(userIdApp, from, to, importStartedAt);
+
+        int imported = 0;
+        for (MpWalletMovement movement : walletMovements) {
+            if (upsertWalletMovimiento(movement, tenant, link)) {
+                imported++;
+            }
         }
         return imported;
     }
@@ -311,15 +346,8 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
         String operationType = asString(body.get("operation_type")); // regular_payment, money_transfer, etc.
         
         // Campos para determinar si es ingreso o egreso
-        Long payerId = asLong(body.get("payer_id"));
-        Long collectorId = asLong(body.get("collector"));
-        if (collectorId == null) {
-            // Intentar obtener collector_id del objeto collector
-            Map<String, Object> collector = asMap(body.get("collector"));
-            if (collector != null) {
-                collectorId = asLong(collector.get("id"));
-            }
-        }
+        Long payerId = extractPayerId(body);
+        Long collectorId = extractCollectorId(body);
         
         // Log completo del pago para debug
         System.out.println(">>> === IMPORTANDO PAGO ===");
@@ -339,7 +367,8 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
         // id: autogenerado por JPA
 
         // tipo (tu entidad): clasificación mejorada según múltiples campos de MP
-        TipoMovimiento tipoMovimiento = determinarTipoMovimiento(status, transactionType, operationType, transactionAmount, payerId, collectorId);
+        Long myMpUserId = asLong(link.getMpUserId());
+        TipoMovimiento tipoMovimiento = determinarTipoMovimiento(status, transactionType, operationType, transactionAmount, payerId, collectorId, myMpUserId);
         r.setTipo(tipoMovimiento);
 
         // montoTotal = transactionAmount
@@ -452,9 +481,114 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
 
 
 
+    private boolean upsertWalletMovimiento(MpWalletMovement movement, TenantContext tenant, MpAccountLink link) {
+        if (movement == null || movement.getMpMovementId() == null || movement.getMpMovementId().isBlank()) {
+            return false;
+        }
+
+        String syntheticMpId = "wallet:" + movement.getMpMovementId();
+        MpImportedPayment existing = mpImportedRepo.findByMpPaymentIdAndUsuarioId(syntheticMpId, tenant.usuarioUuid());
+        if (existing != null) {
+            return false;
+        }
+
+        Movimiento registro = new Movimiento();
+        TipoMovimiento tipo = determinarTipoWalletMovimiento(movement);
+        BigDecimal amount = movement.getAmount();
+
+        registro.setTipo(tipo);
+        registro.setMontoTotal(amount != null ? amount.doubleValue() : 0d);
+        registro.setFechaEmision(
+                movement.getDateEvent() != null
+                        ? movement.getDateEvent().atZone(ZoneId.systemDefault()).toLocalDateTime()
+                        : LocalDateTime.now()
+        );
+
+        String descripcion = buildWalletDescripcion(movement);
+        registro.setDescripcion(descripcion);
+        registro.setCategoria(categorySuggestionService.sugerirCategoria(descripcion, tipo));
+        registro.setOrigenNombre("MercadoPago Wallet");
+        registro.setDestinoNombre(null);
+        registro.setFechaCreacion(LocalDateTime.now());
+        registro.setFechaActualizacion(LocalDateTime.now());
+        registro.setUsuarioId(tenant.usuarioSub());
+        registro.setOrganizacionId(tenant.organizacionId());
+        registro.setMedioPago(TipoMedioPago.MercadoPago);
+        registro.setMoneda(parseMoneda(movement.getCurrency()));
+        registro.setDocumentoComercial(null);
+
+        normalizarMontoMovimiento(registro);
+        Movimiento savedRegistro = movimientoRepo.save(registro);
+
+        MpImportedPayment mpImported = new MpImportedPayment(savedRegistro, syntheticMpId, tenant.usuarioUuid(), link.getMpUserId());
+        mpImported.setDescription(descripcion);
+        mpImported.setAmount(amount);
+        mpImported.setCurrencyId(movement.getCurrency());
+        mpImported.setStatus(movement.getStatus());
+        mpImported.setPaymentTypeId(movement.getKind());
+        mpImported.setExternalReference(movement.getMpMovementId());
+        if (movement.getDateEvent() != null) {
+            LocalDateTime eventTime = movement.getDateEvent().atZone(ZoneId.systemDefault()).toLocalDateTime();
+            mpImported.setDateCreated(eventTime);
+            mpImported.setDateApproved(eventTime);
+            mpImported.setDateLastUpdated(eventTime);
+        }
+        mpImportedRepo.save(mpImported);
+        return true;
+    }
+
+    private TipoMovimiento determinarTipoWalletMovimiento(MpWalletMovement movement) {
+        if (movement.getAmount() != null && movement.getAmount().signum() != 0) {
+            return movement.getAmount().signum() < 0 ? TipoMovimiento.Egreso : TipoMovimiento.Ingreso;
+        }
+        String kind = movement.getKind() != null ? movement.getKind().toLowerCase(Locale.ROOT) : "";
+        if (kind.contains("out") || kind.contains("debit") || kind.contains("withdraw") || kind.contains("fee")) {
+            return TipoMovimiento.Egreso;
+        }
+        return TipoMovimiento.Ingreso;
+    }
+
+    private String buildWalletDescripcion(MpWalletMovement movement) {
+        String base = movement.getDescription();
+        if (base == null || base.isBlank()) {
+            base = "Movimiento de billetera MercadoPago";
+        }
+        if (movement.getKind() != null && !movement.getKind().isBlank()) {
+            base += " [" + movement.getKind() + "]";
+        }
+        return base;
+    }
+
+    private TipoMoneda parseMoneda(String currency) {
+        if (currency == null || currency.isBlank()) return null;
+        try {
+            return TipoMoneda.valueOf(currency.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     private String getPayerEmail(Map<String, Object> body) {
         Map<String, Object> payer = asMap(body.get("payer"));
         return payer != null ? asString(payer.get("email")) : null;
+    }
+
+    private Long extractPayerId(Map<String, Object> body) {
+        Long payerId = asLong(body.get("payer_id"));
+        if (payerId != null) return payerId;
+        Map<String, Object> payer = asMap(body.get("payer"));
+        return payer != null ? asLong(payer.get("id")) : null;
+    }
+
+    private Long extractCollectorId(Map<String, Object> body) {
+        Long collectorId = asLong(body.get("collector_id"));
+        if (collectorId != null) return collectorId;
+
+        collectorId = asLong(body.get("collector"));
+        if (collectorId != null) return collectorId;
+
+        Map<String, Object> collector = asMap(body.get("collector"));
+        return collector != null ? asLong(collector.get("id")) : null;
     }
 
     /* =========================
@@ -507,12 +641,24 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     }
 
     /**
-     * Determina el tipo de registro (INGRESO/EGRESO) basado en múltiples campos de MercadoPago
-     * REGLA PRINCIPAL: Si payer_id != collector_id, es un EGRESO (tú pagas a otro)
+     * Determina el tipo de registro (INGRESO/EGRESO) basado en múltiples campos de MercadoPago.
+     * Regla principal: comparar payer/collector contra el mpUserId de la cuenta vinculada.
      */
-    private TipoMovimiento determinarTipoMovimiento(String status, String transactionType, String operationType, BigDecimal amount, Long payerId, Long collectorId) {
+    private TipoMovimiento determinarTipoMovimiento(String status, String transactionType, String operationType, BigDecimal amount, Long payerId, Long collectorId, Long myMpUserId) {
         System.out.println(">>> === CLASIFICACIÓN DE PAGO ===");
-        System.out.println(">>> PayerID: " + payerId + ", CollectorID: " + collectorId);
+        System.out.println(">>> PayerID: " + payerId + ", CollectorID: " + collectorId + ", MyMpUserID: " + myMpUserId);
+        
+        // Regla principal: comparar contra la cuenta vinculada para evitar invertir MP->MP entrante.
+        if (myMpUserId != null) {
+            if (collectorId != null && collectorId.equals(myMpUserId)) {
+                System.out.println(">>> Clasificado como INGRESO por collector == cuenta vinculada");
+                return TipoMovimiento.Ingreso;
+            }
+            if (payerId != null && payerId.equals(myMpUserId)) {
+                System.out.println(">>> Clasificado como EGRESO por payer == cuenta vinculada");
+                return TipoMovimiento.Egreso;
+            }
+        }
         
         // 0. REGLA PRINCIPAL: Análisis de relación payer/collector (MÁS CONFIABLE)
         if (payerId != null && collectorId != null && !payerId.equals(collectorId)) {
@@ -577,7 +723,12 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
             operationTypeLower.contains("transfer") ||
             transactionTypeLower.contains("internal") ||
             operationTypeLower.contains("internal")) {
-            // Para transferencias, depende del contexto, pero por defecto EGRESO
+            if (amount != null && amount.signum() != 0) {
+                TipoMovimiento bySign = amount.signum() < 0 ? TipoMovimiento.Egreso : TipoMovimiento.Ingreso;
+                System.out.println(">>> Clasificado por signo de monto en transferencia: " + bySign);
+                return bySign;
+            }
+            // Para transferencias sin IDs ni signo, mantener comportamiento previo
             System.out.println(">>> Clasificado como EGRESO por transferencia interna");
             return TipoMovimiento.Egreso;
         }
@@ -619,7 +770,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
         Map<String, Object> body = get("/v1/payments/" + paymentId, link.getAccessToken());
         if (body == null || body.isEmpty()) return List.of();
         
-        PaymentDTO dto = convertToPaymentDTO(body);
+        PaymentDTO dto = convertToPaymentDTO(body, link);
         List<PaymentDTO> previewData = List.of(dto);
         
         // Detectar duplicados antes de devolver
@@ -657,7 +808,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
                     continue;
                 }
                 if (approved.isBefore(to)) {
-                    PaymentDTO dto = convertToPaymentDTO(p);
+                    PaymentDTO dto = convertToPaymentDTO(p, link);
                     previewData.add(dto);
                 }
             }
@@ -686,7 +837,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
             if (rs instanceof List<?> list) {
                 for (Object o : list) {
                     if (o instanceof Map<?, ?> m) {
-                        PaymentDTO dto = convertToPaymentDTO((Map<String, Object>) m);
+                        PaymentDTO dto = convertToPaymentDTO((Map<String, Object>) m, link);
                         previewData.add(dto);
                     }
                 }
@@ -726,7 +877,7 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
     /**
      * Convierte un Map de MercadoPago a PaymentDTO para preview
      */
-    private PaymentDTO convertToPaymentDTO(Map<String, Object> body) {
+    private PaymentDTO convertToPaymentDTO(Map<String, Object> body, MpAccountLink link) {
         PaymentDTO dto = new PaymentDTO();
         
         // Parsear datos básicos
@@ -745,17 +896,12 @@ public class MpPaymentImportServiceImpl implements MpPaymentImportService {
         String operationType = asString(body.get("operation_type"));
         
         // Obtener IDs para clasificación correcta en preview
-        Long payerId = asLong(body.get("payer_id"));
-        Long collectorId = asLong(body.get("collector"));
-        if (collectorId == null) {
-            Map<String, Object> collector = asMap(body.get("collector"));
-            if (collector != null) {
-                collectorId = asLong(collector.get("id"));
-            }
-        }
+        Long payerId = extractPayerId(body);
+        Long collectorId = extractCollectorId(body);
         
         // Determinar tipo de registro (para preview, CON IDs para clasificación correcta)
-        TipoMovimiento tipoMovimiento = determinarTipoMovimiento(status, transactionType, operationType, transactionAmount, payerId, collectorId);
+        Long myMpUserId = link != null ? asLong(link.getMpUserId()) : null;
+        TipoMovimiento tipoMovimiento = determinarTipoMovimiento(status, transactionType, operationType, transactionAmount, payerId, collectorId, myMpUserId);
         
         // Mapear a DTO
         dto.setMpPaymentId(mpPaymentId);
