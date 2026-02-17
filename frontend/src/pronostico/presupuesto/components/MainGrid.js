@@ -793,7 +793,7 @@ export default function MainGrid() {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => navigate(`/presupuestos/${slug}`)}
+                  onClick={() => navigate(`/presupuestos/${slug}`, { state: { presupuestoId: p.id } })}
                   sx={darkActionButtonSx}
                 >
                   Ver detalle
@@ -942,7 +942,7 @@ export default function MainGrid() {
             <Button
               variant="outlined"
               size="small"
-              onClick={() => navigate(`/presupuestos/${slug}`)}
+              onClick={() => navigate(`/presupuestos/${slug}`, { state: { presupuestoId: p.id } })}
               sx={isLightMode ? { lineHeight: 1.2 } : { color: "#42897f", lineHeight: 1.2 }}
             >
               Ver detalle
