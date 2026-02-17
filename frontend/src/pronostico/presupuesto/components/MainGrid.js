@@ -793,7 +793,7 @@ export default function MainGrid() {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => navigate(`/presupuestos/${slug}`)}
+                  onClick={() => navigate(`/presupuestos/${slug}`, { state: { presupuestoId: p.id } })}
                   sx={darkActionButtonSx}
                 >
                   Ver detalle
@@ -942,7 +942,7 @@ export default function MainGrid() {
             <Button
               variant="outlined"
               size="small"
-              onClick={() => navigate(`/presupuestos/${slug}`)}
+              onClick={() => navigate(`/presupuestos/${slug}`, { state: { presupuestoId: p.id } })}
               sx={isLightMode ? { lineHeight: 1.2 } : { color: "#42897f", lineHeight: 1.2 }}
             >
               Ver detalle
@@ -1098,7 +1098,19 @@ export default function MainGrid() {
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">
-              <IconButton onClick={handleSearch} size="small" edge="end">
+              <IconButton
+                onClick={handleSearch}
+                size="small"
+                edge="end"
+                disableRipple
+                sx={{
+                  border: "none",
+                  outline: "none",
+                  backgroundColor: "transparent",
+                  "&:hover": { backgroundColor: "transparent" },
+                  "&:focus": { outline: "none", backgroundColor: "transparent" },
+                }}
+              >
                 <SearchRoundedIcon />
               </IconButton>
             </InputAdornment>

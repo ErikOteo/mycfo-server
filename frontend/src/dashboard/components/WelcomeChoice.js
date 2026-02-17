@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -8,7 +8,9 @@ import {
     Button,
     Stack,
     useTheme,
-    alpha
+    alpha,
+    Alert,
+    AlertTitle
 } from '@mui/material';
 import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import GroupAddRoundedIcon from '@mui/icons-material/GroupAddRounded';
@@ -16,11 +18,40 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 
 import JoinOrganizationModal from './JoinOrganizationModal';
 import CreateCompanyModal from './CreateCompanyModal';
+import axios from 'axios';
+import API_CONFIG from '../../config/api-config';
 
 export default function WelcomeChoice() {
     const theme = useTheme();
     const [openJoinModal, setOpenJoinModal] = React.useState(false);
     const [openCreateModal, setOpenCreateModal] = React.useState(false);
+    const [latestRequest, setLatestRequest] = useState(null);
+
+    // Fetch latest request status once on mount
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const token = sessionStorage.getItem('accessToken');
+                const sub = sessionStorage.getItem('sub');
+                if (!token || !sub) return;
+
+                const response = await axios.get(`${API_CONFIG.ADMINISTRACION}/api/solicitudes/mi-ultima`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Usuario-Sub': sub
+                    }
+                });
+                setLatestRequest(response.data);
+            } catch (error) {
+                // Silent fail if no request found
+            }
+        };
+        fetchStatus();
+    }, []);
+
+    const handleCloseRejected = () => {
+        setLatestRequest(null);
+    };
 
     const choices = [
         {
@@ -60,6 +91,30 @@ export default function WelcomeChoice() {
                         Para comenzar a potenciar tu gestión financiera, primero necesitamos establecer tu espacio de trabajo.
                     </Typography>
                 </Stack>
+
+                {/* Request Status Notifications (Only Pending and Rejected) */}
+                {latestRequest && latestRequest.estado === 'PENDIENTE' && (
+                    <Alert severity="info" sx={{ mb: 4, width: '100%', borderRadius: 2 }}>
+                        <AlertTitle>Solicitud Enviada</AlertTitle>
+                        Tu solicitud para unirte a la empresa está <strong>pendiente de aprobación</strong>. Te notificaremos cuando el administrador responda.
+                    </Alert>
+                )}
+
+                {latestRequest && latestRequest.estado === 'RECHAZADA' && (
+                    <Alert
+                        severity="error"
+                        sx={{ mb: 4, width: '100%', borderRadius: 2 }}
+                        action={
+                            <Button color="inherit" size="small" onClick={handleCloseRejected}>
+                                CERRAR
+                            </Button>
+                        }
+                    >
+                        <AlertTitle>Solicitud Rechazada</AlertTitle>
+                        Tu solicitud de acceso ha sido rechazada por el administrador.
+                    </Alert>
+                )}
+                {/* APROBADA is ignored as requested */}
 
                 <Grid container spacing={4} justifyContent="center" sx={{ width: '100%' }}>
                     {choices.map((choice, index) => (

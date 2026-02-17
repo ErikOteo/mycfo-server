@@ -237,7 +237,7 @@ export default function SignIn(props) {
           setLoading(false);
 
           // Redirigir al home usando navigate
-          navigate("/");
+          navigate("/dashboard");
         } catch (err) {
           setLoading(false);
           console.error("Error loading user profile:", err);

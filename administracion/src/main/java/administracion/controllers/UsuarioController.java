@@ -58,6 +58,12 @@ public class UsuarioController {
         return ResponseEntity.ok(empleados);
     }
 
+    @GetMapping("/empresa/{empresaId}/interno")
+    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleadosInterno(@PathVariable Long empresaId) {
+        List<UsuarioDTO> empleados = usuarioService.obtenerEmpleadosPorEmpresa(empresaId);
+        return ResponseEntity.ok(empleados);
+    }
+
     @PutMapping("/{sub}")
     public ResponseEntity<UsuarioDTO> actualizarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,

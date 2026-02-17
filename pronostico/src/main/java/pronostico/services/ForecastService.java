@@ -108,10 +108,16 @@ public class ForecastService {
         // forecast
         List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales, moneda);
 
-        // 3. Llamar al servicio de forecast
+        // 3. Validar cantidad de datos históricos (mínimo 6 meses)
+        if (dataHistorica.size() < 6) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos insuficientes: Se requieren al menos 6 meses de datos históricos para generar el pronóstico.");
+        }
+
+        // 4. Llamar al servicio de forecast
         Map<String, Object> responseForecast = llamarServicioForecast(dataHistorica, horizonteMeses);
 
-        // 4. Combinar datos históricos (real) con estimados
+        // 5. Combinar datos históricos (real) con estimados
         Map<String, Object> resultadoCombinado = combinarDatosRealesYEstimados(dataHistorica, responseForecast);
 
         log.info("Rolling forecast generado exitosamente para organización {}", organizacionId);

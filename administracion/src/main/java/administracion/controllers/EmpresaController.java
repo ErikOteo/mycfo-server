@@ -61,16 +61,13 @@ public class EmpresaController {
     @GetMapping("/buscar")
     public ResponseEntity<List<EmpresaDTO>> buscarEmpresas(
             @RequestParam String nombre,
-            @RequestHeader(value = "X-Usuario-Sub") String subActual) {
+            @RequestHeader(value = "X-Usuario-Sub", required = false) String subActual) {
         try {
             if (nombre == null || nombre.length() < 3) {
                 return ResponseEntity.badRequest().build();
             }
-            // Cualquiera autenticado puede buscar para unirse, verificamos que el sub
-            // exista idealmente
-            // Pero como mínimo requerimos el header
-            if (subActual == null)
-                return ResponseEntity.badRequest().build();
+            // Permitimos búsqueda pública para el registro de usuarios
+            // No validamos subActual aquí
 
             List<EmpresaDTO> empresas = empresaService.buscarEmpresasPorNombre(nombre);
             return ResponseEntity.ok(empresas);

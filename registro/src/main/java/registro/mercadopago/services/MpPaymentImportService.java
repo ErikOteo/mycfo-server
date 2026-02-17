@@ -6,6 +6,7 @@ import java.util.List;
 public interface MpPaymentImportService {
     int importPaymentById(String userIdApp, Long paymentId, String usuarioSub);
     int importByMonth(String userIdApp, int month, int year, String usuarioSub);
+    int importWalletByMonth(String userIdApp, int month, int year, String usuarioSub);
     int importByExternalReference(String userIdApp, String externalRef, String usuarioSub);
     
     // Métodos de preview (sin guardar)

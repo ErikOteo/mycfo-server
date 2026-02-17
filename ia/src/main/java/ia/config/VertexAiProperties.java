@@ -15,6 +15,7 @@ public class VertexAiProperties {
     private String location = "us-central1";
     private String model = "gemini-2.5-flash";
     private String credentialsPath;
-    private double temperature = 0.0;
+    private double temperature = 0.55;
+    private double topP = 0.9;
     private int maxOutputTokens = 2048;
 }

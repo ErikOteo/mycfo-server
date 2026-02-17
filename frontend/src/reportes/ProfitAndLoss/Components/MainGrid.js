@@ -314,7 +314,7 @@ export default function MainGrid() {
                             <BarChart data={dataGrafico}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                                 <XAxis dataKey="mes" />
-                                <YAxis />
+                                <YAxis tickFormatter={(v) => Number(v).toLocaleString('es-AR')} />
                                 <Tooltip formatter={(v) => formatCurrency(v)} />
                                 <Legend />
                                 <Bar dataKey="Ingresos" fill="#2e7d32" />

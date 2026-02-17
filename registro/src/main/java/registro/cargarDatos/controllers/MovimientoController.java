@@ -47,20 +47,20 @@ public class MovimientoController {
     public ResponseEntity<Movimiento> crearMovimiento(
             @RequestBody Movimiento movimiento,
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub) {
-        
+
         try {
             // Establecer usuario desde el header
             movimiento.setUsuarioId(usuarioSub);
-            
+
             // Obtener ID de empresa automáticamente desde administración
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             movimiento.setOrganizacionId(empresaId);
-            
+
             log.info("Creando movimiento para usuario: {} en empresa: {}", usuarioSub, empresaId);
-            
+
             Movimiento guardado = movimientoService.guardarMovimiento(movimiento);
             return ResponseEntity.ok(guardado);
-            
+
         } catch (RuntimeException e) {
             log.error("Error al crear movimiento: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
@@ -93,18 +93,18 @@ public class MovimientoController {
             if (existente == null) {
                 return ResponseEntity.notFound().build();
             }
-            
+
             // Verificar que el usuario tenga permisos (mismo usuario o misma empresa)
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             if (!existente.getOrganizacionId().equals(empresaId)) {
                 log.warn("Usuario {} intentó editar movimiento de otra empresa", usuarioSub);
                 return ResponseEntity.status(403).build();
             }
-            
+
             log.info("Actualizando movimiento {} para usuario: {}", id, usuarioSub);
             Movimiento actualizado = movimientoService.actualizarMovimiento(id, movimiento);
             return ResponseEntity.ok(actualizado);
-            
+
         } catch (RuntimeException e) {
             log.error("Error al actualizar movimiento {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().build();
@@ -124,18 +124,18 @@ public class MovimientoController {
             if (existente == null) {
                 return ResponseEntity.notFound().build();
             }
-            
+
             // Verificar que el usuario tenga permisos
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             if (!existente.getOrganizacionId().equals(empresaId)) {
                 log.warn("Usuario {} intentó eliminar movimiento de otra empresa", usuarioSub);
                 return ResponseEntity.status(403).build();
             }
-            
+
             log.info("Eliminando movimiento {} para usuario: {}", id, usuarioSub);
             movimientoService.eliminarMovimiento(id);
             return ResponseEntity.noContent().build();
-            
+
         } catch (RuntimeException e) {
             log.error("Error al eliminar movimiento {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().build();
@@ -163,7 +163,7 @@ public class MovimientoController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "fechaEmision") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
-        
+
         try {
             // Obtener empresa del usuario
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
@@ -176,12 +176,12 @@ public class MovimientoController {
                     return ResponseEntity.badRequest().build();
                 }
             }
-            
+
             Sort.Direction direction = sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
             Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
-            
+
             log.debug("Obteniendo movimientos para empresa: {}", empresaId);
-            
+
             Page<Movimiento> movimientos = movimientoService.obtenerMovimientos(
                     empresaId,
                     null, // usuarioId - null para traer todos de la empresa
@@ -195,17 +195,16 @@ public class MovimientoController {
                     montoMax,
                     search,
                     searchDate,
-                    pageable
-            );
-            
+                    pageable);
+
             return ResponseEntity.ok(movimientos);
-            
+
         } catch (RuntimeException e) {
             log.error("Error al obtener movimientos: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
-    
+
     /**
      * Obtener todos los movimientos sin paginación
      */
@@ -235,9 +234,9 @@ public class MovimientoController {
                     return ResponseEntity.badRequest().build();
                 }
             }
-            
+
             log.debug("Obteniendo todos los movimientos para empresa: {}", empresaId);
-            
+
             List<Movimiento> movimientos = movimientoService.obtenerTodosLosMovimientos(
                     empresaId,
                     null, // usuarioId - null para traer todos de la empresa
@@ -250,17 +249,16 @@ public class MovimientoController {
                     montoMin,
                     montoMax,
                     search,
-                    searchDate
-            );
-            
+                    searchDate);
+
             return ResponseEntity.ok(movimientos);
-            
+
         } catch (RuntimeException e) {
             log.error("Error al obtener todos los movimientos: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
-    
+
     /**
      * Obtener movimientos agrupados por mes y tipo
      */
@@ -272,15 +270,15 @@ public class MovimientoController {
             @RequestParam(required = false) List<TipoMovimiento> tipos,
             @RequestParam(required = false) Boolean conciliado,
             @RequestParam(required = false) String nombreRelacionado) {
-        
+
         try {
             // Obtener empresa del usuario
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-            
+
             log.debug("Obteniendo movimientos mensuales para empresa: {}", empresaId);
-            
-            Map<String, Map<TipoMovimiento, List<Movimiento>>> movimientosMensuales = 
-                    movimientoService.obtenerMovimientosPorMes(
+
+            Map<String, Map<TipoMovimiento, List<Movimiento>>> movimientosMensuales = movimientoService
+                    .obtenerMovimientosPorMes(
                             empresaId,
                             null, // usuarioId - null para traer todos de la empresa
                             fechaDesde,
@@ -289,11 +287,10 @@ public class MovimientoController {
                             conciliado,
                             nombreRelacionado,
                             null,
-                            null
-                    );
-            
+                            null);
+
             return ResponseEntity.ok(movimientosMensuales);
-            
+
         } catch (RuntimeException e) {
             log.error("Error al obtener movimientos mensuales: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
@@ -307,12 +304,12 @@ public class MovimientoController {
     @GetMapping("/empresa/{organizacionId}/mensuales")
     public ResponseEntity<Map<String, Map<TipoMovimiento, List<Movimiento>>>> obtenerMovimientosMensualesPorEmpresa(
             @PathVariable Long organizacionId) {
-        
+
         try {
             log.debug("Obteniendo movimientos mensuales para empresa: {} (endpoint interno)", organizacionId);
-            
-            Map<String, Map<TipoMovimiento, List<Movimiento>>> movimientosMensuales = 
-                    movimientoService.obtenerMovimientosPorMes(
+
+            Map<String, Map<TipoMovimiento, List<Movimiento>>> movimientosMensuales = movimientoService
+                    .obtenerMovimientosPorMes(
                             organizacionId,
                             null,
                             null,
@@ -321,11 +318,10 @@ public class MovimientoController {
                             null,
                             null,
                             null,
-                            null
-                    );
-            
+                            null);
+
             return ResponseEntity.ok(movimientosMensuales);
-            
+
         } catch (RuntimeException e) {
             log.error("Error al obtener movimientos mensuales: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
@@ -335,8 +331,7 @@ public class MovimientoController {
     @GetMapping("/resumen/mensual")
     public ResponseEntity<ResumenMensualResponse> obtenerResumenMensual(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             // Para reportes/ dashboard queremos siempre el resumen a nivel empresa,
@@ -356,8 +351,7 @@ public class MovimientoController {
             @RequestParam(required = false, defaultValue = "12") Integer meses,
             @RequestParam(required = false, defaultValue = "6") Integer limiteMovimientos,
             @RequestParam(required = false, defaultValue = "6") Integer limiteFacturas,
-            @RequestParam(required = false) String moneda
-    ) {
+            @RequestParam(required = false) String moneda) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
 
@@ -375,47 +369,45 @@ public class MovimientoController {
             int limiteMovsSeguros = limiteMovimientos != null ? Math.max(limiteMovimientos, 1) : 6;
             int limiteFactSeguros = limiteFacturas != null ? Math.max(limiteFacturas, 1) : 6;
 
-            ResumenMensualResponse resumenMensual = movimientoService.obtenerResumenMensual(empresaId, null, fechaBase, monedaEnum);
+            ResumenMensualResponse resumenMensual = movimientoService.obtenerResumenMensual(empresaId, null, fechaBase,
+                    monedaEnum);
             MontosMensualesResponse ingresosMensuales = movimientoService.obtenerIngresosMensuales(
                     empresaId,
                     usuarioSub,
                     fechaBase,
                     mesesSeguros,
-                    monedaEnum
-            );
+                    monedaEnum);
             MontosMensualesResponse egresosMensuales = movimientoService.obtenerEgresosMensuales(
                     empresaId,
                     usuarioSub,
                     fechaBase,
                     mesesSeguros,
-                    monedaEnum
-            );
+                    monedaEnum);
             MontosPorCategoriaResponse ingresosPorCategoria = movimientoService.obtenerIngresosPorCategoria(
                     empresaId,
                     usuarioSub,
                     fechaBase,
-                    monedaEnum
-            );
+                    monedaEnum);
             MontosPorCategoriaResponse egresosPorCategoria = movimientoService.obtenerEgresosPorCategoria(
                     empresaId,
                     usuarioSub,
                     fechaBase,
-                    monedaEnum
-            );
+                    monedaEnum);
             ConciliacionResumenResponse conciliacion = movimientoService.obtenerResumenConciliacion(
                     empresaId,
                     usuarioSub,
                     fechaBase,
-                    monedaEnum
-            );
+                    monedaEnum);
 
             Double saldoTotalValor = movimientoService.obtenerSaldoTotalEmpresa(empresaId, monedaEnum);
             SaldoTotalResponse saldoTotal = SaldoTotalResponse.builder()
                     .organizacionId(empresaId)
                     .saldoTotal(saldoTotalValor)
+                    .moneda(monedaEnum != null ? monedaEnum.name() : "ARS")
                     .build();
 
-            Pageable movimientosPageable = PageRequest.of(0, limiteMovsSeguros, Sort.by(Sort.Direction.DESC, "fechaEmision"));
+            Pageable movimientosPageable = PageRequest.of(0, limiteMovsSeguros,
+                    Sort.by(Sort.Direction.DESC, "fechaEmision"));
             Page<Movimiento> movimientosPage = movimientoService.obtenerMovimientos(
                     empresaId,
                     null,
@@ -429,16 +421,15 @@ public class MovimientoController {
                     null,
                     null,
                     null,
-                    movimientosPageable
-            );
+                    movimientosPageable);
             List<Movimiento> movimientosRecientes = movimientosPage.getContent();
 
-            Pageable facturasPageable = PageRequest.of(0, limiteFactSeguros, Sort.by(Sort.Direction.DESC, "fechaEmision"));
+            Pageable facturasPageable = PageRequest.of(0, limiteFactSeguros,
+                    Sort.by(Sort.Direction.DESC, "fechaEmision"));
             org.springframework.data.domain.Page<Factura> facturasPage = facturaService.listarPaginadasPorOrganizacion(
                     empresaId,
                     monedaEnum,
-                    facturasPageable
-            );
+                    facturasPageable);
             List<Factura> facturasRecientes = facturasPage.getContent();
 
             DashboardSummaryResponse response = DashboardSummaryResponse.builder()
@@ -464,16 +455,14 @@ public class MovimientoController {
     public ResponseEntity<MontosMensualesResponse> obtenerIngresosMensuales(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
-            @RequestParam(required = false, defaultValue = "12") Integer meses
-    ) {
+            @RequestParam(required = false, defaultValue = "12") Integer meses) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             MontosMensualesResponse response = movimientoService.obtenerIngresosMensuales(
                     empresaId,
                     usuarioSub,
                     fecha,
-                    meses != null ? meses : 12
-            );
+                    meses != null ? meses : 12);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Error al obtener ingresos mensuales: {}", e.getMessage());
@@ -485,16 +474,14 @@ public class MovimientoController {
     public ResponseEntity<MontosMensualesResponse> obtenerEgresosMensuales(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
-            @RequestParam(required = false, defaultValue = "12") Integer meses
-    ) {
+            @RequestParam(required = false, defaultValue = "12") Integer meses) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             MontosMensualesResponse response = movimientoService.obtenerEgresosMensuales(
                     empresaId,
                     usuarioSub,
                     fecha,
-                    meses != null ? meses : 12
-            );
+                    meses != null ? meses : 12);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Error al obtener egresos mensuales: {}", e.getMessage());
@@ -505,15 +492,13 @@ public class MovimientoController {
     @GetMapping("/resumen/ingresos-categorias")
     public ResponseEntity<MontosPorCategoriaResponse> obtenerIngresosPorCategoria(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             MontosPorCategoriaResponse response = movimientoService.obtenerIngresosPorCategoria(
                     empresaId,
                     usuarioSub,
-                    fecha
-            );
+                    fecha);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Error al obtener ventas por categoría: {}", e.getMessage());
@@ -524,15 +509,13 @@ public class MovimientoController {
     @GetMapping("/resumen/egresos-categorias")
     public ResponseEntity<MontosPorCategoriaResponse> obtenerEgresosPorCategoria(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             MontosPorCategoriaResponse response = movimientoService.obtenerEgresosPorCategoria(
                     empresaId,
                     usuarioSub,
-                    fecha
-            );
+                    fecha);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Error al obtener egresos por categoria: {}", e.getMessage());
@@ -543,15 +526,13 @@ public class MovimientoController {
     @GetMapping("/resumen/conciliacion")
     public ResponseEntity<ConciliacionResumenResponse> obtenerResumenConciliacion(
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha
-    ) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             ConciliacionResumenResponse response = movimientoService.obtenerResumenConciliacion(
                     empresaId,
                     usuarioSub,
-                    fecha
-            );
+                    fecha);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Error al obtener resumen de conciliacion: {}", e.getMessage());
@@ -561,14 +542,25 @@ public class MovimientoController {
 
     @GetMapping("/resumen/saldo-total")
     public ResponseEntity<SaldoTotalResponse> obtenerSaldoTotalEmpresa(
-            @RequestHeader(value = "X-Usuario-Sub") String usuarioSub
-    ) {
+            @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
+            @RequestParam(required = false) String moneda) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-            Double saldoTotal = movimientoService.obtenerSaldoTotalEmpresa(empresaId);
+
+            TipoMoneda monedaEnum = null;
+            if (moneda != null) {
+                try {
+                    monedaEnum = TipoMoneda.fromString(moneda);
+                } catch (IllegalArgumentException ex) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+
+            Double saldoTotal = movimientoService.obtenerSaldoTotalEmpresa(empresaId, monedaEnum);
             SaldoTotalResponse response = SaldoTotalResponse.builder()
                     .organizacionId(empresaId)
                     .saldoTotal(saldoTotal)
+                    .moneda(monedaEnum != null ? monedaEnum.name() : "ARS")
                     .build();
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
@@ -586,8 +578,7 @@ public class MovimientoController {
             @RequestHeader(value = "X-Usuario-Sub") String usuarioSub,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
-            @RequestParam(required = false) String moneda
-    ) {
+            @RequestParam(required = false) String moneda) {
         try {
             Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
             TipoMoneda monedaEnum = null;
@@ -598,13 +589,13 @@ public class MovimientoController {
                     return ResponseEntity.badRequest().build();
                 }
             }
-            
-            log.info("Obteniendo movimientos para presupuesto - Empresa: {}, Desde: {}, Hasta: {}", 
+
+            log.info("Obteniendo movimientos para presupuesto - Empresa: {}, Desde: {}, Hasta: {}",
                     empresaId, fechaDesde, fechaHasta);
-            
+
             MovimientosPresupuestoResponse response = movimientoService.obtenerMovimientosParaPresupuesto(
                     empresaId, fechaDesde, fechaHasta, monedaEnum);
-            
+
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             log.error("Error al obtener movimientos para presupuesto: {}", e.getMessage());

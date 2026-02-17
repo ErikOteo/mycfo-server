@@ -7,6 +7,12 @@ import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
+import Stack from "@mui/material/Stack";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
 
 import CamposRequeridos from "./components/CamposRequeridos";
 import ResumenCarga from "./components/ResumenCarga";
@@ -26,25 +32,29 @@ export default function CargaMovimientos({ onCargaCompletada }) {
   const [previewData, setPreviewData] = React.useState([]);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [fileName, setFileName] = React.useState("");
+  const [helpOpen, setHelpOpen] = React.useState(false);
   const [excelLibreConfig, setExcelLibreConfig] = React.useState({
-    columnMap: { fecha: 0, descripcion: 1, monto: 2 },
+    columnMap: { fecha: 1, descripcion: 2, monto: 3 },
     dataStartRow: 2,
     dateFormat: "dd/MM/yyyy",
     decimalSeparator: ",",
   });
-  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
+  const [snackbar, setSnackbar] = React.useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
   const obtenerUsuarioSub = () => sessionStorage.getItem("sub");
 
   const handleTipoOrigenChange = (event) => {
     const value = event.target.value;
-    // Mostrar opciones pero ignorar selección para las bloqueadas
     const bloqueados = ["modo"];
     if (bloqueados.includes(value)) return;
     setTipoOrigen(value);
     if (value !== "excel-libre") {
       setExcelLibreConfig((prev) => ({
         ...prev,
-        columnMap: prev.columnMap || { fecha: 0, descripcion: 1, monto: 2 },
+        columnMap: prev.columnMap || { fecha: 1, descripcion: 2, monto: 3 },
       }));
     }
   };
@@ -73,7 +83,12 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         colMap.descripcion === undefined ||
         colMap.monto === undefined
       ) {
-        setSnackbar({ open: true, message: "Configurá el mapeo: fecha, descripción y monto son obligatorios.", severity: "warning" });
+        setSnackbar({
+          open: true,
+          message:
+            "Configura el mapeo: fecha, descripcion y monto son obligatorios.",
+          severity: "warning",
+        });
         return;
       }
     }
@@ -82,7 +97,12 @@ export default function CargaMovimientos({ onCargaCompletada }) {
     try {
       const usuarioSub = obtenerUsuarioSub();
       if (!usuarioSub) {
-        setSnackbar({ open: true, message: "No se encontró la sesión del usuario. Volvé a iniciar sesión.", severity: "error" });
+        setSnackbar({
+          open: true,
+          message:
+            "No se encontro la sesion del usuario. Volve a iniciar sesion.",
+          severity: "error",
+        });
         setPreviewLoading(false);
         return;
       }
@@ -115,7 +135,11 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       setPreviewOpen(true);
     } catch (error) {
       console.error("Error al procesar el archivo:", error);
-      setSnackbar({ open: true, message: "Ocurrió un error al procesar el archivo. Revisar consola.", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Ocurrio un error al procesar el archivo. Revisar consola.",
+        severity: "error",
+      });
     } finally {
       setPreviewLoading(false);
     }
@@ -125,7 +149,12 @@ export default function CargaMovimientos({ onCargaCompletada }) {
     try {
       const usuarioSub = obtenerUsuarioSub();
       if (!usuarioSub) {
-        setSnackbar({ open: true, message: "No se encontró la sesión del usuario. Volvé a iniciar sesión.", severity: "error" });
+        setSnackbar({
+          open: true,
+          message:
+            "No se encontro la sesion del usuario. Volve a iniciar sesion.",
+          severity: "error",
+        });
         return;
       }
       const requestData = {
@@ -157,13 +186,35 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       setFile(null);
       setFileName("");
 
-      // Notificar que la carga se completó
       onCargaCompletada?.();
     } catch (error) {
       console.error("Error al guardar los registros:", error);
-      setSnackbar({ open: true, message: "Ocurrió un error al guardar los registros. Revisar consola.", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Ocurrio un error al guardar los registros. Revisar consola.",
+        severity: "error",
+      });
     }
   };
+
+  const guiaPasos = [
+    {
+      titulo: "1. Elegi las 3 columnas obligatorias",
+      desc: "Completa Fecha, Descripcion y Monto. La columna A es 1, B es 2, C es 3.",
+    },
+    {
+      titulo: "2. Indica desde que fila hay datos",
+      desc: "La fila de inicio es la primera fila con movimientos, no la fila de encabezados.",
+    },
+    {
+      titulo: "3. Revisa formato de fecha",
+      desc: "Si tus fechas son 31/01/2026 usa dd/MM/yyyy. Si no coincide, ajusta este campo.",
+    },
+    {
+      titulo: "4. Ejecuta Vista Previa",
+      desc: "Valida duplicados, categorias sugeridas y luego guarda solo los movimientos seleccionados.",
+    },
+  ];
 
   return (
     <Box
@@ -172,7 +223,7 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       <Typography component="h2" variant="h6" sx={{ mb: 3 }}>
         Carga Excel
       </Typography>
-      {/* Desplegable para tipo de archivo */}
+
       <FormControl fullWidth sx={{ mb: 4 }} size="small">
         <InputLabel id="tipo-origen-label">Tipo de archivo</InputLabel>
         <Select
@@ -182,33 +233,38 @@ export default function CargaMovimientos({ onCargaCompletada }) {
           label="Tipo de archivo"
           onChange={handleTipoOrigenChange}
         >
-          <MenuItem value="">Seleccione una opción</MenuItem>
-          <MenuItem value="mycfo">MyCFO - Plantilla Genérica</MenuItem>
+          <MenuItem value="">Seleccione una opcion</MenuItem>
+          <MenuItem value="mycfo">MyCFO - Plantilla Generica</MenuItem>
           <MenuItem value="excel-libre">Excel libre - Mapeo Manual</MenuItem>
           <MenuItem value="mercado-pago">Mercado Pago</MenuItem>
           <MenuItem value="santander">Banco Santander</MenuItem>
           <MenuItem value="galicia">Banco Galicia</MenuItem>
-          <MenuItem value="nacion">Banco Nación</MenuItem>
-          <MenuItem value="uala">Ualá (PDF)</MenuItem>
+          <MenuItem value="nacion">Banco Nacion</MenuItem>
+          <MenuItem value="uala">Uala (PDF)</MenuItem>
         </Select>
       </FormControl>
+
       {tipoOrigen === "mycfo" && <CamposRequeridos sx={{ mb: 4 }} />}
+
       {tipoOrigen === "excel-libre" && (
         <Box sx={{ mb: 3 }}>
           <ExcelLibreMapper
             value={excelLibreConfig}
+            onOpenHelp={() => setHelpOpen(true)}
             onChange={(next) =>
               setExcelLibreConfig((prev) => ({ ...prev, ...next }))
             }
           />
         </Box>
       )}
+
       <DropzoneUploader
         onFileSelected={handleFileSelected}
         width="100%"
         height={120}
         sx={{ mb: 3 }}
       />
+
       <CustomButton
         width="100%"
         onClick={procesarArchivo}
@@ -217,16 +273,16 @@ export default function CargaMovimientos({ onCargaCompletada }) {
       >
         {previewLoading ? "Procesando..." : "Vista Previa"}
       </CustomButton>
+
       {resumen && (
         <Box mt={4} mb={4}>
-          {" "}
-          {/* <-- agrega mb aquí para separar de FormControl */}
           <ResumenCarga resumen={resumen} sx={{ mb: 3 }} />
           {resumen.errores?.length > 0 && (
             <TablaErrores errores={resumen.errores} />
           )}
         </Box>
       )}
+
       <ExcelPreviewDialog
         open={previewOpen}
         onClose={() => {
@@ -239,6 +295,48 @@ export default function CargaMovimientos({ onCargaCompletada }) {
         fileName={fileName}
         tipoOrigen={tipoOrigen}
       />
+
+      <Dialog
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+          Guia de mapeo libre
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {guiaPasos.map((paso, index) => (
+              <Box key={paso.titulo}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{ fontWeight: 600, color: "primary.main", mb: 0.5 }}
+                >
+                  {paso.titulo}
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.primary", opacity: 0.8 }}>
+                  {paso.desc}
+                </Typography>
+                {index < guiaPasos.length - 1 && <Divider sx={{ mt: 2, opacity: 0.5 }} />}
+              </Box>
+            ))}
+          </Stack>
+
+          <Box sx={{ mt: 4, textAlign: "center" }}>
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={() => setHelpOpen(false)}
+              sx={{ borderRadius: 2 }}
+            >
+              Entendido
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

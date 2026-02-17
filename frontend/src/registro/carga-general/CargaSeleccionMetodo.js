@@ -46,7 +46,7 @@ export default function CargaSeleccionMetodo() {
       <Typography variant="h5" sx={{ mb: 2 }}>
         Selección de método
       </Typography>
-      <Typography variant="subtitle1" sx={{ mb: 4 }}>
+      <Typography variant="subtitle1" sx={{ mb: 4, display: { xs: 'none', md: 'block' } }}>
         Elegí cómo querés cargar tu {tipo}
       </Typography>
 
@@ -68,8 +68,8 @@ export default function CargaSeleccionMetodo() {
                 borderRadius: 3,
                 border: "2px solid",
                 borderColor: "divider",
-                width: 180,
-                height: 180,
+                width: { xs: 120, md: 180 }, // 120px en mobile, 180px en desktop
+                height: { xs: 120, md: 180 }, // 120px en mobile, 180px en desktop
                 justifyContent: "center",
                 alignItems: "center",
                 bgcolor: "background.paper",

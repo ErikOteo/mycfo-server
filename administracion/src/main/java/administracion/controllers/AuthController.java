@@ -24,6 +24,7 @@ public class AuthController {
     private final UsuarioService usuarioService;
     private final UsuarioRepository usuarioRepository;
     private final EmpresaRepository empresaRepository;
+    private final administracion.services.SolicitudAccesoService solicitudAccesoService;
 
     /**
      * Registra un nuevo usuario completo (Cognito + BD)
@@ -56,37 +57,61 @@ public class AuthController {
                     dto.getApellido(),
                     dto.getNombreEmpresa());
 
-            // 4. SEGUNDO: Buscar o crear empresa en BD
-            Empresa empresa = empresaRepository.findByNombreIgnoreCase(dto.getNombreEmpresa())
-                    .orElseGet(() -> {
-                        Empresa nuevaEmpresa = new Empresa();
-                        nuevaEmpresa.setNombre(dto.getNombreEmpresa());
-                        nuevaEmpresa.setDescripcion("Empresa creada desde registro");
-                        return empresaRepository.save(nuevaEmpresa);
-                    });
+            // 4. SEGUNDO: Verificar si la empresa ya existe
+            java.util.Optional<Empresa> empresaExistente = empresaRepository
+                    .findByNombreIgnoreCase(dto.getNombreEmpresa());
 
-            // 5. TERCERO: Crear usuario en BD
+            // 5. Crear usuario en BD
             Usuario usuario = new Usuario();
             usuario.setSub(sub);
             usuario.setNombre(dto.getNombre() + " " + dto.getApellido());
             usuario.setEmail(dto.getEmail());
+            usuario.setActivo(true);
 
-            // Determinar rol: ADMINISTRADOR si es el primer usuario de la empresa, NORMAL
-            // si es invitación
-            boolean esPrimerUsuario = usuarioRepository.countByEmpresa(empresa) == 0;
             boolean esInvitacion = dto.getEsInvitacion() != null && dto.getEsInvitacion();
 
-            if (esPrimerUsuario && !esInvitacion) {
-                usuario.setRol("ADMINISTRADOR"); // Primer usuario de empresa nueva es administrador
-                usuario.setEsPropietario(true); // El creador es el dueño absoluto
-            } else {
-                usuario.setRol("COLABORADOR"); // Usuarios invitados siempre son COLABORADOR
-                usuario.setEsPropietario(false);
-            }
+            if (empresaExistente.isPresent()) {
+                // CASO 1: Empresa EXISTE -> Crear usuario huerfano + Solicitud de Acceso
+                // A MENOS que sea una invitacion explicita, en cuyo caso lo unimos directo
 
-            usuario.setActivo(true);
-            usuario.setEmpresa(empresa);
-            usuarioRepository.save(usuario);
+                if (esInvitacion) {
+                    // Si es invitación, lo unimos directo como COLABORADOR
+                    usuario.setRol("COLABORADOR");
+                    usuario.setEsPropietario(false);
+                    usuario.setEmpresa(empresaExistente.get());
+                    usuarioRepository.save(usuario);
+                } else {
+                    // Si NO es invitación (se unió por buscador), creamos solicitud
+                    usuario.setRol("COLABORADOR");
+                    usuario.setEsPropietario(false);
+                    usuario.setEmpresa(null); // Sin empresa asignada aún
+                    usuarioRepository.save(usuario);
+
+                    // Crear solicitud de acceso
+                    try {
+                        solicitudAccesoService.crearSolicitud(
+                                usuario.getSub(),
+                                usuario.getNombre(),
+                                usuario.getEmail(),
+                                empresaExistente.get().getId());
+                    } catch (Exception ex) {
+                        System.err.println("Error creando solicitud automática: " + ex.getMessage());
+                        // No fallamos el registro, el usuario podrá pedirla manualmente después
+                    }
+                }
+
+            } else {
+                // CASO 2: Empresa NUEVA -> Crear empresa + Usuario ADMIN
+                Empresa nuevaEmpresa = new Empresa();
+                nuevaEmpresa.setNombre(dto.getNombreEmpresa());
+                nuevaEmpresa.setDescripcion("Empresa creada desde registro");
+                Empresa empresaGuardada = empresaRepository.save(nuevaEmpresa);
+
+                usuario.setRol("ADMINISTRADOR");
+                usuario.setEsPropietario(true);
+                usuario.setEmpresa(empresaGuardada);
+                usuarioRepository.save(usuario);
+            }
 
             // 6. Retornar éxito (código enviado automáticamente por Cognito)
             Map<String, String> response = new HashMap<>();

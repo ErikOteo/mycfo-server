@@ -6,7 +6,7 @@ import {
   Snackbar, Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import http from '../../../api/http';
 import { formatCurrency } from '../../../utils/currency';
@@ -128,6 +128,7 @@ async function getRealPorMes(meses, tipo, moneda) {
 export default function PresupuestoDetalle() {
   const { nombre: nombreUrl } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const isLightMode = theme.palette.mode === 'light';
   const paletteVars = theme.vars?.palette ?? theme.palette;
@@ -183,33 +184,60 @@ export default function PresupuestoDetalle() {
   }, []);
 
   React.useEffect(() => {
+    let active = true;
+
     const cargar = async () => {
       try {
         setLoading(true);
         setError(null);
+        // Resetear estado al cambiar de URL para evitar mostrar datos del presupuesto anterior
+        setPresupuesto({
+          id: null,
+          nombre: '',
+          detalleMensual: [],
+        });
 
-        // 1) Buscar presupuesto por nombre
-        const res = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos`);
-        const listaPayload = res?.data;
-        let lista = [];
-        if (Array.isArray(listaPayload)) {
-          lista = listaPayload;
-        } else if (Array.isArray(listaPayload?.content)) {
-          lista = listaPayload.content;
+        // 1) Buscar presupuesto: por ID directo (si viene del state) o por nombre (fallback)
+        let encontrado = null;
+        const stateId = location.state?.presupuestoId;
+
+        if (stateId) {
+          // Ruta rápida: tenemos el ID del router state, fetch directo
+          try {
+            const resById = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${stateId}`);
+            if (resById?.data?.id) {
+              encontrado = resById.data;
+            }
+          } catch (e) {
+            console.warn('No se pudo obtener presupuesto por ID, intentando por nombre...', e);
+          }
         }
 
-        const slug = decodeURIComponent(nombreUrl || '')
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '-');
+        if (!encontrado) {
+          // Fallback: buscar por slug en la lista completa
+          const res = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos?size=1000`);
+          const listaPayload = res?.data;
+          let lista = [];
+          if (Array.isArray(listaPayload)) {
+            lista = listaPayload;
+          } else if (Array.isArray(listaPayload?.content)) {
+            lista = listaPayload.content;
+          }
 
-        const encontrado = lista.find(
-          (p) => (p?.nombre || '').trim().toLowerCase().replace(/\s+/g, '-') === slug
-        );
+          const slug = decodeURIComponent(nombreUrl || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '-');
+
+          encontrado = lista.find(
+            (p) => (p?.nombre || '').trim().toLowerCase().replace(/\s+/g, '-') === slug
+          );
+        }
+
+        if (!active) return;
 
         if (!encontrado?.id) {
           setPresupuesto({ id: null, nombre: 'No encontrado', detalleMensual: [] });
-          setLoading(false);
           return;
         }
 
@@ -217,13 +245,19 @@ export default function PresupuestoDetalle() {
         let nombreOficial = encontrado.nombre;
         try {
           const resHeader = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${encontrado.id}`);
-          if (resHeader?.data?.nombre) nombreOficial = resHeader.data.nombre;
+          if (active && resHeader?.data?.nombre) nombreOficial = resHeader.data.nombre;
         } catch { /* no crítico */ }
+
+        if (!active) return;
+
         const currencyDetected = detectCurrencyFromName(nombreOficial || encontrado.nombre);
         setPresupuestoCurrency(currencyDetected);
 
         // 3) Traer TOTALES mensuales del backend nuevo
         const resTot = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${encontrado.id}/totales`);
+
+        if (!active) return;
+
         const totales = Array.isArray(resTot.data) ? resTot.data : [];
 
         // 4) Mapear a la forma que usa el front
@@ -270,6 +304,8 @@ export default function PresupuestoDetalle() {
               moneda: currencyDetected
             });
 
+            if (!active) return;
+
             // Convertir la respuesta optimizada al formato esperado
             if (movimientosData?.datosMensuales) {
               movimientosData.datosMensuales.forEach(mesDatos => {
@@ -289,6 +325,7 @@ export default function PresupuestoDetalle() {
             }
           }
         } catch (movError) {
+          if (!active) return;
           console.error('❌ Error al obtener datos reales del presupuesto:', movError);
           setError((prev) => prev ?? 'No se pudieron cargar los datos reales del presupuesto.');
           // Fallback: calcular reales mes a mes usando el endpoint de movimientos con moneda
@@ -304,13 +341,17 @@ export default function PresupuestoDetalle() {
                 getRealPorMes(mesesDate, 'Ingreso', currencyDetected),
                 getRealPorMes(mesesDate, 'Egreso', currencyDetected),
               ]);
-              realesIngresoPorMes = ingresosFallback;
-              realesEgresoPorMes = egresosFallback;
+              if (active) {
+                realesIngresoPorMes = ingresosFallback;
+                realesEgresoPorMes = egresosFallback;
+              }
             }
           } catch (fallbackErr) {
             console.error('❌ Error en fallback de datos reales:', fallbackErr);
           }
         }
+
+        if (!active) return;
 
         const detalleMensualCompleto = detalleMensual.map((detalle) => {
           const mesKey = (detalle?.mes || '').slice(0, 7);
@@ -332,15 +373,23 @@ export default function PresupuestoDetalle() {
         });
 
       } catch (error) {
-        console.error('Error al cargar presupuesto:', error);
-        setError('Error al cargar el presupuesto');
-        setPresupuesto({ id: null, nombre: 'Error', detalleMensual: [] });
+        if (active) {
+          console.error('Error al cargar presupuesto:', error);
+          setError('Error al cargar el presupuesto');
+          setPresupuesto({ id: null, nombre: 'Error', detalleMensual: [] });
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     if (nombreUrl) cargar();
+
+    return () => {
+      active = false;
+    };
   }, [nombreUrl]);
 
   // ⚠️ Antes filtrabas por fila.id != null → vaciaba todo porque el endpoint no trae id.
@@ -384,13 +433,54 @@ export default function PresupuestoDetalle() {
   const resultadoReal = totalIngresoReal - totalEgresoReal;
   const resultadoEstimado = totalIngresoEst - totalEgresoEst;
 
+  // Lógica YTD (Year-To-Date) para la Salud
   const pctCumplimientoGlobal = (() => {
-    const base = Math.abs(resultadoEstimado) > 0 ? Math.abs(resultadoEstimado) : 1;
-    // cap 120% para pintar semáforo
-    return Math.max(0, Math.min(1.2, resultadoReal / base));
+    // 1. Determinar mes actual YYYY-MM
+    const now = new Date();
+    const currentYM = formatDate(now, 'yyyy-MM');
+
+    // 2. Filtrar meses que ya pasaron o son el actual (YTD)
+    //    Si el presupuesto es de un año futuro, esto dará array vacío -> estimadoYTD = 0 -> Salud Neutra
+    //    Si es de un año pasado, dará todo -> Salud Final
+    const datosYTD = datosMensualesRaw.filter((fila) => (fila.mes || '') <= currentYM);
+
+    // 3. Calcular estimado acumulado a la fecha (CON PROYECCIÓN LINEAL)
+    //    Si es mes pasado, suma 100%. Si es mes actual, suma proporcional al día.
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const actualFactor = Math.max(0.01, day / daysInMonth);
+
+    let ingresoEstYTD = 0;
+    let egresoEstYTD = 0;
+
+    datosYTD.forEach((fila) => {
+      const esActual = fila.mes === currentYM;
+      const f = esActual ? actualFactor : 1;
+
+      ingresoEstYTD += safeNumber(fila.ingresoEst) * f;
+      egresoEstYTD += safeNumber(fila.egresoEst) * f;
+    });
+
+    const resultadoEstimadoYTD = ingresoEstYTD - egresoEstYTD;
+
+    // 4. Comparar Real Global (que ya es YTD por definición) vs Estimado YTD Ajustado
+    const base = Math.abs(resultadoEstimadoYTD) > 0 ? Math.abs(resultadoEstimadoYTD) : 0;
+
+    if (base === 0) {
+      // Caso: Presupuesto futuro o sin estimaciones hasta la fecha
+      return -1; // Valor centinela para "No iniciado / Neutro"
+    }
+
+    // Sin tope de 120%
+    return Math.max(0, resultadoReal / base);
   })();
 
-  const salud = semaforoPorCumplimiento(pctCumplimientoGlobal);
+  const salud = (() => {
+    if (pctCumplimientoGlobal === -1) {
+      return { label: 'Salud: Pendiente', color: 'default' };
+    }
+    return semaforoPorCumplimiento(pctCumplimientoGlobal);
+  })();
 
   const chatbotContext = React.useMemo(
     () => ({
@@ -407,7 +497,7 @@ export default function PresupuestoDetalle() {
         totalIngresoEst,
         totalEgresoEst,
         resultadoEstimado,
-        cumplimiento: pctCumplimientoGlobal,
+        cumplimiento: pctCumplimientoGlobal === -1 ? 0 : pctCumplimientoGlobal,
         salud: salud?.label ?? null,
       },
       detalleMensual: Array.isArray(presupuesto.detalleMensual)
@@ -777,9 +867,15 @@ export default function PresupuestoDetalle() {
                 <Typography variant="h4" fontWeight="bold">
                   {formatCurrency(resultadoReal)}
                 </Typography>
-                <Typography variant="body2">
-                  {resultadoReal >= 0 ? 'Superávit' : 'Déficit'}
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                  Estimado: {formatCurrency(resultadoEstimado)}
                 </Typography>
+                <Chip
+                  label={resultadoReal >= 0 ? 'Superávit' : 'Déficit'}
+                  size="small"
+                  variant="outlined"
+                  sx={{ borderColor: 'rgba(255,255,255,0.7)', color: 'white', fontWeight: 600, mt: 1 }}
+                />
                 <Tooltip title="Ver meses ordenados por impacto en resultado">
                   <IconButton
                     size="small"
@@ -798,7 +894,7 @@ export default function PresupuestoDetalle() {
                 <Stack alignItems="center" spacing={1}>
                   <Chip label={`${salud.label}`} color={salud.color} />
                   <Typography variant="body2" color="text.secondary">
-                    Cumplimiento: {(pctCumplimientoGlobal * 100).toFixed(0)}%
+                    {pctCumplimientoGlobal === -1 ? 'Sin datos / Futuro' : `Cumplimiento: ${(pctCumplimientoGlobal * 100).toFixed(0)}%`}
                   </Typography>
                 </Stack>
               </Paper>

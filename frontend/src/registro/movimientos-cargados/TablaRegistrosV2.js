@@ -328,7 +328,8 @@ export default function TablaRegistrosV2() {
 
   useEffect(() => {
     fetchMaxMonto();
-  }, [fetchMaxMonto]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency]);
 
   const cargarMovimientos = useCallback(async () => {
     setLoading(true);
@@ -434,12 +435,23 @@ export default function TablaRegistrosV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recargar cuando cambie la paginación
+  // Recargar cuando cambie la paginación o filtros
   useEffect(() => {
     if (initializedRef.current) {
       cargarMovimientos();
     }
-  }, [cargarMovimientos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currency,
+    paginationModel.page,
+    paginationModel.pageSize,
+    debouncedSearch,
+    searchDateISO,
+    fechaDesde,
+    fechaHasta,
+    montoDesde,
+    montoHasta,
+  ]);
 
   // Abrir dialog para VER movimiento
   const handleVerMovimiento = (movimiento) => {
@@ -1131,9 +1143,9 @@ export default function TablaRegistrosV2() {
 
   const formatValorExport = (row, field) => {
     if (field === "montoTotal") {
-      const tipo = row.tipo || "";
+      const tipo = String(row.tipo || "").trim().toUpperCase();
       const moneda = row.moneda || "ARS";
-      const multiplicador = tipo === "Egreso" ? -1 : 1;
+      const multiplicador = tipo === "EGRESO" ? -1 : 1;
       const valor = Number(row.montoTotal || 0) * multiplicador;
       const signo = valor < 0 ? "-" : "";
       return `${signo}${new Intl.NumberFormat("es-AR", {
@@ -1152,19 +1164,55 @@ export default function TablaRegistrosV2() {
     return String(value);
   };
 
+  const formatValorExportExcel = (row, field) => {
+    if (field === "montoTotal") {
+      const tipo = String(row.tipo || "").trim().toUpperCase();
+      const monto = Number(row.montoTotal || 0);
+      const valorAbs = Math.abs(monto);
+      return tipo === "EGRESO" ? -valorAbs : valorAbs;
+    }
+
+    if (field === "moneda") {
+      return row.moneda || "ARS";
+    }
+
+    if (field === "fechaEmision") {
+      return formatearFecha(row.fechaEmision);
+    }
+
+    const value = row[field];
+    if (value === null || value === undefined) return "-";
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
   const handleExportExcel = async () => {
     const registros = await fetchMovimientosParaExportar();
     if (!registros.length) return;
 
-    const headers = exportColumns.map((c) => c.headerName);
+    const excelExportColumns = exportColumns.filter(
+      (c) => c.field !== "estado",
+    );
+    const montoIndex = excelExportColumns.findIndex(
+      (c) => c.field === "montoTotal",
+    );
+    const monedaColumn = { field: "moneda", headerName: "Moneda" };
+    if (montoIndex >= 0) {
+      excelExportColumns.splice(montoIndex + 1, 0, monedaColumn);
+    } else {
+      excelExportColumns.push(monedaColumn);
+    }
+
+    const headers = excelExportColumns.map((c) => c.headerName);
     const excelData = [
       headers,
       ...registros.map((row) =>
-        exportColumns.map((c) => formatValorExport(row, c.field)),
+        excelExportColumns.map((c) => formatValorExportExcel(row, c.field)),
       ),
     ];
 
-    const colsConfig = exportColumns.map(() => ({ wch: 18 }));
+    const colsConfig = excelExportColumns.map(() => ({ wch: 18 }));
 
     exportToExcel(excelData, "Movimientos", "Movimientos", colsConfig, [], [], {
       headerRows: [0],
@@ -1433,6 +1481,7 @@ export default function TablaRegistrosV2() {
           autoHeight
           // Paginación del servidor
           paginationMode={paginationMode}
+          sortingMode="server"
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           rowCount={rowCount}

@@ -352,7 +352,8 @@ const FacturaListPage = () => {
 
   useEffect(() => {
     fetchMaxMonto();
-  }, [fetchMaxMonto]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency]);
 
   const loadFacturas = useCallback(async () => {
     setLoading(true);
@@ -513,15 +514,7 @@ const FacturaListPage = () => {
     [setCurrency],
   );
 
-  const initialState = useMemo(
-    () => ({
-      pagination: { paginationModel: { pageSize: FACTURA_PAGE_SIZE } },
-      sorting: { sortModel: [{ field: "fechaEmision", sort: "desc" }] },
-    }),
-    [],
-  );
 
-  const paginationMode = "server";
 
   const validarFormulario = () => {
     const newErrors = {};
@@ -1157,7 +1150,8 @@ const FacturaListPage = () => {
             `${row.numeroDocumento}-${row.fechaEmision}`
           }
           // Paginación del servidor
-          paginationMode={paginationMode}
+          paginationMode="server"
+          sortingMode="server"
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           rowCount={rowCount}

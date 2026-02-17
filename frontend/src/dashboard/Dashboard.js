@@ -1,4 +1,4 @@
-import * as React from "react";
+﻿import * as React from "react";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -318,7 +318,8 @@ const mapMovementFromBackend = (item, index) => {
 
   return {
     id: item.id ?? item.uuid ?? `movement-${index}`,
-    tipo: item.tipo ?? item.tipoMovimiento ?? item.tipoOperacion ?? "Movimiento",
+    tipo:
+      item.tipo ?? item.tipoMovimiento ?? item.tipoOperacion ?? "Movimiento",
     montoTotal: toNumber(item.montoTotal ?? item.monto ?? item.importe ?? 0),
     moneda: item.moneda ?? item.monedaCodigo ?? "ARS",
     fechaEmision: item.fechaEmision ?? item.fecha ?? item.fechaRegistro ?? null,
@@ -390,7 +391,7 @@ const getRecentPeriods = (count = 6) =>
     }).format(date);
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
       2,
-      "0"
+      "0",
     )}`;
     return { label, value };
   });
@@ -407,7 +408,7 @@ const Dashboard = React.memo(() => {
   const fetchTimeoutRef = React.useRef();
   const activeRequestRef = React.useRef(0);
   const useMocks = React.useRef(
-    process.env.REACT_APP_USE_MOCKS === "true"
+    process.env.REACT_APP_USE_MOCKS === "true",
   ).current;
   const buildMockState = React.useCallback(
     () => ({
@@ -433,20 +434,22 @@ const Dashboard = React.memo(() => {
         data: mockExpensesByCategory,
       },
     }),
-    []
+    [],
   );
   const [snackbar, setSnackbar] = React.useState(null);
-  const [company, setCompany] = React.useState(sessionStorage.getItem("organizacionId") || null);
+  const [company, setCompany] = React.useState(
+    sessionStorage.getItem("organizacionId") || null,
+  );
   const periodOptions = React.useMemo(() => getRecentPeriods(6), []);
   const [period, setPeriod] = React.useState(periodOptions[0]?.value ?? "");
   const [currency, setCurrency] = usePreferredCurrency("ARS");
   const dashboardCacheKey = React.useMemo(
     () => `${DASHBOARD_CACHE_KEY}_${currency}`,
-    [currency]
+    [currency],
   );
   const formatCurrency = React.useMemo(
     () => (value) => formatCurrencyByCode(value, currency),
-    [currency]
+    [currency],
   );
 
   const chatbotContext = React.useMemo(
@@ -473,7 +476,7 @@ const Dashboard = React.memo(() => {
         : [],
       budget: state.budget?.data ?? null,
     }),
-    [currency, period, state]
+    [currency, period, state],
   );
 
   useChatbotScreenContext(chatbotContext);
@@ -503,8 +506,18 @@ const Dashboard = React.memo(() => {
 
   const tieneAlgunPermiso = React.useCallback(() => {
     if (esAdminTotal()) return true;
-    const modulos = ['carga', 'movs', 'banco', 'facts', 'concil', 'reps', 'pron', 'pres', 'admin'];
-    return modulos.some(m => tienePermiso(m, 'view'));
+    const modulos = [
+      "carga",
+      "movs",
+      "banco",
+      "facts",
+      "concil",
+      "reps",
+      "pron",
+      "pres",
+      "admin",
+    ];
+    return modulos.some((m) => tienePermiso(m, "view"));
   }, [tienePermiso, esAdminTotal]);
 
   const loadDashboardData = React.useCallback(async () => {
@@ -513,32 +526,34 @@ const Dashboard = React.memo(() => {
 
     // 1. Intentar refrescar los permisos desde el servidor
     try {
-      const { data: profile } = await http.get(`${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`);
+      const { data: profile } = await http.get(
+        `${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`,
+      );
       if (profile && (profile.rol || profile.empresaId !== undefined)) {
         console.log("🔑 Perfil actualizado desde el servidor:", profile);
 
         // 1. Sincronizar Empresa
         if (profile.empresaId) {
-          sessionStorage.setItem('organizacionId', profile.empresaId);
+          sessionStorage.setItem("organizacionId", profile.empresaId);
           setCompany(profile.empresaId);
         } else {
-          sessionStorage.removeItem('organizacionId');
+          sessionStorage.removeItem("organizacionId");
           setCompany(null);
         }
 
         // 2. Sincronizar Rol y Permisos
         if (profile.rol) {
-          sessionStorage.setItem('rol', profile.rol);
-          if (profile.rol.includes('|PERM:')) {
-            const jsonPart = profile.rol.split('|PERM:')[1].split('|')[0];
-            sessionStorage.setItem('permisos', jsonPart);
+          sessionStorage.setItem("rol", profile.rol);
+          if (profile.rol.includes("|PERM:")) {
+            const jsonPart = profile.rol.split("|PERM:")[1].split("|")[0];
+            sessionStorage.setItem("permisos", jsonPart);
           } else {
-            sessionStorage.removeItem('permisos');
+            sessionStorage.removeItem("permisos");
           }
         }
 
         // 3. Notificar cambios
-        window.dispatchEvent(new Event('userDataUpdated'));
+        window.dispatchEvent(new Event("userDataUpdated"));
       }
     } catch (err) {
       console.warn("⚠️ No se pudieron refrescar los permisos:", err);
@@ -626,10 +641,18 @@ const Dashboard = React.memo(() => {
       });
 
       const periodoBase = String(
-        response?.periodoBase ?? response?.periodo ?? ""
+        response?.periodoBase ?? response?.periodo ?? "",
       );
-      const [baseYearStr] = periodoBase.split("-");
-      const targetYear = Number(baseYearStr) || new Date().getFullYear();
+      // Parsear la fecha base (YYYY-MM). Si falla, usar fecha actual.
+      let targetDate = new Date();
+      const [baseYearStr, baseMonthStr] = periodoBase.split("-");
+      const baseYear = Number(baseYearStr);
+      const baseMonth = Number(baseMonthStr);
+
+      if (Number.isFinite(baseYear) && Number.isFinite(baseMonth)) {
+        // baseMonth en Date es 0-index (Enero = 0) -> restamos 1
+        targetDate = new Date(baseYear, baseMonth - 1, 1);
+      }
 
       const totalsByPeriod = new Map();
       datos.forEach((item) => {
@@ -653,28 +676,37 @@ const Dashboard = React.memo(() => {
         return acc;
       }, new Map());
 
-      const pointsDetailed = Array.from({ length: 12 }, (_, index) => {
-        const date = new Date(targetYear, index, 1);
-        const key = `${date.getFullYear()}-${String(index + 1).padStart(
-          2,
-          "0"
-        )}`;
+      // Generar los últimos 12 meses terminando en targetDate
+      // Iteramos: i=11 (hace 11 meses) hasta i=0 (mes actual) para orden cronológico
+      const pointsDetailed = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(targetDate);
+        d.setMonth(d.getMonth() - i); // Restar meses
+
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+
         let value = totalsByPeriod.get(key);
+
+        // Mantener la lógica de fallback por mes (ignorar año) si no hay dato exacto
         if (typeof value === "undefined") {
-          value = fallbackByMonth.get(index + 1) ?? 0;
+          value = fallbackByMonth.get(m) ?? 0;
         }
-        return {
-          month: monthShort.format(date),
-          fullLabel: monthLong.format(date),
+
+        pointsDetailed.push({
+          month: monthShort.format(d),
+          fullLabel: monthLong.format(d),
           value,
-        };
-      });
+        });
+      }
 
       const values = pointsDetailed.map((point) => point.value);
       const nonZeroValues = values.filter((val) => val !== 0);
       const average =
         nonZeroValues.length > 0
-          ? nonZeroValues.reduce((acc, val) => acc + val, 0) / nonZeroValues.length
+          ? nonZeroValues.reduce((acc, val) => acc + val, 0) /
+          nonZeroValues.length
           : 0;
       const maxValue = values.length > 0 ? Math.max(...values) : 0;
       const minValue = values.length > 0 ? Math.min(...values) : 0;
@@ -712,29 +744,57 @@ const Dashboard = React.memo(() => {
       if (!response) return null;
       const total = Number(response.totalMovimientos ?? 0);
       const conciliados = Number(response.conciliados ?? 0);
-      const pendientes = response.pendientes !== undefined
-        ? Number(response.pendientes ?? 0)
-        : Math.max(total - conciliados, 0);
-      const porcentaje = response.porcentajeConciliados !== undefined && response.porcentajeConciliados !== null
-        ? Number(response.porcentajeConciliados)
-        : total > 0 ? (conciliados * 100) / total : 0;
+      const pendientes =
+        response.pendientes !== undefined
+          ? Number(response.pendientes ?? 0)
+          : Math.max(total - conciliados, 0);
+      const porcentaje =
+        response.porcentajeConciliados !== undefined &&
+          response.porcentajeConciliados !== null
+          ? Number(response.porcentajeConciliados)
+          : total > 0
+            ? (conciliados * 100) / total
+            : 0;
 
       const periodo = String(response.periodo ?? "");
       let periodLabel = periodo || "Periodo actual";
       const [yearStr, monthStr] = periodo.split("-");
       const monthIndex = Number(monthStr) - 1;
       const yearNum = Number(yearStr);
-      const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-      if (monthIndex >= 0 && monthIndex < monthNames.length && Number.isFinite(yearNum)) {
+      const monthNames = [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
+      ];
+      if (
+        monthIndex >= 0 &&
+        monthIndex < monthNames.length &&
+        Number.isFinite(yearNum)
+      ) {
         periodLabel = `${monthNames[monthIndex]} ${yearNum}`;
       }
 
-      const porTipoRaw = Array.isArray(response.porTipo) ? response.porTipo : [];
+      const porTipoRaw = Array.isArray(response.porTipo)
+        ? response.porTipo
+        : [];
       const porTipo = porTipoRaw.map((item) => {
         const totalTipo = Number(item?.total ?? 0);
         const conciliadosTipo = Number(item?.conciliados ?? 0);
-        const pendientesTipo = item?.pendientes !== undefined ? Number(item.pendientes ?? 0) : Math.max(totalTipo - conciliadosTipo, 0);
-        const porcentajeTipo = totalTipo > 0 ? (conciliadosTipo * 100) / totalTipo : 0;
+        const pendientesTipo =
+          item?.pendientes !== undefined
+            ? Number(item.pendientes ?? 0)
+            : Math.max(totalTipo - conciliadosTipo, 0);
+        const porcentajeTipo =
+          totalTipo > 0 ? (conciliadosTipo * 100) / totalTipo : 0;
         return {
           tipo: item?.tipo ?? "Sin tipo",
           total: totalTipo,
@@ -876,7 +936,7 @@ const Dashboard = React.memo(() => {
       }
 
       // 2) Hacer la llamada al endpoint compuesto (Solo si hay empresa)
-      if (company && company !== 'null') {
+      if (company && company !== "null") {
         try {
           const composite = await fetchDashboardSummary({
             period,
@@ -892,7 +952,7 @@ const Dashboard = React.memo(() => {
             try {
               window.sessionStorage.setItem(
                 dashboardCacheKey,
-                JSON.stringify(composite)
+                JSON.stringify(composite),
               );
             } catch (err) {
               // ignoramos errores de storage
@@ -919,7 +979,9 @@ const Dashboard = React.memo(() => {
         }
       } else {
         setIsRefreshing(false);
-        console.log("⚠️ No hay empresa seleccionada, omitiendo carga de datos.");
+        console.log(
+          "⚠️ No hay empresa seleccionada, omitiendo carga de datos.",
+        );
       }
     })();
   }, [buildMockState, currency, dashboardCacheKey, useMocks, period, company]);
@@ -930,8 +992,8 @@ const Dashboard = React.memo(() => {
       const currentOrgId = sessionStorage.getItem("organizacionId");
       setCompany(currentOrgId || null);
     };
-    window.addEventListener('userDataUpdated', handleUpdate);
-    return () => window.removeEventListener('userDataUpdated', handleUpdate);
+    window.addEventListener("userDataUpdated", handleUpdate);
+    return () => window.removeEventListener("userDataUpdated", handleUpdate);
   }, []);
 
   React.useEffect(() => {
@@ -941,7 +1003,6 @@ const Dashboard = React.memo(() => {
       activeRequestRef.current += 1;
     };
   }, [loadDashboardData]);
-
 
   const handleNavigate = React.useCallback(
     (path, params) => {
@@ -956,62 +1017,63 @@ const Dashboard = React.memo(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     },
-    [navigate]
+    [navigate],
   );
 
   const quickActions = React.useMemo(
-    () => [
-      {
-        id: "movement",
-        label: "Cargar movimiento",
-        icon: <AddCircleOutlineRoundedIcon />,
-        action: () => handleNavigate("/carga"),
-        visible: tienePermiso('movs', 'edit'),
-      },
-      {
-        id: "excel",
-        label: "Importar Excel",
-        icon: <UploadFileRoundedIcon />,
-        action: () => handleNavigate("/carga-movimientos"),
-        visible: tienePermiso('banco', 'edit'),
-      },
-      {
-        id: "mp",
-        label: "Mercado Pago",
-        icon: <AccountBalanceWalletRoundedIcon />,
-        action: () => handleNavigate("/mercado-pago"),
-        visible: tienePermiso('banco', 'edit'),
-      },
-      {
-        id: "reconcile",
-        label: "Conciliar",
-        icon: <PublishedWithChangesRoundedIcon />,
-        action: () => handleNavigate("/conciliacion"),
-        visible: tienePermiso('concil', 'edit'),
-      },
-      {
-        id: "invoice",
-        label: "Cargar factura",
-        icon: <ReceiptLongRoundedIcon />,
-        action: () => handleNavigate("/carga/factura"),
-        visible: tienePermiso('facts', 'edit'),
-      },
-      {
-        id: "budget",
-        label: "Nuevo presupuesto",
-        icon: <AssessmentRoundedIcon />,
-        action: () => handleNavigate("/presupuestos/nuevo"),
-        visible: tienePermiso('pres', 'edit'),
-      },
-      {
-        id: "reminder",
-        label: "Recordatorio",
-        icon: <NotificationsActiveRoundedIcon />,
-        action: () => handleNavigate("/recordatorios"),
-        visible: true, // Notificaciones son libres
-      },
-    ].filter(a => a.visible),
-    [handleNavigate, tienePermiso]
+    () =>
+      [
+        {
+          id: "movement",
+          label: "Cargar movimiento",
+          icon: <AddCircleOutlineRoundedIcon />,
+          action: () => handleNavigate("/carga"),
+          visible: tienePermiso("carga", "edit"),
+        },
+        {
+          id: "excel",
+          label: "Importar Excel",
+          icon: <UploadFileRoundedIcon />,
+          action: () => handleNavigate("/carga-movimientos"),
+          visible: tienePermiso("banco", "edit"),
+        },
+        {
+          id: "mp",
+          label: "Mercado Pago",
+          icon: <AccountBalanceWalletRoundedIcon />,
+          action: () => handleNavigate("/mercado-pago"),
+          visible: tienePermiso("banco", "edit"),
+        },
+        {
+          id: "reconcile",
+          label: "Conciliar",
+          icon: <PublishedWithChangesRoundedIcon />,
+          action: () => handleNavigate("/conciliacion"),
+          visible: tienePermiso("concil", "edit"),
+        },
+        {
+          id: "invoice",
+          label: "Cargar factura",
+          icon: <ReceiptLongRoundedIcon />,
+          action: () => handleNavigate("/carga/factura"),
+          visible: tienePermiso("facts", "edit"),
+        },
+        {
+          id: "budget",
+          label: "Nuevo presupuesto",
+          icon: <AssessmentRoundedIcon />,
+          action: () => handleNavigate("/presupuestos/nuevo"),
+          visible: tienePermiso("pres", "edit"),
+        },
+        {
+          id: "reminder",
+          label: "Recordatorio",
+          icon: <NotificationsActiveRoundedIcon />,
+          action: () => handleNavigate("/recordatorios"),
+          visible: true, // Notificaciones son libres
+        },
+      ].filter((a) => a.visible),
+    [handleNavigate, tienePermiso],
   );
 
   const handleQuickAction = (action) => {
@@ -1032,24 +1094,52 @@ const Dashboard = React.memo(() => {
 
   const kpiCards = React.useMemo(() => {
     const data = state.kpis.data;
-    const canSeeFinances = tienePermiso('movs', 'view') || tienePermiso('facts', 'view');
+    const canSeeFinances =
+      tienePermiso("movs", "view") || tienePermiso("facts", "view");
     if (!canSeeFinances) return [];
     return [
-      { id: "totalIncomes", title: "Ingresos Totales Mensuales", value: data?.totalIncomes ?? null, formatter: formatCurrency, trend: [] },
-      { id: "totalExpenses", title: "Egresos Totales Mensuales", value: data?.totalExpenses ?? null, formatter: formatCurrency, trend: [] },
-      { id: "netResult", title: "Resultado Neto Mensuales", value: data?.netResult ?? null, formatter: formatCurrency, trend: [] },
-      { id: "totalBalance", title: "Dinero Total", value: data?.totalBalance ?? null, formatter: formatCurrency, trend: [] },
+      {
+        id: "totalIncomes",
+        title: "Ingresos Totales Mensuales",
+        value: data?.totalIncomes ?? null,
+        formatter: formatCurrency,
+        trend: [],
+      },
+      {
+        id: "totalExpenses",
+        title: "Egresos Totales Mensuales",
+        value: data?.totalExpenses ?? null,
+        formatter: formatCurrency,
+        trend: [],
+      },
+      {
+        id: "netResult",
+        title: "Resultado Neto Mensuales",
+        value: data?.netResult ?? null,
+        formatter: formatCurrency,
+        trend: [],
+      },
+      {
+        id: "totalBalance",
+        title: "Dinero Total",
+        value: data?.totalBalance ?? null,
+        formatter: formatCurrency,
+        trend: [],
+      },
     ];
   }, [state.kpis.data, formatCurrency, tienePermiso]);
 
   const quickActionsLoading = state.kpis.loading && !state.kpis.data;
-  const quickActionsSx = React.useMemo(() => ({
-    position: { xs: "relative", md: "sticky" },
-    top: { md: theme.spacing(1) },
-    zIndex: theme.zIndex.appBar - 1,
-    display: "flex",
-    justifyContent: "center",
-  }), [theme]);
+  const quickActionsSx = React.useMemo(
+    () => ({
+      position: { xs: "relative", md: "sticky" },
+      top: { md: theme.spacing(1) },
+      zIndex: theme.zIndex.appBar - 1,
+      display: "flex",
+      justifyContent: "center",
+    }),
+    [theme],
+  );
 
   return (
     <Box
@@ -1062,8 +1152,7 @@ const Dashboard = React.memo(() => {
       }}
     >
       <Stack spacing={3} sx={{ width: "100%" }}>
-
-        {(!company || company === 'null') ? (
+        {!company || company === "null" ? (
           <WelcomeChoice />
         ) : !tieneAlgunPermiso() ? (
           <DashboardEmptyState
@@ -1122,93 +1211,98 @@ const Dashboard = React.memo(() => {
               ))}
             </Grid>
 
-            {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
-              <Grid
-                container
-                spacing={3}
-                justifyContent="center"
-                sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-              >
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesTrendWidget
-                      data={
-                        state.salesTrend.data ?? {
-                          title: "Ingresos durante el período",
-                          points: [],
-                          average: 0,
-                          max: { value: 0, label: "--" },
-                          min: { value: 0, label: "--" },
+            {(tienePermiso("movs", "view") ||
+              tienePermiso("facts", "view")) && (
+                <Grid
+                  container
+                  spacing={3}
+                  justifyContent="center"
+                  sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+                >
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesTrendWidget
+                        data={
+                          state.salesTrend.data ?? {
+                            title: "Ingresos durante el período",
+                            points: [],
+                            average: 0,
+                            max: { value: 0, label: "--" },
+                            min: { value: 0, label: "--" },
+                          }
                         }
-                      }
-                      loading={state.salesTrend.loading && !state.salesTrend.data}
-                      error={state.salesTrend.error}
-                      onNavigate={() => handleNavigate("/reportes/ventas")}
-                      currency={currency}
-                    />
-                  </Box>
+                        loading={
+                          state.salesTrend.loading && !state.salesTrend.data
+                        }
+                        error={state.salesTrend.error}
+                        onNavigate={() => handleNavigate("/reportes/ventas")}
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesByCategoryWidget
+                        data={state.salesByCategory.data ?? []}
+                        loading={
+                          state.salesByCategory.loading &&
+                          !state.salesByCategory.data
+                        }
+                        error={state.salesByCategory.error}
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
                 </Grid>
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesByCategoryWidget
-                      data={state.salesByCategory.data ?? []}
-                      loading={
-                        state.salesByCategory.loading && !state.salesByCategory.data
-                      }
-                      error={state.salesByCategory.error}
-                      currency={currency}
-                    />
-                  </Box>
-                </Grid>
-              </Grid>
-            )}
+              )}
 
-            {(tienePermiso('movs', 'view') || tienePermiso('facts', 'view')) && (
-              <Grid
-                container
-                spacing={3}
-                justifyContent="center"
-                sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-              >
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesTrendWidget
-                      data={
-                        state.expensesTrend.data ?? {
-                          title: "Egresos durante el período",
-                          points: [],
-                          average: 0,
-                          max: { value: 0, label: "--" },
-                          min: { value: 0, label: "--" },
+            {(tienePermiso("movs", "view") ||
+              tienePermiso("facts", "view")) && (
+                <Grid
+                  container
+                  spacing={3}
+                  justifyContent="center"
+                  sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+                >
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesTrendWidget
+                        data={
+                          state.expensesTrend.data ?? {
+                            title: "Egresos durante el período",
+                            points: [],
+                            average: 0,
+                            max: { value: 0, label: "--" },
+                            min: { value: 0, label: "--" },
+                          }
                         }
-                      }
-                      loading={
-                        state.expensesTrend.loading && !state.expensesTrend.data
-                      }
-                      error={state.expensesTrend.error}
-                      emptyMessage="No hay egresos registrados en este periodo."
-                      currency={currency}
-                    />
-                  </Box>
+                        loading={
+                          state.expensesTrend.loading && !state.expensesTrend.data
+                        }
+                        error={state.expensesTrend.error}
+                        emptyMessage="No hay egresos registrados en este periodo."
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesByCategoryWidget
+                        data={state.expensesByCategory.data ?? []}
+                        loading={
+                          state.expensesByCategory.loading &&
+                          !state.expensesByCategory.data
+                        }
+                        error={state.expensesByCategory.error}
+                        emptyMessage="No hay egresos por categoria en este periodo."
+                        title="Egresos por categorias"
+                        subtitle="Distribucion anual por segmento"
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
                 </Grid>
-                <Grid>
-                  <Box sx={{ width: { xs: "100%", md: 720 } }}>
-                    <SalesByCategoryWidget
-                      data={state.expensesByCategory.data ?? []}
-                      loading={
-                        state.expensesByCategory.loading &&
-                        !state.expensesByCategory.data
-                      }
-                      error={state.expensesByCategory.error}
-                      emptyMessage="No hay egresos por categoria en este periodo."
-                      title="Egresos por categorias"
-                      subtitle="Distribucion anual por segmento"
-                      currency={currency}
-                    />
-                  </Box>
-                </Grid>
-              </Grid>
-            )}
+              )}
 
             <Grid
               container
@@ -1216,7 +1310,7 @@ const Dashboard = React.memo(() => {
               justifyContent="center"
               sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
             >
-              {tienePermiso('pres', 'view') && (
+              {tienePermiso("pres", "view") && (
                 <Grid size={{ xs: 12, md: 4 }}>
                   <BudgetWidget
                     companyId={company}
@@ -1229,13 +1323,16 @@ const Dashboard = React.memo(() => {
                   />
                 </Grid>
               )}
-              {tienePermiso('movs', 'view') && (
+              {tienePermiso("movs", "view") && (
                 <Grid size={{ xs: 12, md: 4 }}>
                   <LiquidityGapWidget currency={currency} />
                 </Grid>
               )}
-              {tienePermiso('concil', 'view') && (
-                <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
+              {tienePermiso("concil", "view") && (
+                <Grid
+                  size={{ xs: 12, md: 4 }}
+                  sx={{ display: { xs: "none", md: "block" } }}
+                >
                   <ReconciliationWidget
                     data={state.reconciliation.data}
                     loading={
@@ -1247,7 +1344,7 @@ const Dashboard = React.memo(() => {
                     onNavigate={(account) =>
                       handleNavigate(
                         "/conciliacion",
-                        account ? { cuenta: account } : undefined
+                        account ? { cuenta: account } : undefined,
                       )
                     }
                   />
@@ -1268,7 +1365,7 @@ const Dashboard = React.memo(() => {
                 display: { xs: "none", md: "flex" },
               }}
             >
-              {tienePermiso('movs', 'view') && (
+              {tienePermiso("movs", "view") && (
                 <Grid size={{ xs: 12, md: 6 }}>
                   <RecentMovementsWidget
                     data={state.movements.data}
@@ -1279,7 +1376,7 @@ const Dashboard = React.memo(() => {
                   />
                 </Grid>
               )}
-              {tienePermiso('facts', 'view') && (
+              {tienePermiso("facts", "view") && (
                 <Grid size={{ xs: 12, md: 6 }}>
                   <RecentInvoicesWidget
                     data={state.invoices?.data ?? null}
@@ -1301,14 +1398,13 @@ const Dashboard = React.memo(() => {
               {esAdminTotal() && (
                 <Grid size={{ xs: 12, md: 10 }}>
                   <Box sx={{ width: "100%", mx: "auto" }}>
-                    <InsightsWidget />
+                    <InsightsWidget currency={currency} />
                   </Box>
                 </Grid>
               )}
             </Grid>
           </>
         )}
-
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <Button
             variant="text"

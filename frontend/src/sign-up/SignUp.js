@@ -2,6 +2,10 @@
 import * as React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Autocomplete from "@mui/material/Autocomplete";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
 import CssBaseline from "@mui/material/CssBaseline";
 import FormLabel from "@mui/material/FormLabel";
 import FormControl from "@mui/material/FormControl";
@@ -86,6 +90,48 @@ export default function SignUp(props) {
   const [successMsg, setSuccessMsg] = React.useState("");
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
   // No hay validación de token, solo pre-llenar empresa
+
+  const [companyOptions, setCompanyOptions] = React.useState([]);
+  const [loadingSearch, setLoadingSearch] = React.useState(false);
+  const [isPersonalAccount, setIsPersonalAccount] = React.useState(false);
+
+  // Update company name automatically if it's a personal account and user types name/lastname
+  React.useEffect(() => {
+    if (isPersonalAccount) {
+      const personalName = `${formData.nombre} ${formData.apellido}`.trim();
+      if (personalName) {
+        setFormData(prev => ({ ...prev, nombreEmpresa: personalName }));
+      }
+    }
+  }, [formData.nombre, formData.apellido, isPersonalAccount]);
+
+  const handleCompanySearch = async (query) => {
+    if (!query || query.length < 3) {
+      setCompanyOptions([]);
+      return;
+    }
+    setLoadingSearch(true);
+    try {
+      // Reusing the endpoint from JoinOrganizationModal
+      // Assuming it's public or accessible without token? 
+      // AUTH CHECK: The existing JoinModal uses it. If it requires auth, SignUp usually happens WITHOUT token.
+      // However, often these endpoints are public for this exact reason.
+      // Note: JoinOrganizationModal is usually used inside the dashboard (authenticated).
+      // If this fails (401/403), we might need to rely on the backend handling the join logic blindly, 
+      // or we need a public search endpoint. 
+      // For now, I'll try to use it. If it fails, the user simply won't see suggestions but can still type.
+      const response = await axios.get(`${API_CONFIG.ADMINISTRACION}/api/empresas/buscar`, {
+        params: { nombre: query }
+      });
+      setCompanyOptions(response.data);
+    } catch (error) {
+      console.error("Error searching companies", error);
+      // Fail silently for the user, just don't show options
+      setCompanyOptions([]);
+    } finally {
+      setLoadingSearch(false);
+    }
+  };
 
   const validateInputs = () => {
     let errs = {};
@@ -192,20 +238,92 @@ export default function SignUp(props) {
               </FormControl>
             </Box>
 
+            {/* Nombre de la Empresa con Autocomplete y Checkbox */}
             <FormControl>
               <FormLabel>Nombre de la empresa</FormLabel>
-              <TextField
-                required
-                fullWidth
+
+              <Autocomplete
+                freeSolo
+                options={companyOptions}
+                getOptionLabel={(option) => typeof option === 'string' ? option : option.nombre}
+                disabled={isPersonalAccount || esInvitacion}
                 value={formData.nombreEmpresa}
-                onChange={(e) => setFormData({ ...formData, nombreEmpresa: e.target.value })}
-                error={!!errors.nombreEmpresa}
-                helperText={errors.nombreEmpresa}
-                disabled={esInvitacion}
-                InputProps={{
-                  readOnly: esInvitacion,
+                onInputChange={(event, newInputValue) => {
+                  if (!isPersonalAccount && !esInvitacion) {
+                    setFormData({ ...formData, nombreEmpresa: newInputValue });
+                    handleCompanySearch(newInputValue);
+                  }
                 }}
+                onChange={(event, newValue) => {
+                  if (typeof newValue === 'object' && newValue !== null) {
+                    setFormData({ ...formData, nombreEmpresa: newValue.nombre });
+                  } else if (newValue === null) {
+                    setFormData({ ...formData, nombreEmpresa: '' });
+                  }
+                }}
+                loading={loadingSearch}
+                clearText="Borrar"
+                sx={{
+                  "& .MuiAutocomplete-clearIndicator": {
+                    backgroundColor: "transparent",
+                    border: "none",
+                    boxShadow: "none",
+                    "&:hover": {
+                      backgroundColor: "transparent",
+                    }
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    required={!isPersonalAccount} // Required if not personal
+                    fullWidth
+                    error={!!errors.nombreEmpresa}
+                    helperText={errors.nombreEmpresa}
+                    placeholder={isPersonalAccount ? "Tu nombre personal" : "Busca o crea tu empresa"}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <React.Fragment>
+                          {loadingSearch ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </React.Fragment>
+                      ),
+                    }}
+                  />
+                )}
               />
+
+              {!esInvitacion && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isPersonalAccount}
+                      onChange={(e) => {
+                        setIsPersonalAccount(e.target.checked);
+                        if (e.target.checked) {
+                          // Auto file with name
+                          const personalName = `${formData.nombre} ${formData.apellido}`.trim() || "Mi Cuenta Personal";
+                          setFormData(prev => ({ ...prev, nombreEmpresa: personalName }));
+                        } else {
+                          setFormData(prev => ({ ...prev, nombreEmpresa: "" }));
+                        }
+                      }}
+                      name="isPersonalAccount"
+                      color="primary"
+                      size="small"
+                      sx={{ padding: 0.5 }} // Make it look smaller/tight like "show password"
+                    />
+                  }
+                  label={
+                    <Typography variant="caption" color="text.secondary" sx={{ userSelect: 'none' }}>
+                      Es una cuenta personal
+                    </Typography>
+                  }
+                  sx={{ mt: 0.5, ml: 0 }}
+                />
+              )}
+
               {esInvitacion && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                   Empresa predefinida por invitación.
