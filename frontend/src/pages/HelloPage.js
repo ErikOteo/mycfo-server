@@ -24,7 +24,6 @@ import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import HubIcon from '@mui/icons-material/Hub';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import EmailIcon from '@mui/icons-material/Email';
-import PhoneIcon from '@mui/icons-material/Phone';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
@@ -443,7 +442,7 @@ const HelloPage = () => {
     const navItems = [
         { label: 'Características', id: 'features' },
         { label: 'Integraciones', id: 'integrations' },
-        { label: 'Precios', id: 'pricing' },
+        { label: 'Segmentos', id: 'scale' },
         { label: 'App', id: 'app' },
     ];
 
@@ -657,7 +656,7 @@ const HelloPage = () => {
                             }}>
                                 <Box
                                     component="img"
-                                    src="/mycfo-flujodecaja.png"
+                                    src="/mycfo-flujodecaja4.png"
                                     alt="Dashboard MyCFO"
                                     sx={{
                                         width: '100%',
@@ -761,7 +760,7 @@ const HelloPage = () => {
                 </Box>
 
                 {/* 4. USER TYPES - DESIGNED FOR EVERYONE */}
-                <Box sx={{ py: 6, bgcolor: COLORS.white, borderTop: `1px solid ${alpha(COLORS.textSecondary, 0.1)}` }}>
+                <Box id="scale" sx={{ py: 6, bgcolor: COLORS.white, borderTop: `1px solid ${alpha(COLORS.textSecondary, 0.1)}` }}>
                     <Container maxWidth="lg">
                         <Typography variant="body1" align="center" color={COLORS.textSecondary} sx={{ mb: 4, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>
                             Diseñado para escalar con vos
@@ -1034,7 +1033,7 @@ const HelloPage = () => {
                                 <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Producto</Typography>
                                 {[
                                     { label: 'Características', id: 'features' },
-                                    { label: 'Precios', id: 'pricing' },
+                                    { label: 'Segmentos', id: 'scale' },
                                     { label: 'Integraciones', id: 'integrations' },
                                     { label: 'App', id: 'app' }
                                 ].map((item) => (
@@ -1055,12 +1054,6 @@ const HelloPage = () => {
                                         <EmailIcon fontSize="small" />
                                         <Typography component="a" href="mailto:mycfoar@gmail.com" variant="body2" sx={{ textDecoration: 'none', color: 'inherit' }}>
                                             mycfoar@gmail.com
-                                        </Typography>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.7 }}>
-                                        <PhoneIcon fontSize="small" />
-                                        <Typography variant="body2">
-                                            +54 11 1234 5678
                                         </Typography>
                                     </Box>
                                     <Box component="a" href="https://instagram.com/mycfo.ar" target="_blank" sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.7, textDecoration: 'none', color: 'inherit', '&:hover': { opacity: 1, color: COLORS.accentLight } }}>
