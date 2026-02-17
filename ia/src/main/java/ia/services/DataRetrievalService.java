@@ -42,10 +42,11 @@ public class DataRetrievalService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public Map<String, Object> getBalance(String userSub, String authorization, String moneda) {
+        String normalizedMoneda = normalizeCurrency(moneda);
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(registroUrl + "/movimientos/resumen/saldo-total");
-        if (StringUtils.hasText(moneda)) {
-            builder.queryParam("moneda", moneda);
+        if (StringUtils.hasText(normalizedMoneda)) {
+            builder.queryParam("moneda", normalizedMoneda);
         }
         return exchangeForMap(builder.toUriString(), userSub, authorization);
     }
@@ -59,7 +60,7 @@ public class DataRetrievalService {
                 .queryParam("sortBy", "fechaEmision")
                 .queryParam("sortDir", "desc");
 
-        String moneda = getString(params, "moneda", "currency");
+        String moneda = normalizeCurrency(getString(params, "moneda", "currency"));
         if (StringUtils.hasText(moneda)) {
             builder.queryParam("moneda", moneda);
         }
@@ -109,6 +110,11 @@ public class DataRetrievalService {
             builder.queryParam("fecha", fecha);
         }
 
+        String moneda = normalizeCurrency(getString(params, "moneda", "currency"));
+        if (StringUtils.hasText(moneda)) {
+            builder.queryParam("moneda", moneda);
+        }
+
         return exchangeForMap(builder.toUriString(), userSub, authorization);
     }
 
@@ -118,7 +124,7 @@ public class DataRetrievalService {
             return Map.of("error", "missing_screen");
         }
         String normalized = normalizeScreen(screen);
-        String currency = getString(params, "moneda", "currency");
+        String currency = normalizeCurrency(getString(params, "moneda", "currency"));
         Integer year = getInt(params, "anio", "year");
         Integer month = getInt(params, "mes", "month");
         Integer page = getInt(params, "page");
@@ -441,6 +447,26 @@ public class DataRetrievalService {
             }
         }
         return null;
+    }
+
+    private String normalizeCurrency(String moneda) {
+        if (moneda == null || moneda.isBlank()) {
+            return null;
+        }
+        // Normalización para quitar acentos
+        String normalized = java.text.Normalizer.normalize(moneda.toLowerCase(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+
+        if (normalized.contains("dolar") || normalized.contains("usd") || normalized.contains("u$s")) {
+            return "USD";
+        }
+        if (normalized.contains("peso") || normalized.contains("ars") || normalized.contains("$")) {
+            return "ARS";
+        }
+        if (normalized.contains("euro") || normalized.contains("eur")) {
+            return "EUR";
+        }
+        return moneda.toUpperCase();
     }
 
     private int clampInt(Integer value, int defaultValue, int max) {

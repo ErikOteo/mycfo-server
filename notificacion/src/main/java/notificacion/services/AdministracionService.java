@@ -63,7 +63,7 @@ public class AdministracionService {
 
     public List<UsuarioAdministracionDTO> obtenerUsuariosPorEmpresaId(Long empresaId) {
         try {
-            String url = administracionUrl + "/api/usuarios/empresa/" + empresaId;
+            String url = administracionUrl + "/api/usuarios/empresa/" + empresaId + "/interno";
             log.info("Consultando administracion para obtener usuarios de la empresa {}", empresaId);
             UsuarioAdministracionDTO[] response = restTemplate.getForObject(url, UsuarioAdministracionDTO[].class);
             if (response == null) {

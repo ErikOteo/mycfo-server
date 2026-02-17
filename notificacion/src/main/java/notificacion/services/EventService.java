@@ -342,7 +342,7 @@ public class EventService {
                         NotificationType.MOVEMENT_IMPORT,
                         ResourceType.MOVEMENT,
                         evt.importId() != null ? evt.importId() : "import",
-                        "ImportaciÃ³n de movimientos",
+                        "Importacion de movimientos",
                         String.format("Fuente: %s | Registros: %d",
                                 defaultString(evt.sourceName(), "Excel"),
                                 evt.totalRows()),

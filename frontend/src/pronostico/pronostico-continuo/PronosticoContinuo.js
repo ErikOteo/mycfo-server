@@ -345,7 +345,7 @@ export default function PronosticoContinuo() {
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="mes" />
-                <YAxis width={70} />
+                <YAxis width={90} tickFormatter={(value) => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`} />
                 <Tooltip formatter={(value) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
                 <Legend />
                 {splitPointMes && (

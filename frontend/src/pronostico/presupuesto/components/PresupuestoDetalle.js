@@ -6,7 +6,7 @@ import {
   Snackbar, Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import http from '../../../api/http';
 import { formatCurrency } from '../../../utils/currency';
@@ -128,6 +128,7 @@ async function getRealPorMes(meses, tipo, moneda) {
 export default function PresupuestoDetalle() {
   const { nombre: nombreUrl } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const isLightMode = theme.palette.mode === 'light';
   const paletteVars = theme.vars?.palette ?? theme.palette;
@@ -196,24 +197,42 @@ export default function PresupuestoDetalle() {
           detalleMensual: [],
         });
 
-        // 1) Buscar presupuesto por nombre
-        const res = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos`);
-        const listaPayload = res?.data;
-        let lista = [];
-        if (Array.isArray(listaPayload)) {
-          lista = listaPayload;
-        } else if (Array.isArray(listaPayload?.content)) {
-          lista = listaPayload.content;
+        // 1) Buscar presupuesto: por ID directo (si viene del state) o por nombre (fallback)
+        let encontrado = null;
+        const stateId = location.state?.presupuestoId;
+
+        if (stateId) {
+          // Ruta rápida: tenemos el ID del router state, fetch directo
+          try {
+            const resById = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos/${stateId}`);
+            if (resById?.data?.id) {
+              encontrado = resById.data;
+            }
+          } catch (e) {
+            console.warn('No se pudo obtener presupuesto por ID, intentando por nombre...', e);
+          }
         }
 
-        const slug = decodeURIComponent(nombreUrl || '')
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '-');
+        if (!encontrado) {
+          // Fallback: buscar por slug en la lista completa
+          const res = await http.get(`${API_CONFIG.PRONOSTICO}/api/presupuestos?size=1000`);
+          const listaPayload = res?.data;
+          let lista = [];
+          if (Array.isArray(listaPayload)) {
+            lista = listaPayload;
+          } else if (Array.isArray(listaPayload?.content)) {
+            lista = listaPayload.content;
+          }
 
-        const encontrado = lista.find(
-          (p) => (p?.nombre || '').trim().toLowerCase().replace(/\s+/g, '-') === slug
-        );
+          const slug = decodeURIComponent(nombreUrl || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '-');
+
+          encontrado = lista.find(
+            (p) => (p?.nombre || '').trim().toLowerCase().replace(/\s+/g, '-') === slug
+          );
+        }
 
         if (!active) return;
 

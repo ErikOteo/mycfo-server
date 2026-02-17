@@ -9,4 +9,5 @@ public class SaldoTotalResponse {
 
     Long organizacionId;
     Double saldoTotal;
+    String moneda;
 }

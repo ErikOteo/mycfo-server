@@ -3,14 +3,14 @@ import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { fetchCategorias } from '../../../shared-services/categoriasService';
 
 const Filtros = ({
-                     selectedMonth,
-                     selectedYear,
-                     onMonthChange,
-                     onYearChange,
-                     selectedCategoria,
-                     onCategoriaChange,
-                 }) => {
-    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    selectedMonth,
+    selectedYear,
+    onMonthChange,
+    onYearChange,
+    selectedCategoria,
+    onCategoriaChange,
+}) => {
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const anios = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
     const categoriasBase = ['Alimentos y Bebidas', 'Transporte', 'Vivienda', 'Servicios Basicos', 'Ocio y Entretenimiento', 'Compras Personales', 'Salud', 'Educacion', 'Impuestos y Tasas', 'Servicios Financieros', 'Compras de Negocio', 'Otros Egresos', 'Ventas de Productos', 'Prestacion de Servicios', 'Cobranzas', 'Transferencias Recibidas', 'Inversiones y Rendimientos', 'Otros Ingresos'];
@@ -61,7 +61,7 @@ const Filtros = ({
 
             {/* Anio */}
             <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-                <InputLabel id="anio-label">Anio</InputLabel>
+                <InputLabel id="anio-label">Año</InputLabel>
                 <Select labelId="anio-label" id="anio-select" value={selectedYear} onChange={onYearChange} label="Anio">
                     {anios.map((anio) => (
                         <MenuItem key={anio} value={anio}>{anio}</MenuItem>
@@ -71,7 +71,7 @@ const Filtros = ({
 
             {/* Categoria */}
             <FormControl variant="outlined" size="small" sx={{ minWidth: 180 }}>
-                <InputLabel id="categoria-label" shrink>Categoria</InputLabel>
+                <InputLabel id="categoria-label" shrink>Categoría</InputLabel>
                 <Select
                     labelId="categoria-label"
                     id="categoria-select"
