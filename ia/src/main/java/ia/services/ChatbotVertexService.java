@@ -95,7 +95,7 @@ public class ChatbotVertexService {
                     "deuda|deudas|acreencia|acreencias|kpi|indicador|indicadores|numero|numeros|" +
                     "pendiente|pendientes|recordatorio|recordatorios|notificacion|notificaciones|" +
                     "pronostico|pronosticos|forecast|conciliado|conciliados|conciliar|conciliacion|" +
-                    "movimento|movimentos|otro|otra|mas|más|siguiente)\\b");
+                    "movimento|movimentos|otro|otra|mas|más|siguiente|dolar|dolares|usd|ars|peso|pesos|u\\$s)\\b");
     private static final Pattern HOW_TO_PATTERN = Pattern.compile(
             "(?i)\\b(pasos|procedimiento|instrucciones|guia|tutorial|ayuda|" +
                     "como hago|como puedo|dime como|dime donde|que hace|para que sirve|" +
@@ -845,12 +845,45 @@ public class ChatbotVertexService {
                             break;
                         } else if (matchesAny(prevMsg, "factura", "facturas")) {
                             params.put("screen", "ver-facturas");
+                            // Heredar filtros temporales
+                            if (!params.containsKey("anio")) {
+                                Integer hYear = extractYearFromMessage(prevMsg);
+                                if (hYear != null)
+                                    params.put("anio", hYear);
+                            }
+                            if (!params.containsKey("mes")) {
+                                Integer hMonth = extractMonthFromMessage(prevMsg);
+                                if (hMonth != null)
+                                    params.put("mes", hMonth);
+                            }
                             break;
                         } else if (matchesAny(prevMsg, "presupuesto", "presupuestos")) {
                             params.put("screen", "presupuestos");
+                            // Heredar filtros temporales
+                            if (!params.containsKey("anio")) {
+                                Integer hYear = extractYearFromMessage(prevMsg);
+                                if (hYear != null)
+                                    params.put("anio", hYear);
+                            }
+                            if (!params.containsKey("mes")) {
+                                Integer hMonth = extractMonthFromMessage(prevMsg);
+                                if (hMonth != null)
+                                    params.put("mes", hMonth);
+                            }
                             break;
                         } else if (matchesAny(prevMsg, "movimiento", "movimientos", "ingreso", "egreso")) {
                             params.put("screen", "ver-movimientos");
+                            // Heredar filtros temporales
+                            if (!params.containsKey("anio")) {
+                                Integer hYear = extractYearFromMessage(prevMsg);
+                                if (hYear != null)
+                                    params.put("anio", hYear);
+                            }
+                            if (!params.containsKey("mes")) {
+                                Integer hMonth = extractMonthFromMessage(prevMsg);
+                                if (hMonth != null)
+                                    params.put("mes", hMonth);
+                            }
                             break;
                         }
                     }
@@ -878,7 +911,8 @@ public class ChatbotVertexService {
                 "movimientos", "movimento", "movimentos")) {
             return ToolName.SEARCH_MOVEMENTS;
         }
-        if (matchesAny(normalizedMessage, "saldo", "balance", "saldo total", "plata", "dinero", "efectivo")
+        if (matchesAny(normalizedMessage, "saldo", "balance", "saldo total", "plata", "dinero", "efectivo", "total",
+                "dolar", "dolares", "usd", "ars", "peso", "pesos", "u$s")
                 || (normalizedMessage.contains("caja") && !normalizedMessage.contains("flujo"))) {
             return ToolName.GET_BALANCE;
         }
@@ -980,16 +1014,20 @@ public class ChatbotVertexService {
         } else if (matchesAny(normalized, "egreso", "egresos") && !matchesAny(normalized, "ingreso", "ingresos")) {
             params.put("tipo", "Egreso");
         }
-        String currency = extractCurrencyFromContext(context);
+        String currency = null;
+        String lowerMsg = message.toLowerCase();
+        if (lowerMsg.contains("dolar") || lowerMsg.contains("usd") || lowerMsg.contains("u$s")) {
+            currency = "USD";
+        } else if (lowerMsg.contains("peso") || lowerMsg.contains("ars") || lowerMsg.contains("$")) {
+            currency = "ARS";
+        }
+
         if (!StringUtils.hasText(currency)) {
-            String lowerMsg = message.toLowerCase();
-            if (lowerMsg.contains("dolar") || lowerMsg.contains("usd") || lowerMsg.contains("u$s")) {
-                currency = "USD";
-            } else if (lowerMsg.contains("peso") || lowerMsg.contains("ars") || lowerMsg.contains("$")) {
-                currency = "ARS";
-            } else {
-                currency = "ARS"; // Default a pesos si no hay info
-            }
+            currency = extractCurrencyFromContext(context);
+        }
+
+        if (!StringUtils.hasText(currency)) {
+            currency = "ARS"; // Default
         }
         params.put("moneda", currency);
         Integer userId = extractUserIdFromContext(context);

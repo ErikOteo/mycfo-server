@@ -63,7 +63,7 @@ public final class ChatbotPolicy {
                         "Si el usuario pide un periodo ambiguo como 'el mes pasado' o 'el trimestre pasado', pedi mes y a\u00f1o.",
                         "Si el usuario menciona hoy/ahora dentro de una consulta de datos, responde con datos del sistema, no con la fecha.",
                         "Herramientas disponibles para obtener datos reales cuando el contexto no alcanza:",
-                        "GET_BALANCE: saldo total actual de caja.",
+                        "GET_BALANCE: saldo total actual de caja. Soporta parametro opcional \"moneda\" (ej: USD, ARS).",
                         "SEARCH_MOVEMENTS: buscar movimientos con filtros opcionales (a\u00f1o, mes, fechaDesde, fechaHasta, tipo, moneda, search, limite).",
                         "GET_PENDING_TASKS: resumen de conciliaciones o pendientes.",
                         "GET_SCREEN_DATA: obtener datos de una pantalla o modulo (screen) del sistema.",
