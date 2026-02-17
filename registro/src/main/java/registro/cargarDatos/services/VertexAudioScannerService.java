@@ -150,7 +150,7 @@ public class VertexAudioScannerService {
 
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", properties.getTemperature());
-        generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
+        //generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
         generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -484,20 +484,12 @@ public class VertexAudioScannerService {
         return cleaned;
     }
 
-    private String truncate(String value, int max) {
-        if (value == null) {
-            return "";
-        }
-        if (value.length() <= max) {
-            return value;
-        }
-        return value.substring(0, max) + "...";
-    }
+
 
     private String buildPrompt(ScanType type) {
         return switch (type) {
             case FACTURA -> """
-                Sos un sistema experto en extraccion de datos fiscales de Argentina.
+                Sos un sistema de extraccion de datos fiscales de Argentina.
 
                 Analiza el audio de una FACTURA (lectura humana o dictado) y devolve exclusivamente un JSON valido con esta estructura exacta:
 

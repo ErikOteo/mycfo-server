@@ -6,6 +6,7 @@ import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -18,6 +19,10 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import registro.cargarDatos.config.VertexAiProperties;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -33,6 +38,8 @@ public class VertexImageScannerService {
 
     private static final String CLOUD_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
     private static final Pattern FENCE_PATTERN = Pattern.compile("```[a-zA-Z]*");
+    private static final int MAX_IMAGE_DIMENSION = 1024;
+    private static final float JPEG_QUALITY = 0.6f;
 
     private final VertexAiProperties properties;
     private final ObjectMapper objectMapper;
@@ -61,7 +68,9 @@ public class VertexImageScannerService {
         );
 
         String token = resolveAccessToken();
-        Map<String, Object> requestBody = buildRequestBody(prompt, imageBytes, mimeType);
+        log.info("Imagen original recibida. Bytes: {}", imageBytes.length);
+        byte[] compressedImage = compressImageForVertex(imageBytes, mimeType);
+        Map<String, Object> requestBody = buildRequestBody(prompt, compressedImage, mimeType);
 
         try {
             long requestStart = System.nanoTime();
@@ -70,7 +79,8 @@ public class VertexImageScannerService {
             headers.setBearerAuth(token);
 
             String payload = objectMapper.writeValueAsString(requestBody);
-            log.info("Enviando imagen a Vertex AI. Tipo: {}, Bytes: {}, Endpoint: {}", scanType, imageBytes.length, endpoint);
+            log.info("Enviando imagen a Vertex AI. Tipo: {}, Bytes: {}, Endpoint: {}",
+                    scanType, compressedImage.length, endpoint);
             ResponseEntity<String> response = restTemplate.exchange(
                     endpoint,
                     HttpMethod.POST,
@@ -80,6 +90,7 @@ public class VertexImageScannerService {
             long requestEnd = System.nanoTime();
 
             log.info("Respuesta recibida de Vertex AI en {} ms", nanosToMillis(requestEnd - requestStart));
+            log.info("Respuesta completa de Vertex AI (JSON): {}", response.getBody());
             String raw = extractTextFromResponse(response.getBody());
             log.info("Respuesta raw de Vertex (completa): {}", raw);
             long parseStart = System.nanoTime();
@@ -162,6 +173,62 @@ public class VertexImageScannerService {
         }
     }
 
+    private byte[] compressImageForVertex(byte[] imageBytes, String mimeType) {
+        String format = resolveImageFormat(mimeType);
+        if (format == null) {
+            log.warn("MimeType no soportado para compresion: {}. Se envia la imagen original.", mimeType);
+            return imageBytes;
+        }
+        try (ByteArrayInputStream input = new ByteArrayInputStream(imageBytes);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            BufferedImage image = ImageIO.read(input);
+            if (image == null) {
+                log.warn("No se pudo leer la imagen. Se envia la imagen original.");
+                return imageBytes;
+            }
+
+            int width = image.getWidth();
+            int height = image.getHeight();
+            boolean needsResize = width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION;
+            Thumbnails.Builder<BufferedImage> builder = Thumbnails.of(image);
+
+            if (needsResize) {
+                builder.size(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION);
+            } else {
+                builder.scale(1.0);
+            }
+
+            builder.outputFormat(format);
+            if ("jpg".equals(format) || "jpeg".equals(format)) {
+                builder.outputQuality(JPEG_QUALITY);
+            }
+
+            builder.toOutputStream(output);
+            byte[] compressed = output.toByteArray();
+            byte[] result = compressed.length >= imageBytes.length ? imageBytes : compressed;
+            log.info("Compresion imagen: {} bytes -> {} bytes ({}x{}).",
+                    imageBytes.length, result.length, width, height);
+            return result;
+        } catch (Exception ex) {
+            log.warn("Fallo la compresion de imagen. Se envia la imagen original.", ex);
+            return imageBytes;
+        }
+    }
+
+    private String resolveImageFormat(String mimeType) {
+        if (!StringUtils.hasText(mimeType)) {
+            return null;
+        }
+        String lower = mimeType.trim().toLowerCase(Locale.ROOT);
+        if (lower.contains("jpeg") || lower.contains("jpg")) {
+            return "jpg";
+        }
+        if (lower.contains("png")) {
+            return "png";
+        }
+        return null;
+    }
+
     private String resolveAccessToken() {
         try {
             GoogleCredentials credentials;
@@ -205,7 +272,7 @@ public class VertexImageScannerService {
 
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", properties.getTemperature());
-        generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
+        //generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
         generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -224,7 +291,7 @@ public class VertexImageScannerService {
 
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("temperature", properties.getTemperature());
-        generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
+        //generationConfig.put("maxOutputTokens", properties.getMaxOutputTokens());
         generationConfig.put("responseMimeType", "application/json");
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -558,21 +625,10 @@ public class VertexImageScannerService {
         return cleaned;
     }
 
-    private String truncate(String value, int max) {
-        if (value == null) {
-            return "";
-        }
-        if (value.length() <= max) {
-            return value;
-        }
-        return value.substring(0, max) + "...";
-    }
 
     private String buildPrompt(ScanType type) {
         return switch (type) {
             case FACTURA -> """
-                Sos un sistema experto en extraccion de datos fiscales de Argentina.
-
                 Analiza la imagen de una FACTURA y devolve exclusivamente un JSON valido con esta estructura exacta:
 
                 {
@@ -756,8 +812,6 @@ public class VertexImageScannerService {
     private String buildPromptForText(ScanType type) {
         return switch (type) {
             case FACTURA -> """
-                Sos un sistema experto en extraccion de datos fiscales de Argentina.
-
                 Analiza el TEXTO EXTRAIDO de una FACTURA (PDF/DOC/DOCX) y devolve SOLO un JSON valido con esta estructura exacta:
 
                 {
