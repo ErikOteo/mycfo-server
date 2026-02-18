@@ -494,21 +494,22 @@ public class VertexAudioScannerService {
                 Analiza el audio de una FACTURA (lectura humana o dictado) y devolve exclusivamente un JSON valido con esta estructura exacta:
 
                 {
+                "numeroDocumento": "",
+                "versionDocumento": "",
+                "tipoFactura": "",
+                "fechaEmision": "",
                 "montoTotal": "",
                 "moneda": "",
                 "categoria": "",
-                "descripcion":"",
-                "versionDocumento": "",
-                "compradorNombre": "",
                 "vendedorNombre": "",
-                "vendedorCondicionIVA": "",
-                "compradorCondicionIVA": "",
                 "vendedorCuit": "",
+                "vendedorCondicionIVA": "",
                 "vendedorDomicilio": "",
+                "compradorNombre": "",
                 "compradorCuit": "",
+                "compradorCondicionIVA": "",
                 "compradorDomicilio": "",
-                "numeroDocumento": "",
-                "fechaEmision": "",
+                "descripcion": ""
                 }
 
                 REGLAS GENERALES:
@@ -516,10 +517,12 @@ public class VertexAudioScannerService {
                 - Si un dato no esta presente, usar null.
                 - Interpretar sinonimos cuando tenga sentido.
                 - No inventar datos.
-                
+
                 REGLAS ESPECIFICAS:
-                - versionDocumento solo puede ser Original si se menciona que compre algo, Duplicado si se menciona que vendi algo.
+                - tipoFactura solo puede ser A, B, C, M o null.
+                - versionDocumento solo puede ser Original, Duplicado o null.
                 - fechaEmision debe estar en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
+                - moneda en ARS si no se identifica otra.
                 - montoTotal debe ser numerico con punto decimal.
                 - Si hay varios importes, usar el mayor correspondiente al total a pagar.
                 """;
