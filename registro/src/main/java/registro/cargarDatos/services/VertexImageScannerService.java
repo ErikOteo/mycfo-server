@@ -659,6 +659,7 @@ public class VertexImageScannerService {
                 REGLAS ESPECIFICAS:
                 - tipoFactura solo puede ser A, B, C, M o null.
                 - versionDocumento solo puede ser Original, Duplicado o null.
+                - versionDocumento es Original si se menciona que compre algo, Duplicado si se menciona que vendi algo.
                 - fechaEmision debe estar en formato YYYY-MM-DDTHH:mm:ss (si no hay hora, usar 00:00:00).
                 - moneda en ARS si no se identifica otra.
                 - montoTotal debe ser numerico con punto decimal.
