@@ -4,19 +4,20 @@ import registro.mercadopago.dtos.PaymentDTO;
 import java.util.List;
 
 public interface MpPaymentImportService {
-    int importPaymentById(Long userIdApp, Long paymentId, String usuarioSub);
-    int importByMonth(Long userIdApp, int month, int year, String usuarioSub);
-    int importByExternalReference(Long userIdApp, String externalRef, String usuarioSub);
+    int importPaymentById(String userIdApp, Long paymentId, String usuarioSub);
+    int importByMonth(String userIdApp, int month, int year, String usuarioSub);
+    int importWalletByMonth(String userIdApp, int month, int year, String usuarioSub);
+    int importByExternalReference(String userIdApp, String externalRef, String usuarioSub);
     
     // Métodos de preview (sin guardar)
-    List<PaymentDTO> previewPaymentById(Long userIdApp, Long paymentId, String usuarioSub);
-    List<PaymentDTO> previewByMonth(Long userIdApp, int month, int year, String usuarioSub);
-    List<PaymentDTO> previewByExternalReference(Long userIdApp, String externalRef, String usuarioSub);
+    List<PaymentDTO> previewPaymentById(String userIdApp, Long paymentId, String usuarioSub);
+    List<PaymentDTO> previewByMonth(String userIdApp, int month, int year, String usuarioSub);
+    List<PaymentDTO> previewByExternalReference(String userIdApp, String externalRef, String usuarioSub);
     
     // Importar pagos seleccionados
-    int importSelectedPayments(Long userIdApp, List<Long> paymentIds, String usuarioSub);
+    int importSelectedPayments(String userIdApp, List<Long> paymentIds, String usuarioSub);
     
     // Actualizar categoría de un pago
-    int updatePaymentCategory(Long userIdApp, Long paymentId, String newCategory);
+    int updatePaymentCategory(String userIdApp, Long paymentId, String newCategory);
 }
 

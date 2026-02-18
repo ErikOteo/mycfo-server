@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Typography, Grid, ButtonBase } from "@mui/material";
 import { Edit, Description, CameraAlt, Mic } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function CargaSeleccionMetodo() {
   const navigate = useNavigate();
@@ -17,6 +18,17 @@ export default function CargaSeleccionMetodo() {
     { key: "foto", label: "Foto", icon: <CameraAlt fontSize="large" /> },
     { key: "audio", label: "Audio", icon: <Mic fontSize="large" /> },
   ];
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-seleccion-metodo",
+      tipo,
+      modos: modos.map((m) => ({ key: m.key, label: m.label })),
+    }),
+    [tipo, modos]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   return (
     <Box
@@ -34,7 +46,7 @@ export default function CargaSeleccionMetodo() {
       <Typography variant="h5" sx={{ mb: 2 }}>
         Selección de método
       </Typography>
-      <Typography variant="subtitle1" sx={{ mb: 4 }}>
+      <Typography variant="subtitle1" sx={{ mb: 4, display: { xs: 'none', md: 'block' } }}>
         Elegí cómo querés cargar tu {tipo}
       </Typography>
 
@@ -42,15 +54,22 @@ export default function CargaSeleccionMetodo() {
         {modos.map((m) => (
           <Grid item key={m.key}>
             <ButtonBase
-              onClick={() => navigate(`/carga/${tipo}/${m.key}`)}
+              onClick={() => {
+                const tipoLower = (tipo || "").toLowerCase();
+                if ((tipoLower === "ingreso" || tipoLower === "egreso") && m.key === "documento") {
+                  navigate("/carga-movimientos");
+                  return;
+                }
+                navigate(`/carga/${tipo}/${m.key}`);
+              }}
               sx={{
                 flexDirection: "column",
                 p: 3,
                 borderRadius: 3,
                 border: "2px solid",
                 borderColor: "divider",
-                width: 180,
-                height: 180,
+                width: { xs: 120, md: 180 }, // 120px en mobile, 180px en desktop
+                height: { xs: 120, md: 180 }, // 120px en mobile, 180px en desktop
                 justifyContent: "center",
                 alignItems: "center",
                 bgcolor: "background.paper",

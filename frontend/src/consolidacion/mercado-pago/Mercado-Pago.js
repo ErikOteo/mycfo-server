@@ -13,6 +13,7 @@ import {
 import { mpApi } from "./mpApi";
 import MpLinkCard from "./components/MpLinkCard";
 import MainGrid from "./components/MainGrid";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function MercadoPagoPage() {
   const [loading, setLoading] = React.useState(true);
@@ -74,6 +75,18 @@ export default function MercadoPagoPage() {
   }, [loadStatus]);
 
   const onRefreshStatus = () => loadStatus();
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "mercado-pago",
+      loading,
+      error,
+      status,
+    }),
+    [loading, error, status]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>

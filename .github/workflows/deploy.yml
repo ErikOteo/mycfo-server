@@ -10,7 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build & deploy
+      - name: Build backend jars
+        run: mvn clean package -DskipTests
+
+      - name: Deploy
         run: |
           cd ~/mycfo
           git fetch origin

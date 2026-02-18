@@ -26,6 +26,7 @@ import {
 import dayjs from "dayjs";
 import CustomTimePicker from "../../../shared-components/CustomTimePicker";
 import API_CONFIG from "../../../config/api-config";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 const FieldBox = ({ label, children }) => (
   <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -44,7 +45,6 @@ const timeStringToDayjs = (timeStr) => {
 export default function NotificationSettings() {
   const [preferences, setPreferences] = React.useState({
     emailEnabled: true,
-    inAppEnabled: true,
     pushEnabled: false,
     dailyDigestEnabled: true,
     weeklyDigestEnabled: false,
@@ -54,6 +54,7 @@ export default function NotificationSettings() {
     quietDays: [],
     typeConfigs: {},
     userEmail: "",
+    movementHighThreshold: 100000,
   });
 
   const [loading, setLoading] = React.useState(false);
@@ -69,7 +70,7 @@ export default function NotificationSettings() {
           return;
         }
         const response = await fetch(
-          `${API_CONFIG.NOTIFICACION}/api/users/1/notification-preferences`,
+          `${API_CONFIG.NOTIFICACION}/api/users/${usuarioSub}/notification-preferences`,
           {
             headers: {
               "X-Usuario-Sub": usuarioSub,
@@ -88,21 +89,26 @@ export default function NotificationSettings() {
     loadPreferences();
   }, []);
 
+  const reminderGroup = {
+    value: "REMINDERS_GROUP",
+    label: "Recordatorios",
+    members: ["REMINDER_CREATED", "REMINDER_CUSTOM"],
+  };
+
   const notificationTypes = [
-    { value: "MOVEMENT_NEW", label: "Nuevos Movimientos" },
+    reminderGroup,
     { value: "MOVEMENT_HIGH", label: "Movimientos Altos" },
-    { value: "RECONCILIATION_STALE", label: "Conciliación Pendiente" },
-    { value: "REMINDER_BILL_DUE", label: "Facturas por Vencer" },
-    { value: "USER_INVITED", label: "Usuarios Invitados" },
-    { value: "ROLE_CHANGED", label: "Cambios de Rol" },
-    { value: "BUDGET_EXCEEDED", label: "Presupuestos Excedidos" },
-    { value: "BUDGET_WARNING", label: "Presupuestos al 80%" },
-    { value: "BUDGET_MISSING_CATEGORY", label: "Categorías sin Presupuesto" },
-    { value: "CASH_FLOW_ALERT", label: "Alertas de Cash Flow" },
-    { value: "REPORT_READY", label: "Reportes Listos" },
-    { value: "MONTHLY_SUMMARY", label: "Resumen Mensual" },
-    { value: "REMINDER_CUSTOM", label: "Recordatorios" },
-    { value: "SYSTEM_MAINTENANCE", label: "Mantenimiento del Sistema" },
+    { value: "MOVEMENT_IMPORT", label: "Importación de Movimientos" },
+    { value: "ACCOUNT_MP_LINKED", label: "Vinculación Mercado Pago" },
+
+    { value: "BUDGET_CREATED", label: "Presupuesto Creado" },
+    { value: "BUDGET_DELETED", label: "Presupuesto Eliminado" },
+    // { value: "BUDGET_EXCEEDED", label: "Presupuesto Excedido" }, // ocultado
+
+    { value: "REPORT_READY", label: "Reporte Generado" },
+    // { value: "REPORT_ANOMALY", label: "Reporte con Anomalías" }, // ocultado
+    { value: "MONTHLY_SUMMARY", label: "Resumen Mensual Listo" },
+    // { value: "CASH_FLOW_ALERT", label: "Alerta de Cash Flow" }, // ocultado
   ];
 
   const daysOfWeek = [
@@ -114,6 +120,45 @@ export default function NotificationSettings() {
     { value: "SATURDAY", label: "Sábado" },
     { value: "SUNDAY", label: "Domingo" },
   ];
+
+  const chatbotContext = React.useMemo(() => {
+    const typeConfigs = notificationTypes
+      .map((type) => {
+        const members = type.members || [type.value];
+        const configs = members.map(
+          (m) => preferences.typeConfigs?.[m] || {}
+        );
+        return {
+          type: type.value,
+          enabled: configs.every((c) => c.enabled ?? true),
+          emailEnabled: configs.every((c) => c.emailEnabled ?? true),
+          inAppEnabled: configs.every((c) => c.inAppEnabled ?? true),
+        };
+      })
+      .slice(0, 25);
+
+    return {
+      screen: "configuracion-notificaciones",
+      loading,
+      saved,
+      preferences: {
+        emailEnabled: preferences.emailEnabled,
+        inAppEnabled: preferences.inAppEnabled,
+        pushEnabled: preferences.pushEnabled,
+        dailyDigestEnabled: preferences.dailyDigestEnabled,
+        weeklyDigestEnabled: preferences.weeklyDigestEnabled,
+        digestTime: preferences.digestTime,
+        quietStart: preferences.quietStart,
+        quietEnd: preferences.quietEnd,
+        quietDaysCount: preferences.quietDays?.length ?? 0,
+        userEmail: preferences.userEmail,
+      },
+      typeConfigs,
+      tiposDisponibles: notificationTypes.map((type) => type.value),
+    };
+  }, [notificationTypes, preferences, loading, saved]);
+
+  useChatbotScreenContext(chatbotContext);
 
   const handlePreferenceChange = (field, value) => {
     setPreferences((prev) => ({
@@ -143,6 +188,19 @@ export default function NotificationSettings() {
     }));
   };
 
+  const handleTypeGroupChange = (types, field, value) => {
+    setPreferences((prev) => {
+      const nextTypeConfigs = { ...prev.typeConfigs };
+      types.forEach((t) => {
+        nextTypeConfigs[t] = {
+          ...(nextTypeConfigs[t] || {}),
+          [field]: value,
+        };
+      });
+      return { ...prev, typeConfigs: nextTypeConfigs };
+    });
+  };
+
   const handleQuietDayToggle = (day) => {
     setPreferences((prev) => ({
       ...prev,
@@ -162,7 +220,7 @@ export default function NotificationSettings() {
 
       // Enviar preferencias al backend
       const response = await fetch(
-        `${API_CONFIG.NOTIFICACION}/api/users/1/notification-preferences`,
+        `${API_CONFIG.NOTIFICACION}/api/users/${usuarioSub}/notification-preferences`,
         {
           method: "PUT",
           headers: {
@@ -271,17 +329,6 @@ export default function NotificationSettings() {
                   }
                   label="Notificaciones por Email"
                 />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={preferences.inAppEnabled}
-                      onChange={(e) =>
-                        handlePreferenceChange("inAppEnabled", e.target.checked)
-                      }
-                    />
-                  }
-                  label="Notificaciones en la Aplicación"
-                />
                 {/*<FormControlLabel
                   control={
                     <Switch
@@ -294,9 +341,6 @@ export default function NotificationSettings() {
                   label="Notificaciones Push"
                 />*/}
               </FormGroup>
-
-              {/* Espaciado adicional */}
-              <Box sx={{ mt: 2 }} />
 
               {/* Campo de Email del Usuario */}
               <TextField
@@ -422,96 +466,116 @@ export default function NotificationSettings() {
         <CardContent>
           <Box
             sx={{
-              columnCount: { xs: 1, sm: 2, md: 3, lg: 4 },
-              columnGap: { xs: 2, sm: 2.5 },
+              display: "flex",
+              flexWrap: "wrap",
+              gap: { xs: 2, sm: 2.5 },
+              justifyContent: "center",
             }}
           >
-            {notificationTypes.map((type) => (
-              <Box
-                key={type.value}
-                sx={{
-                  breakInside: "avoid",
-                  display: "inline-block",
-                  width: "100%",
-                  mb: 2,
-                }}
-              >
-                <Paper sx={{ p: 2, height: "100%" }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    {type.label}
-                  </Typography>
-                  <FormGroup>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={
-                            preferences.typeConfigs[type.value]?.enabled ??
-                            true
-                          }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "enabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                          disabled={
-                            !preferences.emailEnabled &&
-                            !preferences.inAppEnabled
-                          }
-                        />
-                      }
-                      label="Habilitado"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={
-                            (preferences.emailEnabled &&
-                              preferences.typeConfigs[type.value]
-                                ?.emailEnabled) ??
-                            true
-                          }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "emailEnabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                          disabled={!preferences.emailEnabled}
-                        />
-                      }
-                      label="Email"
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={
-                            (preferences.inAppEnabled &&
-                              preferences.typeConfigs[type.value]
-                                ?.inAppEnabled) ??
-                            true
-                          }
-                          onChange={(e) =>
-                            handleTypeConfigChange(
-                              type.value,
-                              "inAppEnabled",
-                              e.target.checked
-                            )
-                          }
-                          size="small"
-                          disabled={!preferences.inAppEnabled}
-                        />
-                      }
-                      label="En App"
-                    />
-                  </FormGroup>
-                </Paper>
-              </Box>
-            ))}
+            {notificationTypes.map((type) => {
+              const members = type.members || [type.value];
+              const enabled =
+                preferences.typeConfigs[type.value]?.enabled ??
+                members.every(
+                  (m) => (preferences.typeConfigs[m]?.enabled ?? true) === true
+                );
+              const emailEnabled =
+                (preferences.emailEnabled &&
+                  (preferences.typeConfigs[type.value]?.emailEnabled ??
+                    members.every(
+                      (m) =>
+                        (preferences.typeConfigs[m]?.emailEnabled ?? true) ===
+                        true
+                    ))) ??
+                true;
+
+              const onToggleEnabled = (checked) =>
+                type.members
+                  ? handleTypeGroupChange(members, "enabled", checked)
+                  : handleTypeConfigChange(type.value, "enabled", checked);
+
+              const onToggleEmail = (checked) =>
+                type.members
+                  ? handleTypeGroupChange(members, "emailEnabled", checked)
+                  : handleTypeConfigChange(type.value, "emailEnabled", checked);
+
+              return (
+                <Box
+                  key={type.value}
+                  sx={{
+                    breakInside: "avoid",
+                    display: "inline-block",
+                    flex: "1 1 280px",
+                    maxWidth: 340,
+                    minWidth: 260,
+                    width: "100%",
+                    mb: 2,
+                  }}
+                >
+                  <Paper sx={{ p: 2, height: "100%" }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      {type.label}
+                    </Typography>
+                    <FormGroup>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={enabled}
+                            onChange={(e) => onToggleEnabled(e.target.checked)}
+                            size="small"
+                            disabled={!preferences.emailEnabled}
+                          />
+                        }
+                        label="Habilitado"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={emailEnabled}
+                            onChange={(e) => onToggleEmail(e.target.checked)}
+                            size="small"
+                            disabled={!preferences.emailEnabled}
+                          />
+                        }
+                        label="Email"
+                      />
+                      {type.value === "MOVEMENT_HIGH" && (
+                        <Box sx={{ mt: 1.5 }}>
+                          <FieldBox label="Umbral de movimiento alto (ARS)">
+                            <TextField
+                              type="number"
+                              fullWidth
+                              inputProps={{ min: 0, step: 1000 }}
+                              value={preferences.movementHighThreshold ?? 100000}
+                              onChange={(e) =>
+                                handlePreferenceChange(
+                                  "movementHighThreshold",
+                                  Number(e.target.value)
+                                )
+                              }
+                            />
+                          </FieldBox>
+                          <FieldBox label="Umbral de movimiento alto (USD)">
+                            <TextField
+                              type="number"
+                              fullWidth
+                              inputProps={{ min: 0, step: 50 }}
+                              value={preferences.movementHighThresholdUsd ?? 1000}
+                              onChange={(e) =>
+                                handlePreferenceChange(
+                                  "movementHighThresholdUsd",
+                                  Number(e.target.value)
+                                )
+                              }
+                            />
+                          </FieldBox>
+                        </Box>
+                      )}
+                    </FormGroup>
+                  </Paper>
+                </Box>
+              );
+            })}
           </Box>
         </CardContent>
       </Card>

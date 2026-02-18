@@ -38,12 +38,12 @@ public class ForecastController {
         try {
             String usuarioSub = requireSub(jwt);
             Long organizacionId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-            
+
             List<ForecastListDTO> forecasts = forecastService.listarForecasts(organizacionId);
             return ResponseEntity.ok(forecasts);
         } catch (RuntimeException e) {
             log.error("Error al listar forecasts: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(null);
         }
     }
 
@@ -57,9 +57,11 @@ public class ForecastController {
             return ResponseEntity.ok(forecast);
         } catch (ResponseStatusException e) {
             if (e.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(null);
             }
-            throw e;
+            return ResponseEntity.status(e.getStatusCode())
+                    .body(null);
         }
     }
 
@@ -69,17 +71,20 @@ public class ForecastController {
     @PostMapping("/generar/{forecastConfigId}")
     public ResponseEntity<ForecastDTO> generarForecast(
             @PathVariable Long forecastConfigId,
+            @RequestParam(required = false) String moneda,
             @AuthenticationPrincipal Jwt jwt,
             @RequestHeader("Authorization") String authorization) {
         try {
             String usuarioSub = requireSub(jwt);
-            ForecastDTO forecast = forecastService.generarForecast(forecastConfigId, usuarioSub, authorization);
+            ForecastDTO forecast = forecastService.generarForecast(forecastConfigId, usuarioSub, authorization, moneda);
             return ResponseEntity.status(HttpStatus.CREATED).body(forecast);
         } catch (ResponseStatusException e) {
-            throw e;
+            return ResponseEntity.status(e.getStatusCode())
+                    .body(null);
         } catch (Exception e) {
             log.error("Error al generar forecast: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(null);
         }
     }
 
@@ -94,36 +99,41 @@ public class ForecastController {
             return ResponseEntity.noContent().build();
         } catch (ResponseStatusException e) {
             if (e.getStatusCode().value() == HttpStatus.NOT_FOUND.value()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
             if (e.getStatusCode().value() == HttpStatus.FORBIDDEN.value()) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-            throw e;
+            return ResponseEntity.status(e.getStatusCode()).build();
         } catch (Exception e) {
             log.error("Error al eliminar forecast: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 
     /**
      * Generar un rolling forecast en tiempo real sin guardarlo
+     * 
      * @param horizonteMeses Meses a pronosticar hacia adelante
      */
     @PostMapping("/rolling")
     public ResponseEntity<Map<String, Object>> generarRollingForecast(
             @RequestParam Integer horizonteMeses,
+            @RequestParam(required = false) String moneda,
             @AuthenticationPrincipal Jwt jwt,
             @RequestHeader("Authorization") String authorization) {
         try {
             String usuarioSub = requireSub(jwt);
-            Map<String, Object> response = forecastService.generarRollingForecast(usuarioSub, horizonteMeses, authorization);
+            Map<String, Object> response = forecastService.generarRollingForecast(usuarioSub, horizonteMeses, moneda,
+                    authorization);
             return ResponseEntity.ok(response);
         } catch (ResponseStatusException e) {
-            throw e;
+            return ResponseEntity.status(e.getStatusCode())
+                    .body(Map.of("message", e.getReason() != null ? e.getReason() : e.getMessage()));
         } catch (Exception e) {
             log.error("Error al generar rolling forecast: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error al generar el forecast: " + e.getMessage()));
         }
     }
 }

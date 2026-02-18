@@ -10,7 +10,9 @@ import {
   Select,
   ToggleButton,
   ToggleButtonGroup,
-  Alert
+  Alert,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
   LineChart,
@@ -27,6 +29,8 @@ import {
 import LoadingSpinner from '../../shared-components/LoadingSpinner';
 import API_CONFIG from '../../config/api-config';
 import http from '../../api/http';
+import CurrencyTabs, { usePreferredCurrency } from '../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../shared-components/useChatbotScreenContext';
 
 // Opciones de horizonte (en años)
 const HORIZONTES = [
@@ -39,11 +43,20 @@ const HORIZONTES = [
 
 export default function PronosticoContinuo() {
   const [horizonteMeses, setHorizonteMeses] = React.useState(12);
+  const [currency, setCurrency] = usePreferredCurrency("ARS");
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = React.useState(false);
   const [forecastData, setForecastData] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [viewMode, setViewMode] = React.useState('todos'); // 'todos', 'ingresos', 'egresos', 'balance'
   const [hasGenerated, setHasGenerated] = React.useState(false);
+
+  // Limpiar el forecast al cambiar la moneda
+  React.useEffect(() => {
+    setForecastData(null);
+    setHasGenerated(false);
+  }, [currency]);
 
   const handleGenerarForecast = async () => {
     setLoading(true);
@@ -52,9 +65,9 @@ export default function PronosticoContinuo() {
 
     try {
       const response = await http.post(
-        `${API_CONFIG.PRONOSTICO}/api/forecasts/rolling?horizonteMeses=${horizonteMeses}`
+        `${API_CONFIG.PRONOSTICO}/api/forecasts/rolling?horizonteMeses=${horizonteMeses}&moneda=${currency}`
       );
-      
+
       setForecastData(response.data);
       setHasGenerated(true);
     } catch (err) {
@@ -95,7 +108,46 @@ export default function PronosticoContinuo() {
   };
 
   const chartData = prepareChartData();
-  
+
+  const chartSummary = React.useMemo(() => {
+    if (!chartData || chartData.length === 0) return null;
+    const first = chartData[0];
+    const last = chartData[chartData.length - 1];
+    const realCount = chartData.filter((item) => item.tipo === 'real').length;
+    return {
+      meses: chartData.length,
+      rango: {
+        desde: first.mes,
+        hasta: last.mes,
+      },
+      reales: realCount,
+      estimados: chartData.length - realCount,
+      ultimo: {
+        mes: last.mes,
+        tipo: last.tipo,
+        ingresos: last.ingresos,
+        egresos: last.egresos,
+        balance: last.balance,
+      },
+    };
+  }, [chartData]);
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: 'pronostico-continuo',
+      currency,
+      horizonteMeses,
+      viewMode,
+      loading,
+      hasGenerated,
+      error,
+      resumen: chartSummary,
+    }),
+    [currency, horizonteMeses, viewMode, loading, hasGenerated, error, chartSummary]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
   // Determinar el punto de cambio entre real y estimado
   const getSplitPoint = () => {
     if (!chartData) return -1;
@@ -116,11 +168,11 @@ export default function PronosticoContinuo() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="ingresos" 
-                stroke="#2e7d32" 
-                strokeWidth={2} 
-                name="Ingresos" 
+              <Line
+                dataKey="ingresos"
+                stroke="#2e7d32"
+                strokeWidth={2}
+                name="Ingresos"
                 dot={false}
               />
             </>
@@ -131,11 +183,11 @@ export default function PronosticoContinuo() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="egresos" 
-                stroke="#c62828" 
-                strokeWidth={2} 
-                name="Egresos" 
+              <Line
+                dataKey="egresos"
+                stroke="#c62828"
+                strokeWidth={2}
+                name="Egresos"
                 dot={false}
               />
             </>
@@ -146,11 +198,11 @@ export default function PronosticoContinuo() {
         if (hasRealAndEstimated) {
           return (
             <>
-              <Line 
-                dataKey="balance" 
-                stroke="#1565c0" 
-                strokeWidth={2} 
-                name="Balance" 
+              <Line
+                dataKey="balance"
+                stroke="#1565c0"
+                strokeWidth={2}
+                name="Balance"
                 dot={false}
               />
             </>
@@ -184,8 +236,12 @@ export default function PronosticoContinuo() {
     return chartData[splitPoint]?.mes;
   };
 
+  const splitPointMes = getSplitPointMes();
+  const firstMes = chartData && chartData.length > 0 ? chartData[0].mes : null;
+
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', p: 3 }}>
+      <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
       <Typography variant="h4" gutterBottom>
         Pronóstico Continuo (Rolling Forecast)
       </Typography>
@@ -197,7 +253,8 @@ export default function PronosticoContinuo() {
       {/* Selector de horizonte y botón generar */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <FormControl sx={{ minWidth: 200 }}>
+
+          <FormControl sx={{ minWidth: 100, flex: { xs: '1 1 100%', sm: '0 1 auto' } }}>
             <InputLabel>Horizonte</InputLabel>
             <Select
               value={horizonteMeses}
@@ -219,7 +276,7 @@ export default function PronosticoContinuo() {
             onClick={handleGenerarForecast}
             disabled={loading}
             size="large"
-            sx={{ height: 56 }}
+            sx={{ height: 56, flex: { xs: '1 1 100%', sm: '0 1 auto' } }}
           >
             {loading ? 'Generando...' : 'Generar Forecast'}
           </Button>
@@ -241,29 +298,46 @@ export default function PronosticoContinuo() {
         <>
           {/* Controles de visualización del gráfico */}
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ mr: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+              <Typography variant="h6" sx={{ mr: 3, display: { xs: 'none', sm: 'block' } }}>
                 Visualización
               </Typography>
-              <ToggleButtonGroup
-                value={viewMode}
-                exclusive
-                onChange={(e, newMode) => newMode && setViewMode(newMode)}
-                size="small"
-              >
-                <ToggleButton value="todos">
-                  Todos
-                </ToggleButton>
-                <ToggleButton value="ingresos">
-                  Solo Ingresos
-                </ToggleButton>
-                <ToggleButton value="egresos">
-                  Solo Egresos
-                </ToggleButton>
-                <ToggleButton value="balance">
-                  Solo Balance
-                </ToggleButton>
-              </ToggleButtonGroup>
+
+              {isMobile ? (
+                <FormControl size="small" sx={{ minWidth: 100, flexGrow: 1, flex: '1 1 100%' }}>
+                  <Select
+                    value={viewMode}
+                    onChange={(e) => setViewMode(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="todos">Todos</MenuItem>
+                    <MenuItem value="ingresos">Solo Ingresos</MenuItem>
+                    <MenuItem value="egresos">Solo Egresos</MenuItem>
+                    <MenuItem value="balance">Solo Balance</MenuItem>
+                  </Select>
+                </FormControl>
+              ) : (
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={(e, newMode) => newMode && setViewMode(newMode)}
+                  size="small"
+                  sx={{ flexWrap: 'wrap' }}
+                >
+                  <ToggleButton value="todos">
+                    Todos
+                  </ToggleButton>
+                  <ToggleButton value="ingresos">
+                    Solo Ingresos
+                  </ToggleButton>
+                  <ToggleButton value="egresos">
+                    Solo Egresos
+                  </ToggleButton>
+                  <ToggleButton value="balance">
+                    Solo Balance
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              )}
             </Box>
 
             {/* Gráfico */}
@@ -271,22 +345,31 @@ export default function PronosticoContinuo() {
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="mes" />
-                <YAxis />
+                <YAxis width={90} tickFormatter={(value) => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`} />
                 <Tooltip formatter={(value) => `$${value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
                 <Legend />
-                {getSplitPointMes() && (
+                {splitPointMes && (
                   <>
-                    <ReferenceLine 
-                      x={getSplitPointMes()} 
-                      stroke="#9e9e9e" 
-                      strokeWidth={2} 
+                    {firstMes && firstMes !== splitPointMes && (
+                      <ReferenceArea
+                        x1={firstMes}
+                        x2={splitPointMes}
+                        fillOpacity={0}
+                        label={{ value: "Datos historicos", position: "insideBottom", fill: "#546e7a" }}
+                      />
+                    )}
+                    <ReferenceLine
+                      x={splitPointMes}
+                      stroke="#9e9e9e"
+                      strokeWidth={2}
                       strokeDasharray="3 3"
                       label={{ value: "Estimado", position: "top", fill: "#9e9e9e" }}
                     />
-                    <ReferenceArea 
-                      x1={getSplitPointMes()} 
-                      fill="#e3f2fd" 
+                    <ReferenceArea
+                      x1={splitPointMes}
+                      fill="#e3f2fd"
                       fillOpacity={0.3}
+                      label={{ value: "Datos pronosticados", position: "insideBottom", fill: "#546e7a" }}
                     />
                   </>
                 )}

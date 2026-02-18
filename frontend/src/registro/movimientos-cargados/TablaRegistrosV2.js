@@ -48,11 +48,14 @@ import VerIngreso from "./components/VerIngreso";
 import VerEgreso from "./components/VerEgreso";
 import VerDeuda from "./components/VerDeuda";
 import VerAcreencia from "./components/VerAcreencia";
+import { sendReportGenerated } from "../../notificaciones/services/reportGeneratedService";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import SuccessSnackbar from "../../shared-components/SuccessSnackbar";
 import ExportadorSimple from "../../shared-components/ExportadorSimple";
 import { exportToExcel } from "../../utils/exportExcelUtils";
 import { exportPdfReport } from "../../utils/exportPdfUtils";
+import CustomNoRowsOverlay from "../../shared-components/CustomNoRowsOverlay";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 // ✅ IMPORTANTE: usar tu cliente central con interceptors
 import http from "../../api/http";
@@ -60,6 +63,7 @@ import CurrencyTabs, {
   getStoredCurrencyPreference,
   persistCurrencyPreference,
 } from "../../shared-components/CurrencyTabs";
+import usePermisos from "../../hooks/usePermisos";
 
 export default function TablaRegistrosV2() {
   const [movimientos, setMovimientos] = useState([]);
@@ -74,6 +78,8 @@ export default function TablaRegistrosV2() {
   });
   const [rowCount, setRowCount] = useState(0);
   const [currency, setCurrency] = useState(getStoredCurrencyPreference());
+  const { tienePermiso } = usePermisos();
+  const canEdit = tienePermiso('movs', 'edit');
   const [usuarioRol, setUsuarioRol] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("view"); // "view" o "edit"
@@ -101,11 +107,92 @@ export default function TablaRegistrosV2() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState(null);
   const [fechaHasta, setFechaHasta] = useState(null);
+  const [montoDesde, setMontoDesde] = useState("");
+  const [montoHasta, setMontoHasta] = useState("");
+  const [montoRangeLabel, setMontoRangeLabel] = useState("");
+  const [montoRangeOptions, setMontoRangeOptions] = useState([]);
   const searchDateISO = useMemo(() => {
     if (!searchText) return null;
     const parsed = dayjs(searchText, ["DD/MM/YYYY", "DD-MM-YYYY"], true);
     return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
   }, [searchText]);
+
+  const chatbotContext = useMemo(
+    () => ({
+      screen: "movimientos",
+      currency,
+      totalMovimientos: rowCount,
+      filtros: {
+        searchText,
+        fechaDesde: fechaDesde?.format ? fechaDesde.format("YYYY-MM-DD") : null,
+        fechaHasta: fechaHasta?.format ? fechaHasta.format("YYYY-MM-DD") : null,
+      },
+      movimientos: movimientos.slice(0, 5),
+      movimientoSeleccionado: selectedMovimiento
+        ? {
+          id: selectedMovimiento.id,
+          tipo: selectedMovimiento.tipo,
+          monto: selectedMovimiento.montoTotal ?? selectedMovimiento.monto,
+          fecha: selectedMovimiento.fechaEmision ?? selectedMovimiento.fecha,
+          categoria: selectedMovimiento.categoria,
+        }
+        : null,
+    }),
+    [
+      currency,
+      rowCount,
+      searchText,
+      fechaDesde,
+      fechaHasta,
+      movimientos,
+      selectedMovimiento,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
+
+  const parseMontoInput = useCallback((valor) => {
+    if (valor === null || valor === undefined) return null;
+    const cleaned = String(valor)
+      .replace(/\s|\$/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".");
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, []);
+
+  const formatMonto = (valor) =>
+    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(
+      Math.round(valor ?? 0),
+    );
+
+  const buildMontoRanges = useCallback(
+    (max) => {
+      if (!Number.isFinite(max) || max <= 0) return [];
+      let step;
+      if (max <= 100) step = 10;
+      else if (max <= 1_000) step = 100;
+      else if (max <= 10_000) step = 1_000;
+      else if (max <= 100_000) step = 10_000;
+      else if (max <= 1_000_000) step = 50_000;
+      else step = 10 ** Math.max(3, Math.floor(Math.log10(max)) - 1);
+
+      let bucketCount = Math.ceil(max / step);
+      if (bucketCount > 15) {
+        step *= 2;
+        bucketCount = Math.ceil(max / step);
+      }
+
+      const upper = Math.ceil(max / step) * step;
+      const options = [];
+      for (let from = 0; from < upper; from += step) {
+        const to = from + step;
+        options.push(`${formatMonto(from)} - ${formatMonto(to)}`);
+      }
+      return options;
+    },
+    [formatMonto],
+  );
 
   useEffect(() => {
     const handler = setTimeout(
@@ -135,7 +222,7 @@ export default function TablaRegistrosV2() {
     setPaginationModel((prev) =>
       prev.page === 0 ? prev : { ...prev, page: 0 },
     );
-  }, [debouncedSearch, fechaDesde, fechaHasta]);
+  }, [debouncedSearch, fechaDesde, fechaHasta, montoDesde, montoHasta, montoRangeLabel]);
 
   const clearDeepLink = useCallback(() => {
     const hasQuery = searchParams.has("editMovementId");
@@ -210,14 +297,60 @@ export default function TablaRegistrosV2() {
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
   }, []);
 
+  const fetchMaxMonto = useCallback(async () => {
+    try {
+      const usuarioSub = sessionStorage.getItem("sub");
+      if (!usuarioSub) return;
+      const headers = { "X-Usuario-Sub": usuarioSub };
+      const params = {
+        page: 0,
+        size: 1,
+        sortBy: "montoTotal",
+        sortDir: "desc",
+        moneda: currency,
+      };
+      const res = await http.get(`${API_BASE}/movimientos`, {
+        headers,
+        params,
+      });
+      const firstRow = res?.data?.content?.[0] ?? res?.data?.[0];
+      const max = firstRow?.montoTotal;
+      if (Number.isFinite(max)) {
+        setMontoRangeOptions(buildMontoRanges(max));
+      } else {
+        setMontoRangeOptions([]);
+      }
+    } catch (err) {
+      console.error("Error obteniendo max monto:", err);
+      setMontoRangeOptions([]);
+    }
+  }, [API_BASE, buildMontoRanges, currency]);
+
+  useEffect(() => {
+    fetchMaxMonto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency]);
+
   const cargarMovimientos = useCallback(async () => {
     setLoading(true);
+    const montoMinParsed = parseMontoInput(montoDesde);
+    const montoMaxParsed = parseMontoInput(montoHasta);
+    if (
+      montoMinParsed !== null &&
+      montoMaxParsed !== null &&
+      montoMinParsed > montoMaxParsed
+    ) {
+      setMovimientos([]);
+      setRowCount(0);
+      setLoading(false);
+      return;
+    }
     try {
       const usuarioSub = sessionStorage.getItem("sub");
 
       if (!usuarioSub) {
         console.error("No se encontró sub de usuario en la sesión");
-        alert("Error: No se encontró usuario en la sesión");
+        setSnackbar({ open: true, message: "Error: No se encontró usuario en la sesión", severity: "error" });
         return;
       }
 
@@ -233,6 +366,8 @@ export default function TablaRegistrosV2() {
         // Si es fecha, usamos searchDate y no enviamos el texto para evitar condición AND que vacía resultados
         search: searchDateISO ? undefined : debouncedSearch || undefined,
         searchDate: searchDateISO || undefined,
+        montoMin: montoMinParsed ?? undefined,
+        montoMax: montoMaxParsed ?? undefined,
         fechaDesde: fechaDesde
           ? dayjs(fechaDesde).format("YYYY-MM-DD")
           : undefined,
@@ -278,7 +413,17 @@ export default function TablaRegistrosV2() {
     } finally {
       setLoading(false);
     }
-  }, [currency, paginationModel, debouncedSearch, searchDateISO, fechaDesde, fechaHasta]);
+  }, [
+    currency,
+    paginationModel,
+    debouncedSearch,
+    searchDateISO,
+    fechaDesde,
+    fechaHasta,
+    montoDesde,
+    montoHasta,
+    parseMontoInput,
+  ]);
 
   const initializedRef = useRef(false);
 
@@ -290,12 +435,23 @@ export default function TablaRegistrosV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recargar cuando cambie la paginación
+  // Recargar cuando cambie la paginación o filtros
   useEffect(() => {
     if (initializedRef.current) {
       cargarMovimientos();
     }
-  }, [cargarMovimientos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currency,
+    paginationModel.page,
+    paginationModel.pageSize,
+    debouncedSearch,
+    searchDateISO,
+    fechaDesde,
+    fechaHasta,
+    montoDesde,
+    montoHasta,
+  ]);
 
   // Abrir dialog para VER movimiento
   const handleVerMovimiento = (movimiento) => {
@@ -386,7 +542,7 @@ export default function TablaRegistrosV2() {
 
   const handleGuardarCambios = async () => {
     if (!validarCamposObligatorios()) {
-      alert("⚠️ Por favor completa todos los campos obligatorios");
+      setSnackbar({ open: true, message: "⚠️ Por favor completa todos los campos obligatorios", severity: "warning" });
       return;
     }
 
@@ -456,10 +612,11 @@ export default function TablaRegistrosV2() {
     } catch (error) {
       console.error("Error actualizando movimiento:", error);
       console.error("Datos enviados:", formData);
-      alert(
-        "❌ Error al actualizar: " +
-          (error.response?.data?.mensaje || error.message),
-      );
+      setSnackbar({
+        open: true,
+        message: "❌ Error al actualizar: " + (error.response?.data?.mensaje || error.message),
+        severity: "error"
+      });
     }
   };
 
@@ -485,10 +642,11 @@ export default function TablaRegistrosV2() {
       cargarMovimientos();
     } catch (error) {
       console.error("Error eliminando movimiento:", error);
-      alert(
-        "❌ Error al eliminar: " +
-          (error.response?.data?.mensaje || error.message),
-      );
+      setSnackbar({
+        open: true,
+        message: "❌ Error al eliminar: " + (error.response?.data?.mensaje || error.message),
+        severity: "error"
+      });
     }
   };
 
@@ -646,6 +804,8 @@ export default function TablaRegistrosV2() {
     sortDir: "desc",
     search: searchDateISO ? undefined : debouncedSearch || undefined,
     searchDate: searchDateISO || undefined,
+    montoMin: parseMontoInput(montoDesde) ?? undefined,
+    montoMax: parseMontoInput(montoHasta) ?? undefined,
     fechaDesde: fechaDesde ? dayjs(fechaDesde).format("YYYY-MM-DD") : undefined,
     fechaHasta: fechaHasta ? dayjs(fechaHasta).format("YYYY-MM-DD") : undefined,
     moneda: currency,
@@ -654,7 +814,7 @@ export default function TablaRegistrosV2() {
   const fetchMovimientosParaExportar = async () => {
     const usuarioSub = sessionStorage.getItem("sub");
     if (!usuarioSub) {
-      alert("No se encontró usuario en la sesión.");
+      setSnackbar({ open: true, message: "No se encontró usuario en la sesión.", severity: "error" });
       return [];
     }
 
@@ -676,7 +836,7 @@ export default function TablaRegistrosV2() {
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       console.error("Error al exportar movimientos:", error);
-      alert("No se pudieron obtener los movimientos para exportar.");
+      setSnackbar({ open: true, message: "No se pudieron obtener los movimientos para exportar.", severity: "error" });
       return [];
     }
   };
@@ -715,6 +875,8 @@ export default function TablaRegistrosV2() {
       headerName: "Tipo",
       flex: 0.8,
       minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const tipo = params.value;
         if (!tipo)
@@ -744,6 +906,8 @@ export default function TablaRegistrosV2() {
       headerName: "Monto",
       flex: 0.8,
       minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const monto = params.row.montoTotal || 0;
         const moneda = params.row.moneda || "ARS";
@@ -761,8 +925,19 @@ export default function TablaRegistrosV2() {
                   ? COLOR_ACREENCIA
                   : "#424242";
         const signo = tipo === "Egreso" && valor !== 0 ? "-" : "";
+        const valorAbs = Math.abs(valor);
+        const isInteger = Number.isInteger(valorAbs);
+        const formatted = new Intl.NumberFormat("es-AR", {
+          minimumFractionDigits: isInteger ? 0 : 2,
+          maximumFractionDigits: 2,
+        }).format(valorAbs);
+
         return (
-          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: "24px", color }}>
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            sx={{ lineHeight: "24px", color }}
+          >
             {`${signo}${new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2 }).format(Math.abs(valor))} ${moneda}`}
           </Typography>
         );
@@ -774,6 +949,8 @@ export default function TablaRegistrosV2() {
       headerName: "Fecha",
       flex: 0.7,
       minWidth: 110,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
         <Typography variant="body2" sx={{ lineHeight: "24px" }}>
           {formatearFecha(params.value)}
@@ -786,6 +963,8 @@ export default function TablaRegistrosV2() {
       headerName: "Estado",
       flex: 0.8,
       minWidth: 120,
+      align: 'center',
+      headerAlign: 'center',
       hide: true,
       renderCell: (params) => {
         if (!params.value)
@@ -827,6 +1006,8 @@ export default function TablaRegistrosV2() {
       headerName: "Categoría",
       flex: 1,
       minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         if (!params.value)
           return (
@@ -851,6 +1032,8 @@ export default function TablaRegistrosV2() {
       headerName: "Origen",
       flex: 1,
       minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         return (
           <Typography variant="body2" sx={{ lineHeight: "24px" }}>
@@ -865,6 +1048,8 @@ export default function TablaRegistrosV2() {
       headerName: "Destino",
       flex: 1,
       minWidth: 130,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         return (
           <Typography variant="body2" sx={{ lineHeight: "24px" }}>
@@ -879,6 +1064,8 @@ export default function TablaRegistrosV2() {
       headerName: "Descripción",
       flex: 1.2,
       minWidth: 150,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         return (
           <Typography variant="body2" sx={{ lineHeight: "24px" }}>
@@ -893,21 +1080,38 @@ export default function TablaRegistrosV2() {
       headerName: "Acciones",
       flex: 1,
       minWidth: 140,
+      align: 'center',
+      headerAlign: 'center',
       sortable: false,
       filterable: false,
       renderCell: (params) => {
         const isAdmin = (usuarioRol || "").toUpperCase().includes("ADMIN");
         return (
           <Box sx={{ display: "flex", gap: 0.5 }}>
-            <IconButton size="small" color="info" onClick={() => handleVerMovimiento(params.row)} title="Ver detalles">
+            <IconButton
+              size="small"
+              color="info"
+              onClick={() => handleVerMovimiento(params.row)}
+              title="Ver detalles"
+            >
               <VisibilityIcon fontSize="small" />
             </IconButton>
-            {isAdmin && (
+            {canEdit && (
               <>
-                <IconButton size="small" color="primary" onClick={() => handleEditarMovimiento(params.row)} title="Editar">
+                <IconButton
+                  size="small"
+                  color="primary"
+                  onClick={() => handleEditarMovimiento(params.row)}
+                  title="Editar"
+                >
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" color="error" onClick={() => handleEliminarClick(params.row)} title="Eliminar">
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleEliminarClick(params.row)}
+                  title="Eliminar"
+                >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </>
@@ -917,7 +1121,7 @@ export default function TablaRegistrosV2() {
       },
     };
 
-    if (isMobile) return [tipoColumn, montoColumn, accionesColumn];
+    if (isMobile) return [montoColumn, accionesColumn];
 
     return [
       tipoColumn,
@@ -939,9 +1143,9 @@ export default function TablaRegistrosV2() {
 
   const formatValorExport = (row, field) => {
     if (field === "montoTotal") {
-      const tipo = row.tipo || "";
+      const tipo = String(row.tipo || "").trim().toUpperCase();
       const moneda = row.moneda || "ARS";
-      const multiplicador = tipo === "Egreso" ? -1 : 1;
+      const multiplicador = tipo === "EGRESO" ? -1 : 1;
       const valor = Number(row.montoTotal || 0) * multiplicador;
       const signo = valor < 0 ? "-" : "";
       return `${signo}${new Intl.NumberFormat("es-AR", {
@@ -960,31 +1164,69 @@ export default function TablaRegistrosV2() {
     return String(value);
   };
 
+  const formatValorExportExcel = (row, field) => {
+    if (field === "montoTotal") {
+      const tipo = String(row.tipo || "").trim().toUpperCase();
+      const monto = Number(row.montoTotal || 0);
+      const valorAbs = Math.abs(monto);
+      return tipo === "EGRESO" ? -valorAbs : valorAbs;
+    }
+
+    if (field === "moneda") {
+      return row.moneda || "ARS";
+    }
+
+    if (field === "fechaEmision") {
+      return formatearFecha(row.fechaEmision);
+    }
+
+    const value = row[field];
+    if (value === null || value === undefined) return "-";
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
   const handleExportExcel = async () => {
     const registros = await fetchMovimientosParaExportar();
     if (!registros.length) return;
 
-    const headers = exportColumns.map((c) => c.headerName);
+    const excelExportColumns = exportColumns.filter(
+      (c) => c.field !== "estado",
+    );
+    const montoIndex = excelExportColumns.findIndex(
+      (c) => c.field === "montoTotal",
+    );
+    const monedaColumn = { field: "moneda", headerName: "Moneda" };
+    if (montoIndex >= 0) {
+      excelExportColumns.splice(montoIndex + 1, 0, monedaColumn);
+    } else {
+      excelExportColumns.push(monedaColumn);
+    }
+
+    const headers = excelExportColumns.map((c) => c.headerName);
     const excelData = [
       headers,
-      ...registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field))),
+      ...registros.map((row) =>
+        excelExportColumns.map((c) => formatValorExportExcel(row, c.field)),
+      ),
     ];
 
-    const colsConfig = exportColumns.map(() => ({ wch: 18 }));
+    const colsConfig = excelExportColumns.map(() => ({ wch: 18 }));
 
-    exportToExcel(
-      excelData,
-      "Movimientos",
-      "Movimientos",
-      colsConfig,
-      [],
-      [],
-      {
-        headerRows: [0],
-        zebra: true,
-        freezePane: { rowSplit: 1, colSplit: 1 },
-      },
-    );
+    exportToExcel(excelData, "Movimientos", "Movimientos", colsConfig, [], [], {
+      headerRows: [0],
+      zebra: true,
+      freezePane: { rowSplit: 1, colSplit: 1 },
+    });
+
+    await sendReportGenerated({
+      reportType: "MOVEMENTS_EXPORT",
+      reportName: "Movimientos financieros (Excel)",
+      period: new Date().toLocaleString("es-AR"),
+      downloadUrl: null,
+      hasAnomalies: false,
+    });
   };
 
   const handleExportPdf = async () => {
@@ -992,17 +1234,17 @@ export default function TablaRegistrosV2() {
     if (!registros.length) return;
 
     const head = [exportColumns.map((c) => c.headerName)];
-    const body = registros.map((row) => exportColumns.map((c) => formatValorExport(row, c.field)));
+    const body = registros.map((row) =>
+      exportColumns.map((c) => formatValorExport(row, c.field)),
+    );
 
     const categorias = new Set(
-      registros
-        .map((r) => r.categoria)
-        .filter(Boolean),
+      registros.map((r) => r.categoria).filter(Boolean),
     );
 
     await exportPdfReport({
       title: "Movimientos financieros",
-      subtitle: "Exportaci?n",
+      subtitle: "Exportación",
       charts: [],
       table: { head, body },
       fileName: "Movimientos",
@@ -1021,10 +1263,16 @@ export default function TablaRegistrosV2() {
           { label: "Categorias", value: categorias.size.toString() },
           { label: "Orden", value: "Fecha desc" },
         ],
-        summary: [
-          "Incluye filtros y rango de fechas aplicados.",
-        ],
+        summary: ["Incluye filtros y rango de fechas aplicados."],
       },
+    });
+
+    await sendReportGenerated({
+      reportType: "MOVEMENTS_EXPORT",
+      reportName: "Movimientos financieros (PDF)",
+      period: new Date().toLocaleString("es-AR"),
+      downloadUrl: null,
+      hasAnomalies: false,
     });
   };
 
@@ -1084,7 +1332,28 @@ export default function TablaRegistrosV2() {
               textField: {
                 size: "small",
                 placeholder: "dd/mm/aaaa",
-                sx: { backgroundColor: "white", borderRadius: "8px" },
+                sx: (theme) => ({
+                  borderRadius: "8px",
+                  backgroundColor: theme.vars
+                    ? `rgba(${theme.vars.palette.background.paperChannel} / 1)`
+                    : theme.palette.background.paper,
+                  "& .MuiInputBase-input": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+                      : theme.palette.text.primary,
+                    "&::placeholder": {
+                      color: theme.vars
+                        ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                        : theme.palette.text.secondary,
+                      opacity: 0.8,
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                      : theme.palette.text.secondary,
+                  },
+                }),
               },
               openPickerButton: {
                 size: "small",
@@ -1108,7 +1377,28 @@ export default function TablaRegistrosV2() {
               textField: {
                 size: "small",
                 placeholder: "dd/mm/aaaa",
-                sx: { backgroundColor: "white", borderRadius: "8px" },
+                sx: (theme) => ({
+                  borderRadius: "8px",
+                  backgroundColor: theme.vars
+                    ? `rgba(${theme.vars.palette.background.paperChannel} / 1)`
+                    : theme.palette.background.paper,
+                  "& .MuiInputBase-input": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.primaryChannel} / 1)`
+                      : theme.palette.text.primary,
+                    "&::placeholder": {
+                      color: theme.vars
+                        ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                        : theme.palette.text.secondary,
+                      opacity: 0.8,
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: theme.vars
+                      ? `rgba(${theme.vars.palette.text.secondaryChannel} / 1)`
+                      : theme.palette.text.secondary,
+                  },
+                }),
               },
               openPickerButton: {
                 size: "small",
@@ -1124,13 +1414,38 @@ export default function TablaRegistrosV2() {
             sx={{ width: 140, flex: "0 0 140px" }}
           />
         </LocalizationProvider>
-        {(fechaDesde || fechaHasta) && (
+        <CustomSelect
+          name="montoRange"
+          value={montoRangeLabel}
+          onChange={(value) => {
+            setMontoRangeLabel(value);
+            if (!value) {
+              setMontoDesde("");
+              setMontoHasta("");
+              return;
+            }
+            const numbers = value.match(/[\d.,]+/g) || [];
+            const [minRaw, maxRaw] = numbers;
+            const parseNumber = (txt) =>
+              parseFloat(txt.replace(/\./g, "").replace(/,/g, "."));
+            const minVal = parseNumber(minRaw ?? "0");
+            const maxVal = parseNumber(maxRaw ?? "0");
+            setMontoDesde(Number.isFinite(minVal) ? minVal.toString() : "");
+            setMontoHasta(Number.isFinite(maxVal) ? maxVal.toString() : "");
+          }}
+          options={montoRangeOptions}
+          width="180px"
+        />
+        {(fechaDesde || fechaHasta || montoDesde || montoHasta || montoRangeLabel) && (
           <Button
             size="small"
             variant="text"
             onClick={() => {
               setFechaDesde(null);
               setFechaHasta(null);
+              setMontoDesde("");
+              setMontoHasta("");
+              setMontoRangeLabel("");
             }}
             sx={{ ml: { xs: 0, md: "auto" } }}
           >
@@ -1146,20 +1461,27 @@ export default function TablaRegistrosV2() {
             flexWrap: "wrap",
           }}
         >
-          <Button variant="contained" onClick={() => navigate("/carga")}>
-            Cargar movimiento
-          </Button>
-          <ExportadorSimple onExportPdf={handleExportPdf} onExportExcel={handleExportExcel} />
+          {canEdit && (
+            <Button variant="contained" onClick={() => navigate("/carga")}>
+              Cargar movimiento
+            </Button>
+          )}
+          <ExportadorSimple
+            onExportPdf={handleExportPdf}
+            onExportExcel={handleExportExcel}
+          />
         </Box>
       </Box>
 
-      <Box sx={{ height: 700, width: "100%" }}>
+      <Box sx={{ width: "100%" }}>
         <DataGrid
           rows={movimientos}
           columns={columns}
           loading={loading}
+          autoHeight
           // Paginación del servidor
           paginationMode={paginationMode}
+          sortingMode="server"
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
           rowCount={rowCount}
@@ -1183,73 +1505,91 @@ export default function TablaRegistrosV2() {
                 }}
               />
             ),
+            noRowsOverlay: () => <CustomNoRowsOverlay message="No se encontraron movimientos registrados" />,
           }}
           slotProps={{
-            toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 500 } },
+            toolbar: {
+              showQuickFilter: true,
+              quickFilterProps: { debounceMs: 500 },
+            },
+          }}
+          localeText={{
+            columnMenuSortAsc: "Ordenar Ascendente",
+            columnMenuSortDesc: "Ordenar Descendente",
+            columnMenuFilter: "Filtrar",
+            columnMenuHideColumn: "Ocultar columna",
+            columnMenuManageColumns: "Administrar columnas",
           }}
           disableRowSelectionOnClick
-          autoHeight={false}
           sx={{
-            backgroundColor: "rgba(255, 255, 255, 0.7)",
+            backgroundColor: "background.paper",
+            borderRadius: 2,
+            border: (theme) => `1px solid ${theme.palette.divider}`,
             "& .MuiDataGrid-cell": {
-              borderBottom: "1px solid #e0e0e0",
-              borderRight: "1px solid #e0e0e0",
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
               display: "flex",
               alignItems: "center",
             },
-            "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" },
             "& .MuiDataGrid-columnHeaders": {
-              backgroundColor: "#f5f5f5",
-              fontSize: "0.95rem",
-              borderTop: "1px solid #e0e0e0",
-              borderBottom: "1px solid #e0e0e0",
+              backgroundColor: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.05)"
+                  : "#f5f5f5",
+              color: "text.primary",
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
             },
             "& .MuiDataGrid-columnHeader": {
-              borderLeft: "1px solid #e0e0e0",
-              borderRight: "1px solid #e0e0e0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              boxSizing: "border-box",
+              "&:focus": { outline: "none" },
             },
             "& .MuiDataGrid-columnHeader:first-of-type": { borderLeft: "none" },
             "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
             "& .MuiDataGrid-columnHeaderTitle": { fontWeight: 700 },
-            "& .MuiDataGrid-columnSeparator": { opacity: 1, visibility: "visible", color: "#d5d5d5" },
-            "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(0, 0, 0, 0.02)" },
+            "& .MuiDataGrid-columnSeparator": {
+              opacity: 1,
+              visibility: "visible",
+              color: "#d5d5d5",
+            },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: "rgba(0, 0, 0, 0.02)",
+            },
             "& .MuiDataGrid-sortIcon": { display: "none" },
             "& .MuiDataGrid-columnHeaderTitleContainer": {
               paddingRight: "8px",
               display: "flex",
               alignItems: "center",
             },
-            "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer": {
-              width: "24px",
-              height: "24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+            "& .MuiDataGrid-iconButtonContainer": {
+              visibility: "hidden",
             },
-            "& .MuiDataGrid-columnHeader .MuiIconButton-root": {
-              padding: "4px",
-              fontSize: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            },
-            "& .MuiDataGrid-menuIcon": {
-              fontSize: "16px",
-              display: "block !important",
+            "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-iconButtonContainer":
+            {
+              visibility: "visible",
             },
             "& .MuiDataGrid-columnHeader .MuiDataGrid-iconButtonContainer .MuiIconButton-root:not([aria-label*='menu'])":
-              {
-                display: "none",
+            {
+              display: "none",
+            },
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: (theme) => theme.palette.action.hover,
+            },
+            "& .MuiDataGrid-row.Mui-selected": {
+              backgroundColor: (theme) =>
+                `${theme.palette.primary.main}15 !important`,
+              "&:hover": {
+                backgroundColor: (theme) =>
+                  `${theme.palette.primary.main}25 !important`,
               },
+            },
           }}
         />
       </Box>
 
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle sx={{ fontWeight: 600 }}>
           {dialogMode === "edit"
             ? "Editar movimiento"
@@ -1281,7 +1621,10 @@ export default function TablaRegistrosV2() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
         <DialogTitle>⚠️ Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1305,7 +1648,9 @@ export default function TablaRegistrosV2() {
               </Typography>
             </Box>
           )}
-          <Alert severity="error" sx={{ mt: 2 }}>Esta acción no se puede deshacer.</Alert>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Esta acción no se puede deshacer.
+          </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>

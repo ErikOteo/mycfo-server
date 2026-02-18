@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {
-    Box, Typography, Paper, CssBaseline
+    Box, Typography, Paper, CssBaseline, Snackbar, Alert
 } from '@mui/material';
 import Filtros from './Filtros';
 import TablaDetalle from './TablaDetalle';
@@ -8,9 +8,11 @@ import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 export default function MainGrid() {
     const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
@@ -25,6 +27,7 @@ export default function MainGrid() {
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
     const chartRef = React.useRef(null);
     const [currency, setCurrency] = usePreferredCurrency("ARS");
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
     // Formateador de moneda para tooltips del gráfico
     const formatCurrency = React.useCallback(
@@ -90,7 +93,60 @@ export default function MainGrid() {
         return s.length ? s : 'Sin categoria';
     };
 
-    const handleExportExcel = () => {
+    const totalIngresos = React.useMemo(
+        () => data.detalleIngresos.reduce((sum, item) => sum + (Number(item?.total) || 0), 0),
+        [data.detalleIngresos]
+    );
+
+    const totalEgresos = React.useMemo(
+        () => data.detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item?.total) || 0), 0),
+        [data.detalleEgresos]
+    );
+
+    const topIngresos = React.useMemo(
+        () =>
+            [...data.detalleIngresos]
+                .sort((a, b) => Number(b?.total ?? 0) - Number(a?.total ?? 0))
+                .slice(0, 5),
+        [data.detalleIngresos]
+    );
+
+    const topEgresos = React.useMemo(
+        () =>
+            [...data.detalleEgresos]
+                .sort((a, b) => Math.abs(Number(b?.total ?? 0)) - Math.abs(Number(a?.total ?? 0)))
+                .slice(0, 5),
+        [data.detalleEgresos]
+    );
+
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "estado-de-resultados",
+            year: selectedYear,
+            currency,
+            ingresosMensuales: data.ingresosMensuales,
+            egresosMensuales: data.egresosMensuales,
+            totalIngresos,
+            totalEgresos,
+            resultadoEjercicio: totalIngresos - totalEgresos,
+            topIngresos,
+            topEgresos,
+        }),
+        [
+            selectedYear,
+            currency,
+            data.ingresosMensuales,
+            data.egresosMensuales,
+            totalIngresos,
+            totalEgresos,
+            topIngresos,
+            topEgresos,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
+
+    const handleExportExcel = async () => {
         const { detalleIngresos, detalleEgresos } = data;
         const totalIngresos = detalleIngresos.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
         const totalEgresos = detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item.total) || 0), 0);
@@ -135,12 +191,20 @@ export default function MainGrid() {
                 freezePane: { rowSplit: 2, colSplit: 1 },
             }
         );
+
+        await sendReportGenerated({
+            reportType: "PROFIT_AND_LOSS",
+            reportName: "Estado de resultados (Excel)",
+            period: `${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
         const chartElement = chartRef.current;
         if (!chartElement) {
-            alert("No se pudo encontrar el grafico para exportar.");
+            setSnackbar({ open: true, message: "No se pudo encontrar el gráfico para exportar.", severity: "warning" });
             return;
         }
 
@@ -188,9 +252,17 @@ export default function MainGrid() {
                     ],
                 },
             });
+
+            await sendReportGenerated({
+                reportType: "PROFIT_AND_LOSS",
+                reportName: "Estado de resultados (PDF)",
+                period: `${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
+            });
         } catch (e) {
             console.error("Error al exportar PDF de P&L:", e);
-            alert("No se pudo generar el PDF. Intente nuevamente.");
+            setSnackbar({ open: true, message: "No se pudo generar el PDF. Intente nuevamente.", severity: "error" });
         } finally {
             setExportingPdf(false);
         }
@@ -220,8 +292,8 @@ export default function MainGrid() {
                     mx: 'auto',
                 }}
             >
-            <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <CurrencyTabs value={currency} onChange={setCurrency} sx={{ justifyContent: 'center', mb: 1.5 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography component="h2" variant="h4">
                         Estado de Resultados
                     </Typography>
@@ -232,7 +304,7 @@ export default function MainGrid() {
                     />
                 </Box>
 
-            <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />
+                <Filtros selectedYear={selectedYear} onYearChange={handleYearChange} />
                 <TablaDetalle year={selectedYear} ingresos={data.detalleIngresos} egresos={data.detalleEgresos} />
 
                 <div ref={chartRef}>
@@ -242,7 +314,7 @@ export default function MainGrid() {
                             <BarChart data={dataGrafico}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
                                 <XAxis dataKey="mes" />
-                                <YAxis />
+                                <YAxis tickFormatter={(v) => Number(v).toLocaleString('es-AR')} />
                                 <Tooltip formatter={(v) => formatCurrency(v)} />
                                 <Legend />
                                 <Bar dataKey="Ingresos" fill="#2e7d32" />
@@ -251,6 +323,22 @@ export default function MainGrid() {
                         </ResponsiveContainer>
                     </Paper>
                 </div>
+
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={4000}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                >
+                    <Alert
+                        onClose={() => setSnackbar({ ...snackbar, open: false })}
+                        severity={snackbar.severity}
+                        variant="filled"
+                        sx={{ width: '100%', borderRadius: 2 }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
 
             </Box>
         </React.Fragment>

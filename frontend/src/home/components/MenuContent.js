@@ -22,6 +22,7 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
 import routeConfig from '../../config/routes';
+import usePermisos from '../../hooks/usePermisos';
 
 const fadeIn = keyframes`
   from {
@@ -76,18 +77,18 @@ const StyledListItemButton = styled(ListItemButton)(({ theme }) => ({
   },
   ...(theme.applyStyles
     ? theme.applyStyles('dark', {
-        color: '#fff',
-        '&.Mui-selected': {
-          backgroundColor: '#008375 !important',
-          color: '#fff !important',
-        },
-        '&:hover': {
-          backgroundColor: '#008375',
-          color: '#000',
-        },
-      })
+      color: '#fff',
+      '&.Mui-selected': {
+        backgroundColor: '#008375 !important',
+        color: '#fff !important',
+      },
+      '&:hover': {
+        backgroundColor: '#008375',
+        color: '#000',
+      },
+    })
     : theme.palette.mode === 'dark'
-    ? {
+      ? {
         color: '#fff',
         '&.Mui-selected': {
           backgroundColor: '#008375 !important',
@@ -98,16 +99,98 @@ const StyledListItemButton = styled(ListItemButton)(({ theme }) => ({
           color: '#000',
         },
       }
-    : {}),
+      : {}),
 }));
 
 export default function MenuContent({ onNavigate, collapsed = false }) {
   const theme = useTheme();
+  const { tienePermiso } = usePermisos();
   const [openMenus, setOpenMenus] = React.useState({});
   const [collapsedMenuAnchor, setCollapsedMenuAnchor] = React.useState(null);
   const [collapsedMenuItems, setCollapsedMenuItems] = React.useState([]);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const closeCollapsedMenu = () => {
+    setCollapsedMenuAnchor(null);
+    setCollapsedMenuItems([]);
+  };
+
+  const handleItemClick = (event, item) => {
+    // Si estamos en modo colapsado, abrir el popper si hay hijos
+    if (collapsed) {
+      if (item.filteredChildren && item.filteredChildren.length > 0) {
+        const isSameAnchor = collapsedMenuAnchor === event.currentTarget;
+        setCollapsedMenuAnchor(isSameAnchor ? null : event.currentTarget);
+        setCollapsedMenuItems(isSameAnchor ? [] : item.filteredChildren);
+        return;
+      }
+      // Si no hay hijos, navegar directamente
+      closeCollapsedMenu();
+      if (item.path) handleNavigate(item.path);
+      return;
+    }
+
+    closeCollapsedMenu();
+
+    // En modo expandido, si hay hijos, colapsar/expandir
+    if (item.filteredChildren && item.filteredChildren.length > 0) {
+      handleToggle(item.label);
+      return;
+    }
+
+    // Si no tiene hijos visibles (o no tiene hijos), navegar
+    if (item.path) {
+      handleNavigate(item.path);
+    }
+  };
+
+  // Función recursiva para filtrar rutas según permisos
+  const filterRoutesRecursive = React.useCallback((items) => {
+    if (!items) return [];
+
+    return items
+      .filter((item) => {
+        // Ocultar si está marcado expresamente como hidden
+        if (item.hidden) return false;
+
+        // Verificar permiso si el item tiene un módulo asociado
+        if (item.modulo && !tienePermiso(item.modulo, item.accion || 'view')) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => {
+        // Clonar el item para evitar mutaciones accidentales en routeConfig
+        const newItem = { ...item };
+
+        if (newItem.children) {
+          const visibleChildren = filterRoutesRecursive(newItem.children);
+
+          // CASO ESPECIAL: Si es un item contenedor (no tiene path propio)
+          // y después del filtrado se quedó sin hijos visibles, lo descartamos.
+          if (visibleChildren.length === 0 && !newItem.path) {
+            return null;
+          }
+
+          // Solo adjuntamos filteredChildren si hay algo que mostrar
+          if (visibleChildren.length > 0) {
+            newItem.filteredChildren = visibleChildren;
+          } else {
+            // Limpiar si existía previamente por algún render anterior
+            delete newItem.filteredChildren;
+          }
+        }
+        return newItem;
+      })
+      .filter(Boolean); // Limpiar nulos (contenedores vacíos)
+  }, [tienePermiso]);
+
+  // Filtrar rutas según permisos
+  const filteredRoutes = React.useMemo(() => {
+    return filterRoutesRecursive(routeConfig);
+  }, [filterRoutesRecursive]);
+
   const getMenuTextSx = React.useCallback(
     (label) => {
       const base = {
@@ -153,34 +236,6 @@ export default function MenuContent({ onNavigate, collapsed = false }) {
     }
   }, [collapsed]);
 
-  const closeCollapsedMenu = () => {
-    setCollapsedMenuAnchor(null);
-    setCollapsedMenuItems([]);
-  };
-
-  const handleItemClick = (event, item) => {
-    if (collapsed) {
-      if (item.children) {
-        const isSameAnchor = collapsedMenuAnchor === event.currentTarget;
-        setCollapsedMenuAnchor(isSameAnchor ? null : event.currentTarget);
-        setCollapsedMenuItems(isSameAnchor ? [] : item.children);
-        return;
-      }
-      closeCollapsedMenu();
-      handleNavigate(item.path);
-      return;
-    }
-
-    closeCollapsedMenu();
-
-    if (item.children) {
-      handleToggle(item.label);
-      return;
-    }
-
-    handleNavigate(item.path);
-  };
-
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -197,8 +252,7 @@ export default function MenuContent({ onNavigate, collapsed = false }) {
             width: '100%',
           }}
         >
-          {routeConfig
-            .filter((item) => !item.hidden)
+          {filteredRoutes
             .map((item, index) => {
               const isParentActive =
                 (item.path && isActive(item.path)) ||
@@ -241,7 +295,7 @@ export default function MenuContent({ onNavigate, collapsed = false }) {
                       primaryTypographyProps={{ sx: getMenuTextSx(item.label) }}
                     />
                   )}
-                  {!collapsed && item.children ? (
+                  {!collapsed && item.filteredChildren && item.filteredChildren.length > 0 ? (
                     openMenus[item.label] ? (
                       <ExpandLess />
                     ) : (
@@ -270,14 +324,14 @@ export default function MenuContent({ onNavigate, collapsed = false }) {
                     )}
                   </ListItem>
 
-                  {item.children && !collapsed && (
+                  {item.filteredChildren && !collapsed && (
                     <Collapse
                       in={openMenus[item.label]}
                       timeout="auto"
                       unmountOnExit
                     >
                       <List component="div" disablePadding sx={{ pl: 2 }}>
-                        {item.children.map((child, childIndex) => (
+                        {item.filteredChildren.map((child, childIndex) => (
                           <ListItem
                             key={childIndex}
                             disablePadding

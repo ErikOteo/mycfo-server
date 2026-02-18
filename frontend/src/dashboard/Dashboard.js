@@ -1,4 +1,4 @@
-import * as React from "react";
+﻿import * as React from "react";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -30,6 +30,8 @@ import ReconciliationWidget from "./components/ReconciliationWidget";
 import SalesTrendWidget from "./components/SalesTrendWidget";
 import SalesByCategoryWidget from "./components/SalesByCategoryWidget";
 import InsightsWidget from "./components/InsightsWidget";
+import DashboardEmptyState from "./components/DashboardEmptyState";
+import WelcomeChoice from "./components/WelcomeChoice";
 // import BillingWidget from "./components/BillingWidget";
 import { fetchDashboardSummary } from "./services/dashboardSummaryService";
 import useResolvedColorTokens from "./useResolvedColorTokens";
@@ -37,6 +39,10 @@ import { formatCurrencyByCode } from "../utils/formatters";
 import CurrencyTabs, {
   usePreferredCurrency,
 } from "../shared-components/CurrencyTabs";
+import { useChatbotScreenContext } from "../shared-components/useChatbotScreenContext";
+import usePermisos from "../hooks/usePermisos";
+import http from "../api/http";
+import API_CONFIG from "../config/api-config";
 
 const mockKpis = {
   totalIncomes: 820000,
@@ -312,7 +318,8 @@ const mapMovementFromBackend = (item, index) => {
 
   return {
     id: item.id ?? item.uuid ?? `movement-${index}`,
-    tipo: item.tipo ?? item.tipoMovimiento ?? item.tipoOperacion ?? "Movimiento",
+    tipo:
+      item.tipo ?? item.tipoMovimiento ?? item.tipoOperacion ?? "Movimiento",
     montoTotal: toNumber(item.montoTotal ?? item.monto ?? item.importe ?? 0),
     moneda: item.moneda ?? item.monedaCodigo ?? "ARS",
     fechaEmision: item.fechaEmision ?? item.fecha ?? item.fechaRegistro ?? null,
@@ -384,7 +391,7 @@ const getRecentPeriods = (count = 6) =>
     }).format(date);
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
       2,
-      "0"
+      "0",
     )}`;
     return { label, value };
   });
@@ -392,6 +399,7 @@ const getRecentPeriods = (count = 6) =>
 const Dashboard = React.memo(() => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { tienePermiso, esAdminTotal } = usePermisos();
   const { resolvedMode, paletteVars, primaryTextColor } =
     useResolvedColorTokens();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -400,7 +408,7 @@ const Dashboard = React.memo(() => {
   const fetchTimeoutRef = React.useRef();
   const activeRequestRef = React.useRef(0);
   const useMocks = React.useRef(
-    process.env.REACT_APP_USE_MOCKS === "true"
+    process.env.REACT_APP_USE_MOCKS === "true",
   ).current;
   const buildMockState = React.useCallback(
     () => ({
@@ -426,21 +434,52 @@ const Dashboard = React.memo(() => {
         data: mockExpensesByCategory,
       },
     }),
-    []
+    [],
   );
   const [snackbar, setSnackbar] = React.useState(null);
-  const [company, setCompany] = React.useState(companiesMock[0]);
+  const [company, setCompany] = React.useState(
+    sessionStorage.getItem("organizacionId") || null,
+  );
   const periodOptions = React.useMemo(() => getRecentPeriods(6), []);
   const [period, setPeriod] = React.useState(periodOptions[0]?.value ?? "");
   const [currency, setCurrency] = usePreferredCurrency("ARS");
   const dashboardCacheKey = React.useMemo(
     () => `${DASHBOARD_CACHE_KEY}_${currency}`,
-    [currency]
+    [currency],
   );
   const formatCurrency = React.useMemo(
     () => (value) => formatCurrencyByCode(value, currency),
-    [currency]
+    [currency],
   );
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "dashboard",
+      period,
+      currency,
+      kpis: state.kpis?.data ?? null,
+      cashflow: state.cashflow?.data ?? null,
+      reconciliation: state.reconciliation?.data ?? null,
+      recentMovements: Array.isArray(state.movements?.data)
+        ? state.movements.data.slice(0, 5)
+        : [],
+      recentInvoices: Array.isArray(state.invoices?.data)
+        ? state.invoices.data.slice(0, 5)
+        : [],
+      salesTrend: state.salesTrend?.data ?? null,
+      expensesTrend: state.expensesTrend?.data ?? null,
+      salesByCategory: Array.isArray(state.salesByCategory?.data)
+        ? state.salesByCategory.data.slice(0, 6)
+        : [],
+      expensesByCategory: Array.isArray(state.expensesByCategory?.data)
+        ? state.expensesByCategory.data.slice(0, 6)
+        : [],
+      budget: state.budget?.data ?? null,
+    }),
+    [currency, period, state],
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const userDisplayName = React.useMemo(() => {
     if (typeof window === "undefined") {
@@ -465,9 +504,61 @@ const Dashboard = React.memo(() => {
     return "Usuario";
   }, []);
 
-  const loadDashboardData = React.useCallback(() => {
+  const tieneAlgunPermiso = React.useCallback(() => {
+    if (esAdminTotal()) return true;
+    const modulos = [
+      "carga",
+      "movs",
+      "banco",
+      "facts",
+      "concil",
+      "reps",
+      "pron",
+      "pres",
+      "admin",
+    ];
+    return modulos.some((m) => tienePermiso(m, "view"));
+  }, [tienePermiso, esAdminTotal]);
+
+  const loadDashboardData = React.useCallback(async () => {
     console.log("🔄 Recargando datos del dashboard...");
     setIsRefreshing(true);
+
+    // 1. Intentar refrescar los permisos desde el servidor
+    try {
+      const { data: profile } = await http.get(
+        `${API_CONFIG.ADMINISTRACION}/api/usuarios/perfil`,
+      );
+      if (profile && (profile.rol || profile.empresaId !== undefined)) {
+        console.log("🔑 Perfil actualizado desde el servidor:", profile);
+
+        // 1. Sincronizar Empresa
+        if (profile.empresaId) {
+          sessionStorage.setItem("organizacionId", profile.empresaId);
+          setCompany(profile.empresaId);
+        } else {
+          sessionStorage.removeItem("organizacionId");
+          setCompany(null);
+        }
+
+        // 2. Sincronizar Rol y Permisos
+        if (profile.rol) {
+          sessionStorage.setItem("rol", profile.rol);
+          if (profile.rol.includes("|PERM:")) {
+            const jsonPart = profile.rol.split("|PERM:")[1].split("|")[0];
+            sessionStorage.setItem("permisos", jsonPart);
+          } else {
+            sessionStorage.removeItem("permisos");
+          }
+        }
+
+        // 3. Notificar cambios
+        window.dispatchEvent(new Event("userDataUpdated"));
+      }
+    } catch (err) {
+      console.warn("⚠️ No se pudieron refrescar los permisos:", err);
+    }
+
     setState((prev) => {
       const next = {};
       Object.entries(prev).forEach(([key, value]) => {
@@ -484,7 +575,7 @@ const Dashboard = React.memo(() => {
         setIsRefreshing(false);
         console.log("✅ Datos del dashboard recargados (modo mock)");
       }, 700);
-      return;
+      return; // Exit early if using mocks
     }
 
     fetchTimeoutRef.current = undefined;
@@ -505,7 +596,7 @@ const Dashboard = React.memo(() => {
       if (activeRequestRef.current !== requestId) {
         return;
       }
-      const mockState = buildMockState();
+      const mockState = buildMockState(); // Use mock state as a base to ensure all keys are present
       mockState.movements = movementsState ?? mockState.movements;
       if (invoicesState) {
         mockState.invoices = invoicesState;
@@ -550,10 +641,18 @@ const Dashboard = React.memo(() => {
       });
 
       const periodoBase = String(
-        response?.periodoBase ?? response?.periodo ?? ""
+        response?.periodoBase ?? response?.periodo ?? "",
       );
-      const [baseYearStr] = periodoBase.split("-");
-      const targetYear = Number(baseYearStr) || new Date().getFullYear();
+      // Parsear la fecha base (YYYY-MM). Si falla, usar fecha actual.
+      let targetDate = new Date();
+      const [baseYearStr, baseMonthStr] = periodoBase.split("-");
+      const baseYear = Number(baseYearStr);
+      const baseMonth = Number(baseMonthStr);
+
+      if (Number.isFinite(baseYear) && Number.isFinite(baseMonth)) {
+        // baseMonth en Date es 0-index (Enero = 0) -> restamos 1
+        targetDate = new Date(baseYear, baseMonth - 1, 1);
+      }
 
       const totalsByPeriod = new Map();
       datos.forEach((item) => {
@@ -577,31 +676,37 @@ const Dashboard = React.memo(() => {
         return acc;
       }, new Map());
 
-      const pointsDetailed = Array.from({ length: 12 }, (_, index) => {
-        const date = new Date(targetYear, index, 1);
-        const key = `${date.getFullYear()}-${String(index + 1).padStart(
-          2,
-          "0"
-        )}`;
+      // Generar los últimos 12 meses terminando en targetDate
+      // Iteramos: i=11 (hace 11 meses) hasta i=0 (mes actual) para orden cronológico
+      const pointsDetailed = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(targetDate);
+        d.setMonth(d.getMonth() - i); // Restar meses
+
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+        const key = `${y}-${String(m).padStart(2, "0")}`;
+
         let value = totalsByPeriod.get(key);
+
+        // Mantener la lógica de fallback por mes (ignorar año) si no hay dato exacto
         if (typeof value === "undefined") {
-          value = fallbackByMonth.get(index + 1) ?? 0;
+          value = fallbackByMonth.get(m) ?? 0;
         }
-        return {
-          month: monthShort.format(date),
-          fullLabel: monthLong.format(date),
+
+        pointsDetailed.push({
+          month: monthShort.format(d),
+          fullLabel: monthLong.format(d),
           value,
-        };
-      });
+        });
+      }
 
       const values = pointsDetailed.map((point) => point.value);
-
-      // Promedio solo sobre los meses con movimiento distinto de cero,
-      // para que no se "licúe" cuando solo hubo pocos meses con actividad.
       const nonZeroValues = values.filter((val) => val !== 0);
       const average =
         nonZeroValues.length > 0
-          ? nonZeroValues.reduce((acc, val) => acc + val, 0) / nonZeroValues.length
+          ? nonZeroValues.reduce((acc, val) => acc + val, 0) /
+          nonZeroValues.length
           : 0;
       const maxValue = values.length > 0 ? Math.max(...values) : 0;
       const minValue = values.length > 0 ? Math.min(...values) : 0;
@@ -636,10 +741,7 @@ const Dashboard = React.memo(() => {
     };
 
     const mapConciliationResponse = (response) => {
-      if (!response) {
-        return null;
-      }
-
+      if (!response) return null;
       const total = Number(response.totalMovimientos ?? 0);
       const conciliados = Number(response.conciliados ?? 0);
       const pendientes =
@@ -648,11 +750,11 @@ const Dashboard = React.memo(() => {
           : Math.max(total - conciliados, 0);
       const porcentaje =
         response.porcentajeConciliados !== undefined &&
-        response.porcentajeConciliados !== null
+          response.porcentajeConciliados !== null
           ? Number(response.porcentajeConciliados)
           : total > 0
-          ? (conciliados * 100) / total
-          : 0;
+            ? (conciliados * 100) / total
+            : 0;
 
       const periodo = String(response.periodo ?? "");
       let periodLabel = periodo || "Periodo actual";
@@ -715,110 +817,111 @@ const Dashboard = React.memo(() => {
       };
     };
 
-    (async () => {
-      const applyCompositeResponse = (composite) => {
-        if (!composite) return;
+    const applyCompositeResponse = (composite) => {
+      if (!composite) return;
 
-        const movimientosBackend = Array.isArray(composite.movimientosRecientes)
-          ? composite.movimientosRecientes
-          : [];
-        const facturasBackend = Array.isArray(composite.facturasRecientes)
-          ? composite.facturasRecientes
-          : [];
+      const movimientosBackend = Array.isArray(composite.movimientosRecientes)
+        ? composite.movimientosRecientes
+        : [];
+      const facturasBackend = Array.isArray(composite.facturasRecientes)
+        ? composite.facturasRecientes
+        : [];
 
-        const movementsState = {
-          loading: false,
-          error: null,
-          data: movimientosBackend.map(mapMovementFromBackend),
-        };
-
-        const invoicesState = {
-          loading: false,
-          error: null,
-          data: facturasBackend.map(mapInvoiceFromBackend),
-        };
-
-        let kpisState = null;
-        const resumen = composite.resumenMensual;
-        const saldoTotal = composite.saldoTotal;
-        if (resumen) {
-          kpisState = {
-            loading: false,
-            error: null,
-            data: {
-              totalIncomes: resumen.ingresosTotales,
-              totalExpenses: resumen.egresosTotales,
-              netResult: resumen.resultadoNeto,
-              period: resumen.periodo,
-              periodLabel: resumen.periodo,
-              movementsCount: resumen.totalMovimientos,
-              totalBalance: saldoTotal?.saldoTotal ?? null,
-            },
-          };
-        }
-
-        const salesTrendState = composite.ingresosMensuales
-          ? {
-              loading: false,
-              error: null,
-              data: mapTrendResponse(composite.ingresosMensuales, {
-                title: "Ingresos durante el período",
-                emptyMessage: "No hay ingresos registrados en este periodo.",
-                subheader:
-                  "Serie mensual de ingresos registrados en los ultimos 12 meses.",
-              }),
-            }
-          : { loading: false, error: null, data: null };
-
-        const expensesTrendState = composite.egresosMensuales
-          ? {
-              loading: false,
-              error: null,
-              data: mapTrendResponse(composite.egresosMensuales, {
-                title: "Egresos durante el período",
-                emptyMessage: "No hay egresos registrados en este periodo.",
-                subheader:
-                  "Serie mensual de egresos registrados en los ultimos 12 meses.",
-              }),
-            }
-          : { loading: false, error: null, data: null };
-
-        const salesByCategoryState = composite.ingresosPorCategoria
-          ? {
-              loading: false,
-              error: null,
-              data: mapCategoryResponse(composite.ingresosPorCategoria),
-            }
-          : { loading: false, error: null, data: null };
-
-        const expensesByCategoryState = composite.egresosPorCategoria
-          ? {
-              loading: false,
-              error: null,
-              data: mapCategoryResponse(composite.egresosPorCategoria),
-            }
-          : { loading: false, error: null, data: null };
-
-        const reconciliationState = composite.conciliacion
-          ? {
-              loading: false,
-              error: null,
-              data: mapConciliationResponse(composite.conciliacion),
-            }
-          : { loading: false, error: null, data: null };
-
-        applyResult({
-          movements: movementsState,
-          invoices: invoicesState,
-          kpis: kpisState,
-          salesTrend: salesTrendState,
-          salesByCategory: salesByCategoryState,
-          expensesTrend: expensesTrendState,
-          expensesByCategory: expensesByCategoryState,
-          reconciliation: reconciliationState,
-        });
+      const movementsState = {
+        loading: false,
+        error: null,
+        data: movimientosBackend.map(mapMovementFromBackend),
       };
 
+      const invoicesState = {
+        loading: false,
+        error: null,
+        data: facturasBackend.map(mapInvoiceFromBackend),
+      };
+
+      let kpisState = null;
+      const resumen = composite.resumenMensual;
+      const saldoTotal = composite.saldoTotal;
+      if (resumen) {
+        kpisState = {
+          loading: false,
+          error: null,
+          data: {
+            totalIncomes: resumen.ingresosTotales,
+            totalExpenses: resumen.egresosTotales,
+            netResult: resumen.resultadoNeto,
+            period: resumen.periodo,
+            periodLabel: resumen.periodo,
+            movementsCount: resumen.totalMovimientos,
+            totalBalance: saldoTotal?.saldoTotal ?? null,
+          },
+        };
+      }
+
+      const salesTrendState = composite.ingresosMensuales
+        ? {
+          loading: false,
+          error: null,
+          data: mapTrendResponse(composite.ingresosMensuales, {
+            title: "Ingresos durante el período",
+            emptyMessage: "No hay ingresos registrados en este periodo.",
+            subheader:
+              "Serie mensual de ingresos registrados en los ultimos 12 meses.",
+          }),
+        }
+        : { loading: false, error: null, data: null };
+
+      const expensesTrendState = composite.egresosMensuales
+        ? {
+          loading: false,
+          error: null,
+          data: mapTrendResponse(composite.egresosMensuales, {
+            title: "Egresos durante el período",
+            emptyMessage: "No hay egresos registrados en este periodo.",
+            subheader:
+              "Serie mensual de egresos registrados en los ultimos 12 meses.",
+          }),
+        }
+        : { loading: false, error: null, data: null };
+
+      const salesByCategoryState = composite.ingresosPorCategoria
+        ? {
+          loading: false,
+          error: null,
+          data: mapCategoryResponse(composite.ingresosPorCategoria),
+        }
+        : { loading: false, error: null, data: null };
+
+      const expensesByCategoryState = composite.egresosPorCategoria
+        ? {
+          loading: false,
+          error: null,
+          data: mapCategoryResponse(composite.egresosPorCategoria),
+        }
+        : { loading: false, error: null, data: null };
+
+      const reconciliationState = composite.conciliacion
+        ? {
+          loading: false,
+          error: null,
+          data: mapConciliationResponse(composite.conciliacion),
+        }
+        : { loading: false, error: null, data: null };
+
+      applyResult({
+        movements: movementsState,
+        invoices: invoicesState,
+        kpis: kpisState,
+        salesTrend: salesTrendState,
+        salesByCategory: salesByCategoryState,
+        expensesTrend: expensesTrendState,
+        expensesByCategory: expensesByCategoryState,
+        reconciliation: reconciliationState,
+      });
+    };
+
+    // Actual data fetching logic
+    (async () => {
       // 1) Mostrar primero lo que haya en cache (si existe)
       if (typeof window !== "undefined") {
         try {
@@ -832,45 +935,66 @@ const Dashboard = React.memo(() => {
         }
       }
 
-      // 2) Hacer la llamada al endpoint compuesto
-      try {
-        const composite = await fetchDashboardSummary({
-          period,
-          months: 12,
-          limitMovements: 6,
-          limitInvoices: 6,
-          currency,
-        });
+      // 2) Hacer la llamada al endpoint compuesto (Solo si hay empresa)
+      if (company && company !== "null") {
+        try {
+          const composite = await fetchDashboardSummary({
+            period,
+            months: 12,
+            limitMovements: 6,
+            limitInvoices: 6,
+            currency,
+            organizacionId: company,
+          });
 
-        // guardar en cache la respuesta cruda del backend
-        if (typeof window !== "undefined") {
-          try {
-            window.sessionStorage.setItem(
-              dashboardCacheKey,
-              JSON.stringify(composite)
-            );
-          } catch (err) {
-            // ignoramos errores de storage
+          // guardar en cache la respuesta cruda del backend
+          if (typeof window !== "undefined") {
+            try {
+              window.sessionStorage.setItem(
+                dashboardCacheKey,
+                JSON.stringify(composite),
+              );
+            } catch (err) {
+              // ignoramos errores de storage
+            }
           }
-        }
 
-        applyCompositeResponse(composite);
-      } catch (error) {
-        console.error("❌ Error recargando dashboard:", error);
+          applyCompositeResponse(composite);
+        } catch (error) {
+          console.error("❌ Error recargando dashboard:", error);
+          if (activeRequestRef.current !== requestId) {
+            return;
+          }
+          setIsRefreshing(false);
+          setState((prev) => ({
+            ...prev,
+            kpis: {
+              ...prev.kpis,
+              loading: false,
+              error:
+                error?.message ||
+                "No pudimos actualizar el resumen de dashboard.",
+            },
+          }));
+        }
+      } else {
         setIsRefreshing(false);
-        setState((prev) => ({
-          ...prev,
-          kpis: {
-            ...prev.kpis,
-            loading: false,
-            error:
-              error?.message ||
-              "No pudimos actualizar el resumen de dashboard.",
-          },
-        }));
+        console.log(
+          "⚠️ No hay empresa seleccionada, omitiendo carga de datos.",
+        );
       }
     })();
-  }, [buildMockState, currency, dashboardCacheKey, useMocks, period]);
+  }, [buildMockState, currency, dashboardCacheKey, useMocks, period, company]);
+
+  // Escuchar actualizaciones globales de usuario (ej: desde Home.js)
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      const currentOrgId = sessionStorage.getItem("organizacionId");
+      setCompany(currentOrgId || null);
+    };
+    window.addEventListener("userDataUpdated", handleUpdate);
+    return () => window.removeEventListener("userDataUpdated", handleUpdate);
+  }, []);
 
   React.useEffect(() => {
     loadDashboardData();
@@ -893,55 +1017,63 @@ const Dashboard = React.memo(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     },
-    [navigate]
+    [navigate],
   );
 
   const quickActions = React.useMemo(
-    () => [
-      {
-        id: "movement",
-        label: "Cargar movimiento",
-        icon: <AddCircleOutlineRoundedIcon />,
-        action: () => handleNavigate("/carga"),
-      },
-      {
-        id: "excel",
-        label: "Importar Excel",
-        icon: <UploadFileRoundedIcon />,
-        action: () => handleNavigate("/carga-movimientos"),
-      },
-      {
-        id: "mp",
-        label: "Mercado Pago",
-        icon: <AccountBalanceWalletRoundedIcon />,
-        action: () => handleNavigate("/mercado-pago"),
-      },
-      {
-        id: "reconcile",
-        label: "Conciliar",
-        icon: <PublishedWithChangesRoundedIcon />,
-        action: () => handleNavigate("/conciliacion"),
-      },
-      {
-        id: "invoice",
-        label: "Cargar factura",
-        icon: <ReceiptLongRoundedIcon />,
-        action: () => handleNavigate("/carga/factura"),
-      },
-      {
-        id: "budget",
-        label: "Nuevo presupuesto",
-        icon: <AssessmentRoundedIcon />,
-        action: () => handleNavigate("/presupuestos/nuevo"),
-      },
-      {
-        id: "reminder",
-        label: "Recordatorio",
-        icon: <NotificationsActiveRoundedIcon />,
-        action: () => handleNavigate("/recordatorios"),
-      },
-    ],
-    [handleNavigate]
+    () =>
+      [
+        {
+          id: "movement",
+          label: "Cargar movimiento",
+          icon: <AddCircleOutlineRoundedIcon />,
+          action: () => handleNavigate("/carga"),
+          visible: tienePermiso("carga", "edit"),
+        },
+        {
+          id: "excel",
+          label: "Importar Excel",
+          icon: <UploadFileRoundedIcon />,
+          action: () => handleNavigate("/carga-movimientos"),
+          visible: tienePermiso("banco", "edit"),
+        },
+        {
+          id: "mp",
+          label: "Mercado Pago",
+          icon: <AccountBalanceWalletRoundedIcon />,
+          action: () => handleNavigate("/mercado-pago"),
+          visible: tienePermiso("banco", "edit"),
+        },
+        {
+          id: "reconcile",
+          label: "Conciliar",
+          icon: <PublishedWithChangesRoundedIcon />,
+          action: () => handleNavigate("/conciliacion"),
+          visible: tienePermiso("concil", "edit"),
+        },
+        {
+          id: "invoice",
+          label: "Cargar factura",
+          icon: <ReceiptLongRoundedIcon />,
+          action: () => handleNavigate("/carga/factura"),
+          visible: tienePermiso("facts", "edit"),
+        },
+        {
+          id: "budget",
+          label: "Nuevo presupuesto",
+          icon: <AssessmentRoundedIcon />,
+          action: () => handleNavigate("/presupuestos/nuevo"),
+          visible: tienePermiso("pres", "edit"),
+        },
+        {
+          id: "reminder",
+          label: "Recordatorio",
+          icon: <NotificationsActiveRoundedIcon />,
+          action: () => handleNavigate("/recordatorios"),
+          visible: true, // Notificaciones son libres
+        },
+      ].filter((a) => a.visible),
+    [handleNavigate, tienePermiso],
   );
 
   const handleQuickAction = (action) => {
@@ -960,13 +1092,11 @@ const Dashboard = React.memo(() => {
     setSnackbar(null);
   };
 
-  // const showMessage = React.useCallback((message, severity = "success") => {
-  //   setSnackbar({ message, severity });
-  // }, []);
-
   const kpiCards = React.useMemo(() => {
     const data = state.kpis.data;
-
+    const canSeeFinances =
+      tienePermiso("movs", "view") || tienePermiso("facts", "view");
+    if (!canSeeFinances) return [];
     return [
       {
         id: "totalIncomes",
@@ -996,44 +1126,10 @@ const Dashboard = React.memo(() => {
         formatter: formatCurrency,
         trend: [],
       },
-      // {
-      //   id: "cashBalance",
-      //   title: "Saldo de caja",
-      //   value: data.cashBalance,
-      //   formatter: formatCurrencyAR,
-      //   trend: mockKpiTrends.cashBalance,
-      //   trendColor: theme.palette.info.main,
-      //   secondaryLabel: "Dias de cobertura",
-      //   secondaryValue: data.cashRunwayDays,
-      //   secondaryFormatter: formatDays,
-      // },
-      // {
-      //   id: "pendingReceivables",
-      //   title: "Cobros pendientes (30 dias)",
-      //   value: data.pendingReceivables,
-      //   formatter: formatCurrencyAR,
-      //   trend: mockKpiTrends.pendingReceivables,
-      //   trendColor: theme.palette.primary.main,
-      //   secondaryLabel: "Por vencer 7d",
-      //   secondaryValue: data.receivablesDueSoon,
-      //   secondaryFormatter: formatCurrencyAR,
-      // },
-      // {
-      //   id: "pendingPayables",
-      //   title: "Pagos pendientes (30 dias)",
-      //   value: data.pendingPayables,
-      //   formatter: formatCurrencyAR,
-      //   trend: mockKpiTrends.pendingPayables,
-      //   trendColor: theme.palette.warning.main,
-      //   secondaryLabel: "Vencidos",
-      //   secondaryValue: data.payablesOverdue,
-      //   secondaryFormatter: formatCurrencyAR,
-      // },
     ];
-  }, [state.kpis.data, formatCurrency]);
+  }, [state.kpis.data, formatCurrency, tienePermiso]);
 
   const quickActionsLoading = state.kpis.loading && !state.kpis.data;
-
   const quickActionsSx = React.useMemo(
     () => ({
       position: { xs: "relative", md: "sticky" },
@@ -1042,7 +1138,7 @@ const Dashboard = React.memo(() => {
       display: "flex",
       justifyContent: "center",
     }),
-    [theme]
+    [theme],
   );
 
   return (
@@ -1056,261 +1152,263 @@ const Dashboard = React.memo(() => {
       }}
     >
       <Stack spacing={3} sx={{ width: "100%" }}>
-        <CurrencyTabs value={currency} onChange={setCurrency} />
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={2}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", md: "center" }}
-          sx={{ width: "100%" }}
-        >
-          <Box>
-            <Typography variant="h4" fontWeight={600}>
-              Hola, {userDisplayName}
-            </Typography>
-            <Typography variant="body2" sx={{ color: primaryTextColor }}>
-              Todo lo importante de tu cuenta, en un solo lugar.
-            </Typography>
-          </Box>
-          {/* <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <TextField
-              select
-              label="Empresa"
-              value={company}
-              onChange={(event) => setCompany(event.target.value)}
-              size="small"
-              sx={{ minWidth: { xs: "100%", sm: 200 } }}
-            >
-              {companiesMock.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="Período"
-              value={period}
-              onChange={(event) => setPeriod(event.target.value)}
-              size="small"
-              sx={{ minWidth: { xs: "100%", sm: 200 } }}
-            >
-              {periodOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack> */}
-        </Stack>
-
-        <Box sx={quickActionsSx}>
-          <QuickActions
-            actions={quickActions}
-            loading={quickActionsLoading}
-            onAction={handleQuickAction}
+        {!company || company === "null" ? (
+          <WelcomeChoice />
+        ) : !tieneAlgunPermiso() ? (
+          <DashboardEmptyState
+            userDisplayName={userDisplayName}
+            onRetry={loadDashboardData}
           />
-        </Box>
-
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ maxWidth: { xs: "100%", md: 1600 }, mx: "auto" }}
-        >
-          {kpiCards.map((card) => (
-            <Grid size={{ xs: 12, sm: 12, md: 3 }} key={card.id}>
-              <KpiCard
-                title={card.title}
-                value={card.value}
-                formatter={card.formatter}
-                secondaryLabel={card.secondaryLabel}
-                secondaryValue={card.secondaryValue}
-                secondaryFormatter={card.secondaryFormatter}
-                trend={card.trend}
-                trendColor={card.trendColor}
-                loading={state.kpis.loading && !state.kpis.data}
-                error={state.kpis.error}
-                onRetry={loadDashboardData}
+        ) : (
+          <>
+            <CurrencyTabs value={currency} onChange={setCurrency} />
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              sx={{ width: "100%" }}
+            >
+              <Box>
+                <Typography variant="h4" fontWeight={600}>
+                  Hola, {userDisplayName}
+                </Typography>
+                <Typography variant="body2" sx={{ color: primaryTextColor }}>
+                  Todo lo importante de tu cuenta, en un solo lugar.
+                </Typography>
+              </Box>
+            </Stack>
+            <Box sx={quickActionsSx}>
+              <QuickActions
+                actions={quickActions}
+                loading={quickActionsLoading}
+                onAction={handleQuickAction}
               />
+            </Box>
+
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{ maxWidth: { xs: "100%", md: 1600 }, mx: "auto" }}
+            >
+              {kpiCards.map((card) => (
+                <Grid size={{ xs: 12, sm: 12, md: 3 }} key={card.id}>
+                  <KpiCard
+                    title={card.title}
+                    value={card.value}
+                    formatter={card.formatter}
+                    secondaryLabel={card.secondaryLabel}
+                    secondaryValue={card.secondaryValue}
+                    secondaryFormatter={card.secondaryFormatter}
+                    trend={card.trend}
+                    trendColor={card.trendColor}
+                    loading={state.kpis.loading && !state.kpis.data}
+                    error={state.kpis.error}
+                    onRetry={loadDashboardData}
+                  />
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
 
-        <Grid
-          container
-          spacing={3}
-          justifyContent="center"
-          sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesTrendWidget
-                data={
-                  state.salesTrend.data ?? {
-                    title: "Ingresos durante el período",
-                    points: [],
-                    average: 0,
-                    max: { value: 0, label: "--" },
-                    min: { value: 0, label: "--" },
-                  }
-                }
-                loading={state.salesTrend.loading && !state.salesTrend.data}
-                error={state.salesTrend.error}
-                onNavigate={() => handleNavigate("/reportes/ventas")}
-                currency={currency}
-              />
-            </Box>
-          </Grid>
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesByCategoryWidget
-                data={state.salesByCategory.data ?? []}
-                loading={
-                  state.salesByCategory.loading && !state.salesByCategory.data
-                }
-                error={state.salesByCategory.error}
-                currency={currency}
-              />
-            </Box>
-          </Grid>
-        </Grid>
+            {(tienePermiso("movs", "view") ||
+              tienePermiso("facts", "view")) && (
+                <Grid
+                  container
+                  spacing={3}
+                  justifyContent="center"
+                  sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+                >
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesTrendWidget
+                        data={
+                          state.salesTrend.data ?? {
+                            title: "Ingresos durante el período",
+                            points: [],
+                            average: 0,
+                            max: { value: 0, label: "--" },
+                            min: { value: 0, label: "--" },
+                          }
+                        }
+                        loading={
+                          state.salesTrend.loading && !state.salesTrend.data
+                        }
+                        error={state.salesTrend.error}
+                        onNavigate={() => handleNavigate("/reportes/ventas")}
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesByCategoryWidget
+                        data={state.salesByCategory.data ?? []}
+                        loading={
+                          state.salesByCategory.loading &&
+                          !state.salesByCategory.data
+                        }
+                        error={state.salesByCategory.error}
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                </Grid>
+              )}
 
-        <Grid
-          container
-          spacing={3}
-          justifyContent="center"
-          sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesTrendWidget
-                data={
-                  state.expensesTrend.data ?? {
-                    title: "Egresos durante el período",
-                    points: [],
-                    average: 0,
-                    max: { value: 0, label: "--" },
-                    min: { value: 0, label: "--" },
-                  }
-                }
-                loading={
-                  state.expensesTrend.loading && !state.expensesTrend.data
-                }
-                error={state.expensesTrend.error}
-                emptyMessage="No hay egresos registrados en este periodo."
-                currency={currency}
-              />
-            </Box>
-          </Grid>
-          <Grid>
-            <Box sx={{ width: { xs: "100%", md: 720 } }}>
-              <SalesByCategoryWidget
-                data={state.expensesByCategory.data ?? []}
-                loading={
-                  state.expensesByCategory.loading &&
-                  !state.expensesByCategory.data
-                }
-                error={state.expensesByCategory.error}
-                emptyMessage="No hay egresos por categoria en este periodo."
-                title="Egresos por categorias"
-                subtitle="Distribucion anual por segmento"
-                currency={currency}
-              />
-            </Box>
-          </Grid>
-        </Grid>
+            {(tienePermiso("movs", "view") ||
+              tienePermiso("facts", "view")) && (
+                <Grid
+                  container
+                  spacing={3}
+                  justifyContent="center"
+                  sx={{ width: "100%", maxWidth: 1600, mx: "auto" }}
+                >
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesTrendWidget
+                        data={
+                          state.expensesTrend.data ?? {
+                            title: "Egresos durante el período",
+                            points: [],
+                            average: 0,
+                            max: { value: 0, label: "--" },
+                            min: { value: 0, label: "--" },
+                          }
+                        }
+                        loading={
+                          state.expensesTrend.loading && !state.expensesTrend.data
+                        }
+                        error={state.expensesTrend.error}
+                        emptyMessage="No hay egresos registrados en este periodo."
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid>
+                    <Box sx={{ width: { xs: "100%", md: 720 } }}>
+                      <SalesByCategoryWidget
+                        data={state.expensesByCategory.data ?? []}
+                        loading={
+                          state.expensesByCategory.loading &&
+                          !state.expensesByCategory.data
+                        }
+                        error={state.expensesByCategory.error}
+                        emptyMessage="No hay egresos por categoria en este periodo."
+                        title="Egresos por categorias"
+                        subtitle="Distribucion anual por segmento"
+                        currency={currency}
+                      />
+                    </Box>
+                  </Grid>
+                </Grid>
+              )}
 
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          <Grid size={{ xs: 12, md: 4 }}>
-            <BudgetWidget
-              companyId={company}
-              period={period}
-              data={state.budget.data}
-              loading={state.budget.loading && !state.budget.data}
-              error={state.budget.error}
-              onRetry={loadDashboardData}
-              currency={currency}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
-            {/* Sección comparativa Caja vs Devengado del último mes */}
-            <LiquidityGapWidget currency={currency} />
-          </Grid>
-          <Grid size={{ xs: 12, md: 4 }} sx={{ display: { xs: "none", md: "block" } }}>
-            <ReconciliationWidget
-              data={state.reconciliation.data}
-              loading={
-                state.reconciliation.loading && !state.reconciliation.data
-              }
-              error={state.reconciliation.error}
-              onRetry={loadDashboardData}
-              currency={currency}
-              onNavigate={(account) =>
-                handleNavigate(
-                  "/conciliacion",
-                  account ? { cuenta: account } : undefined
-                )
-              }
-            />
-          </Grid>
-        </Grid>
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
+            >
+              {tienePermiso("pres", "view") && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <BudgetWidget
+                    companyId={company}
+                    period={period}
+                    data={state.budget.data}
+                    loading={state.budget.loading && !state.budget.data}
+                    error={state.budget.error}
+                    onRetry={loadDashboardData}
+                    currency={currency}
+                  />
+                </Grid>
+              )}
+              {tienePermiso("movs", "view") && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <LiquidityGapWidget currency={currency} />
+                </Grid>
+              )}
+              {tienePermiso("concil", "view") && (
+                <Grid
+                  size={{ xs: 12, md: 4 }}
+                  sx={{ display: { xs: "none", md: "block" } }}
+                >
+                  <ReconciliationWidget
+                    data={state.reconciliation.data}
+                    loading={
+                      state.reconciliation.loading && !state.reconciliation.data
+                    }
+                    error={state.reconciliation.error}
+                    onRetry={loadDashboardData}
+                    currency={currency}
+                    onNavigate={(account) =>
+                      handleNavigate(
+                        "/conciliacion",
+                        account ? { cuenta: account } : undefined,
+                      )
+                    }
+                  />
+                </Grid>
+              )}
+            </Grid>
 
-        {/* Bloque de IA / insights a lo ancho al final */}
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{
-            mt: 1,
-            width: "100%",
-            maxWidth: 1600,
-            mx: "auto",
-            display: { xs: "none", md: "flex" },
-          }}
-        >
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RecentMovementsWidget
-              data={state.movements.data}
-              loading={state.movements.loading && !state.movements.data}
-              error={state.movements.error}
-              onRetry={loadDashboardData}
-              onNavigate={() => handleNavigate("/ver-movimientos")}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <RecentInvoicesWidget
-              data={state.invoices?.data ?? null}
-              loading={state.invoices?.loading && !state.invoices?.data}
-              error={state.invoices?.error ?? null}
-              onRetry={loadDashboardData}
-              onNavigate={() => handleNavigate("/ver-facturas")}
-            />
-          </Grid>
-        </Grid>
+            {/* Bloque de IA / insights a lo ancho al final */}
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{
+                mt: 1,
+                width: "100%",
+                maxWidth: 1600,
+                mx: "auto",
+                display: { xs: "none", md: "flex" },
+              }}
+            >
+              {tienePermiso("movs", "view") && (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <RecentMovementsWidget
+                    data={state.movements.data}
+                    loading={state.movements.loading && !state.movements.data}
+                    error={state.movements.error}
+                    onRetry={loadDashboardData}
+                    onNavigate={() => handleNavigate("/ver-movimientos")}
+                  />
+                </Grid>
+              )}
+              {tienePermiso("facts", "view") && (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <RecentInvoicesWidget
+                    data={state.invoices?.data ?? null}
+                    loading={state.invoices?.loading && !state.invoices?.data}
+                    error={state.invoices?.error ?? null}
+                    onRetry={loadDashboardData}
+                    onNavigate={() => handleNavigate("/ver-facturas")}
+                  />
+                </Grid>
+              )}
+            </Grid>
 
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
-        >
-          <Grid size={{ xs: 12, md: 10 }}>
-            <Box sx={{ width: "100%", mx: "auto" }}>
-              <InsightsWidget />
-            </Box>
-          </Grid>
-        </Grid>
-
+            <Grid
+              container
+              spacing={2}
+              justifyContent="center"
+              sx={{ mt: 1, width: "100%", maxWidth: 1600, mx: "auto" }}
+            >
+              {esAdminTotal() && (
+                <Grid size={{ xs: 12, md: 10 }}>
+                  <Box sx={{ width: "100%", mx: "auto" }}>
+                    <InsightsWidget currency={currency} />
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+          </>
+        )}
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button 
-            variant="text" 
-            size="small" 
+          <Button
+            variant="text"
+            size="small"
             onClick={loadDashboardData}
             disabled={isRefreshing}
           >

@@ -4,6 +4,10 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
 import MainGrid from "./components/MainGrid";
+import { useNavigate } from "react-router-dom";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 export default function NotificationDrawer({
   open,
@@ -16,6 +20,7 @@ export default function NotificationDrawer({
   onMarkOneRead,
   userId,
 }) {
+  const navigate = useNavigate();
   return (
     <Drawer
       anchor="right"
@@ -28,7 +33,19 @@ export default function NotificationDrawer({
         },
       }}
     >
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider" }}>
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: "divider", display: "flex", alignItems: "center" }}>
+        <Tooltip title="Ver todas las notificaciones">
+          <IconButton
+            onClick={() => {
+              navigate("/listado-notificaciones");
+              onClose();
+            }}
+            size="small"
+            sx={{ mr: 1 }}
+          >
+            <OpenInNewIcon />
+          </IconButton>
+        </Tooltip>
         <Typography variant="h6" component="h2">
           Notificaciones
           {unreadCount > 0 && (

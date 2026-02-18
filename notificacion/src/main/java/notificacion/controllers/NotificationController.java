@@ -22,6 +22,13 @@ public class NotificationController {
         this.service = service;
         this.administracionService = administracionService;
     }
+
+    private String resolveUsuarioSub(String pathUserId, String headerUsuarioSub) {
+        return (headerUsuarioSub != null && !headerUsuarioSub.isBlank())
+                ? headerUsuarioSub
+                : pathUserId;
+    }
+
     @GetMapping
     public ResponseEntity<NotificationListResponse> list(
             @PathVariable String userId,
@@ -31,8 +38,9 @@ public class NotificationController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String since
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        return ResponseEntity.ok(service.getNotifications(empresaId, usuarioSub, status, page, size, since));
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        return ResponseEntity.ok(service.getNotifications(empresaId, currentSub, status, page, size, since));
     }
 
     @GetMapping("/unreadCount")
@@ -40,8 +48,9 @@ public class NotificationController {
             @PathVariable String userId,
             @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        return ResponseEntity.ok(java.util.Map.of("unread", service.unreadCount(empresaId, usuarioSub)));
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        return ResponseEntity.ok(java.util.Map.of("unread", service.unreadCount(empresaId, currentSub)));
     }
 
     @PatchMapping("/{notifId}")
@@ -51,8 +60,9 @@ public class NotificationController {
             @RequestHeader("X-Usuario-Sub") String usuarioSub,
             @RequestBody MarkReadRequest body
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        service.markRead(empresaId, usuarioSub, notifId, body.is_read());
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        service.markRead(empresaId, currentSub, notifId, body.is_read());
         return ResponseEntity.noContent().build();
     }
 
@@ -61,8 +71,9 @@ public class NotificationController {
             @PathVariable String userId,
             @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        service.markAllRead(empresaId, usuarioSub);
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        service.markAllRead(empresaId, currentSub);
         return ResponseEntity.noContent().build();
     }
 
@@ -74,8 +85,9 @@ public class NotificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        return ResponseEntity.ok(service.getNotificationsByType(empresaId, usuarioSub, type, page, size));
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        return ResponseEntity.ok(service.getNotificationsByType(empresaId, currentSub, type, page, size));
     }
 
     @GetMapping("/severity/{severity}")
@@ -86,8 +98,9 @@ public class NotificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        return ResponseEntity.ok(service.getNotificationsBySeverity(empresaId, usuarioSub, severity, page, size));
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        return ResponseEntity.ok(service.getNotificationsBySeverity(empresaId, currentSub, severity, page, size));
     }
 
     @GetMapping("/search")
@@ -98,8 +111,9 @@ public class NotificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        return ResponseEntity.ok(service.searchNotifications(empresaId, usuarioSub, q, page, size));
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        return ResponseEntity.ok(service.searchNotifications(empresaId, currentSub, q, page, size));
     }
 
     @DeleteMapping("/{notifId}")
@@ -108,8 +122,9 @@ public class NotificationController {
             @PathVariable Long notifId,
             @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        service.deleteNotification(empresaId, usuarioSub, notifId);
+        String currentSub = resolveUsuarioSub(userId, usuarioSub);
+        Long empresaId = administracionService.obtenerEmpresaIdPorUsuarioSub(currentSub);
+        service.deleteNotification(empresaId, currentSub, notifId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -31,22 +31,22 @@ public class FacturaService {
         // Establecer fecha de creación
         factura.setFechaCreacion(LocalDateTime.now());
         factura.setFechaActualizacion(LocalDateTime.now());
-        
+
         // Cargar datos de la empresa automáticamente si hay usuarioId
         if (factura.getUsuarioId() != null && !factura.getUsuarioId().isEmpty()) {
             empresaDataService.cargarDatosEmpresaEnFactura(factura, factura.getUsuarioId());
         }
-        
+
         // Setear estado de documento comercial inicial
         if (factura.getEstadoDocumentoComercial() == null) {
             factura.setEstadoDocumentoComercial(EstadoDocumentoComercial.PagoPendiente);
         }
-        
+
         // Setear estado de pago inicial
         if (factura.getEstadoPago() == null) {
             factura.setEstadoPago(EstadoPago.NO_PAGADO);
         }
-        
+
         return facturaRepository.save(factura);
     }
 
@@ -79,13 +79,13 @@ public class FacturaService {
     }
 
     public org.springframework.data.domain.Page<Factura> listarPaginadasPorOrganizacion(Long organizacionId,
-                                                                                       org.springframework.data.domain.Pageable pageable) {
+            org.springframework.data.domain.Pageable pageable) {
         return listarPaginadasPorOrganizacion(organizacionId, null, pageable);
     }
 
     public org.springframework.data.domain.Page<Factura> listarPaginadasPorOrganizacion(Long organizacionId,
-                                                                                       TipoMoneda moneda,
-                                                                                       org.springframework.data.domain.Pageable pageable) {
+            TipoMoneda moneda,
+            org.springframework.data.domain.Pageable pageable) {
         org.springframework.data.domain.Page<Factura> page = (moneda == null)
                 ? facturaRepository.findByOrganizacionId(organizacionId, pageable)
                 : facturaRepository.buscarFacturas(
@@ -98,14 +98,16 @@ public class FacturaService {
                         moneda,
                         null,
                         null,
-                        pageable
-                );
+                        null,
+                        null,
+                        pageable);
 
         if (moneda == null) {
             return page;
         }
 
-        // Salvaguarda adicional en caso de que el filtro JPA no se aplique (compatibilidad con despliegues previos)
+        // Salvaguarda adicional en caso de que el filtro JPA no se aplique
+        // (compatibilidad con despliegues previos)
         java.util.List<Factura> filtradas = page.getContent().stream()
                 .filter(f -> moneda.equals(f.getMoneda()))
                 .collect(java.util.stream.Collectors.toList());
@@ -139,6 +141,7 @@ public class FacturaService {
         factura.setMontoTotal(datosActualizados.getMontoTotal());
         factura.setMoneda(datosActualizados.getMoneda());
         factura.setCategoria(datosActualizados.getCategoria());
+        factura.setDescripcion(datosActualizados.getDescripcion());
         factura.setEstadoDocumentoComercial(datosActualizados.getEstadoDocumentoComercial());
 
         // Actualizar campos específicos de factura
@@ -174,34 +177,11 @@ public class FacturaService {
             String tipoFactura,
             EstadoPago estadoPago,
             TipoMoneda moneda,
-            org.springframework.data.domain.Pageable pageable
-    ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, null, null, pageable);
-    }
-
-    public List<Factura> buscarFacturas(
-            Long organizacionId,
-            String usuarioId,
-            java.time.LocalDate fechaDesde,
-            java.time.LocalDate fechaHasta,
-            String tipoFactura,
-            EstadoPago estadoPago,
-            TipoMoneda moneda
-    ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda, null, null);
-    }
-
-    public List<Factura> buscarFacturas(
-            Long organizacionId,
-            String usuarioId,
-            java.time.LocalDate fechaDesde,
-            java.time.LocalDate fechaHasta,
-            String tipoFactura,
-            EstadoPago estadoPago,
-            String search,
-            java.time.LocalDate searchDate
-    ) {
-        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, null, search, searchDate);
+            Double montoMin,
+            Double montoMax,
+            org.springframework.data.domain.Pageable pageable) {
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda,
+                montoMin, montoMax, null, null, pageable);
     }
 
     public List<Factura> buscarFacturas(
@@ -212,9 +192,37 @@ public class FacturaService {
             String tipoFactura,
             EstadoPago estadoPago,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax) {
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, moneda,
+                montoMin, montoMax, null, null);
+    }
+
+    public List<Factura> buscarFacturas(
+            Long organizacionId,
+            String usuarioId,
+            java.time.LocalDate fechaDesde,
+            java.time.LocalDate fechaHasta,
+            String tipoFactura,
+            EstadoPago estadoPago,
             String search,
-            java.time.LocalDate searchDate
-    ) {
+            java.time.LocalDate searchDate) {
+        return buscarFacturas(organizacionId, usuarioId, fechaDesde, fechaHasta, tipoFactura, estadoPago, null, null,
+                null, search, searchDate);
+    }
+
+    public List<Factura> buscarFacturas(
+            Long organizacionId,
+            String usuarioId,
+            java.time.LocalDate fechaDesde,
+            java.time.LocalDate fechaHasta,
+            String tipoFactura,
+            EstadoPago estadoPago,
+            TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
+            String search,
+            java.time.LocalDate searchDate) {
         java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
         java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
 
@@ -226,9 +234,10 @@ public class FacturaService {
                 tipoFactura,
                 estadoPago,
                 moneda,
+                montoMin,
+                montoMax,
                 search,
-                searchDate
-        );
+                searchDate);
 
         if (moneda == null) {
             return result;
@@ -248,10 +257,11 @@ public class FacturaService {
             String tipoFactura,
             EstadoPago estadoPago,
             TipoMoneda moneda,
+            Double montoMin,
+            Double montoMax,
             String search,
             java.time.LocalDate searchDate,
-            org.springframework.data.domain.Pageable pageable
-    ) {
+            org.springframework.data.domain.Pageable pageable) {
         java.time.LocalDateTime desde = fechaDesde != null ? fechaDesde.atStartOfDay() : null;
         java.time.LocalDateTime hasta = fechaHasta != null ? fechaHasta.plusDays(1).atStartOfDay().minusNanos(1) : null;
 
@@ -263,31 +273,28 @@ public class FacturaService {
                 tipoFactura,
                 estadoPago,
                 moneda,
+                montoMin,
+                montoMax,
                 search,
                 searchDate,
-                pageable
-        );
+                pageable);
 
         if (moneda == null) {
             return page;
         }
 
-        java.util.List<Factura> filtradas = page.getContent().stream()
-                .filter(f -> moneda.equals(f.getMoneda()))
-                .collect(java.util.stream.Collectors.toList());
-        return new org.springframework.data.domain.PageImpl<>(filtradas, pageable, filtradas.size());
+        return page;
     }
 
     public Map<java.time.YearMonth, List<Factura>> agruparFacturasPorMes(
             Long organizacionId,
             java.time.LocalDate fechaDesde,
-            java.time.LocalDate fechaHasta
-    ) {
-        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null, null, null).stream()
+            java.time.LocalDate fechaHasta) {
+        return buscarFacturas(organizacionId, null, fechaDesde, fechaHasta, null, null, null, null, null, null, null)
+                .stream()
                 .collect(Collectors.groupingBy(
                         factura -> java.time.YearMonth.from(factura.getFechaEmision() != null
                                 ? factura.getFechaEmision()
-                                : java.time.LocalDate.now())
-                ));
+                                : java.time.LocalDate.now())));
     }
 }

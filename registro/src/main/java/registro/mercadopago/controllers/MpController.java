@@ -86,26 +86,37 @@ public class MpController {
     }
 
     // En tu proyecto real obtendrás el userId del token/JWT.
-    private Long currentUserId() { return 1L; }
+    private String getCurrentUserUuid(String usuarioSub) {
+        String value = requireUsuarioSub(usuarioSub).trim();
+        try {
+            UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El header X-Usuario-Sub debe ser un UUID v\u00e1lido");
+        }
+        return value;
+    }
 
     /* ======================
        OAuth
        ====================== */
 
     @GetMapping("/oauth/url")
-    public Map<String, String> getOauthUrl() {
-        String url = auth.buildAuthorizationUrl(null, currentUserId());
+    public Map<String, String> getOauthUrl(@RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        String url = auth.buildAuthorizationUrl(null, getCurrentUserUuid(usuarioSub));
         System.out.println(">>> URL de autorización generada: " + url);
         return Map.of("url", url);
     }
 
     @GetMapping("/oauth/callback")
-    public ResponseEntity<Void> callback(@RequestParam String code, @RequestParam String state) {
+    public ResponseEntity<Void> callback(@RequestParam String code, @RequestParam String state, @RequestHeader(value = "X-Usuario-Sub", required = false) String usuarioSub) {
         String base = Optional.ofNullable(mpProps.getFrontendUrl())
                 .orElseThrow(() -> new IllegalStateException("mercadopago.frontend-url no está configurado"));
         if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
         try {
-            auth.handleCallback(code, state, currentUserId());
+            String userId = usuarioSub != null && !usuarioSub.isBlank()
+                    ? getCurrentUserUuid(usuarioSub)
+                    : extractUserIdFromState(state);
+            auth.handleCallback(code, state, userId);
             // HashRouter (React) requiere "#/"
             String target = base + "/#/mercado-pago?linked=1";
             return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(target)).build();
@@ -125,8 +136,8 @@ public class MpController {
        ====================== */
 
     @GetMapping("/status")
-    public ResponseEntity<OauthStatusDTO> status() {
-        Long userId = currentUserId();
+    public ResponseEntity<OauthStatusDTO> status(@RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        String userId = getCurrentUserUuid(usuarioSub);
         return ResponseEntity.ok(auth.getStatus(userId));
     }
 
@@ -139,8 +150,8 @@ public class MpController {
             @RequestBody ImportRequest req,
             @RequestHeader("X-Usuario-Sub") String usuarioSub) {
 
-        final String usuarioActual = requireUsuarioSub(usuarioSub);
-        final Long uid = currentUserId();
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
+        final String uid = usuarioActual;
         List<PaymentDTO> previewData;
 
         if (req.getPaymentId() != null) {
@@ -172,8 +183,8 @@ public class MpController {
             @RequestBody ImportRequest req,
             @RequestHeader("X-Usuario-Sub") String usuarioSub) {
 
-        final Long uid = currentUserId();
-        final String usuarioActual = requireUsuarioSub(usuarioSub);
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
+        final String uid = usuarioActual;
         int cant;
 
         if (req.getPaymentId() != null) {
@@ -201,9 +212,22 @@ public class MpController {
             @RequestBody List<Long> paymentIds,
             @RequestHeader("X-Usuario-Sub") String usuarioSub) {
 
-        final Long uid = currentUserId();
-        final String usuarioActual = requireUsuarioSub(usuarioSub);
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
+        final String uid = usuarioActual;
         int cant = importer.importSelectedPayments(uid, paymentIds, usuarioActual);
+        return Map.of("importados", cant);
+    }
+
+    @PostMapping("/import/wallet")
+    public Map<String, Object> importWalletByMonth(
+            @RequestBody ImportRequest req,
+            @RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        if (req.getMonth() == null || req.getYear() == null) {
+            throw new IllegalArgumentException("Debes indicar month/year");
+        }
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
+        final String uid = usuarioActual;
+        int cant = importer.importWalletByMonth(uid, req.getMonth(), req.getYear(), usuarioActual);
         return Map.of("importados", cant);
     }
 
@@ -219,11 +243,11 @@ public class MpController {
             @PageableDefault(size = 10, sort = "fechaEmision", direction = Sort.Direction.DESC) Pageable pg,
             @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        final Long userId = currentUserId();
-        final Long organizacionId = resolveOrganizacionId(requireUsuarioSub(usuarioSub));
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
+        final Long organizacionId = resolveOrganizacionId(usuarioActual);
 
         // Verificar que el usuario tenga cuenta vinculada
-        MpAccountLink accountLink = auth.getAccountLink(userId);
+        MpAccountLink accountLink = auth.getAccountLink(usuarioActual);
         if (accountLink == null) {
             return Page.empty();
         }
@@ -234,12 +258,8 @@ public class MpController {
             // Filtrar solo registros de MercadoPago del usuario actual
             ands.add(cb.equal(root.get("medioPago"), TipoMedioPago.MercadoPago));
             ands.add(cb.equal(root.get("organizacionId"), organizacionId));
+            ands.add(cb.equal(root.get("usuarioId"), usuarioActual));
             
-            // Filtrar por usuario si está disponible
-            if (accountLink.getUserIdApp() != null) {
-                // Aquí podrías agregar un filtro adicional si tienes el UUID del usuario
-                // ands.add(cb.equal(root.get("usuario"), userUuid));
-            }
 
             if (from != null) {
                 ands.add(cb.greaterThanOrEqualTo(root.get("fechaEmision"), from.atStartOfDay()));
@@ -296,14 +316,13 @@ public class MpController {
             @PageableDefault(size = 10, sort = "fechaEmision", direction = Sort.Direction.DESC) Pageable pg,
             @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        final Long userId = currentUserId();
-        final String usuarioActual = requireUsuarioSub(usuarioSub);
+        final String usuarioActual = getCurrentUserUuid(usuarioSub);
         final UUID usuarioUuid = parseUsuarioUuid(usuarioActual);
         resolveOrganizacionId(usuarioActual); // valida empresa asociada
-        System.out.println(">>> [IMPORTED-PAYMENTS] Endpoint llamado para usuario: " + userId);
+        System.out.println(">>> [IMPORTED-PAYMENTS] Endpoint llamado para usuario: " + usuarioActual);
 
         // Verificar que el usuario tenga cuenta vinculada
-        MpAccountLink accountLink = auth.getAccountLink(userId);
+        MpAccountLink accountLink = auth.getAccountLink(usuarioActual);
         if (accountLink == null) {
             System.out.println(">>> [IMPORTED-PAYMENTS] No hay cuenta vinculada");
             return Page.empty();
@@ -363,7 +382,11 @@ public class MpController {
             dto.setId(mp.getRegistroId());
             
             // ID del pago de MercadoPago
-            dto.setMpPaymentId(Long.valueOf(mp.getMpPaymentId()));
+            try {
+                dto.setMpPaymentId(Long.valueOf(mp.getMpPaymentId()));
+            } catch (Exception ignored) {
+                dto.setMpPaymentId(null);
+            }
             
             return dto;
         });
@@ -377,16 +400,18 @@ public class MpController {
     @PostMapping("/wallet/import")
     public Map<String, Object> importWallet(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        int n = walletImporter.importRange(currentUserId(), from, to);
+        int n = walletImporter.importRange(getCurrentUserUuid(usuarioSub), from, to);
         return Map.of("importados", n);
     }
 
     // Importar por “N° de movimiento” (string alfanumérico tipo B31HQ7A…)
     @PostMapping("/wallet/importById")
-    public Map<String, Object> importWalletById(@RequestParam String movementId) {
-        int n = walletImporter.importByMovementId(currentUserId(), movementId);
+    public Map<String, Object> importWalletById(@RequestParam String movementId,
+                                               @RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        int n = walletImporter.importByMovementId(getCurrentUserUuid(usuarioSub), movementId);
         return Map.of("importados", n);
     }
 
@@ -396,9 +421,10 @@ public class MpController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String q,
-            @PageableDefault(size = 20, sort = "dateEvent", direction = Sort.Direction.DESC) Pageable pg
+            @PageableDefault(size = 20, sort = "dateEvent", direction = Sort.Direction.DESC) Pageable pg,
+            @RequestHeader("X-Usuario-Sub") String usuarioSub
     ) {
-        final Long userId = currentUserId();
+        final String userId = getCurrentUserUuid(usuarioSub);
         final ZoneId zone = ZoneId.systemDefault();
 
         Specification<MpWalletMovement> spec = (root, query, cb) -> {
@@ -443,8 +469,9 @@ public class MpController {
        ====================== */
 
     @PostMapping("/facturar")
-    public FacturarResponse facturar(@RequestBody FacturarRequest req) {
-        return billing.facturarPagos(currentUserId(), req.getPaymentIds());
+    public FacturarResponse facturar(@RequestBody FacturarRequest req,
+                                     @RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        return billing.facturarPagos(getCurrentUserUuid(usuarioSub), req.getPaymentIds());
     }
 
     /* ======================
@@ -452,8 +479,8 @@ public class MpController {
        ====================== */
 
     @PostMapping("/unlink")
-    public ResponseEntity<Void> unlink() {
-        auth.unlink(currentUserId()); // asegurate de implementarlo en el service
+    public ResponseEntity<Void> unlink(@RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        auth.unlink(getCurrentUserUuid(usuarioSub)); // asegurate de implementarlo en el service
         return ResponseEntity.noContent().build();
     }
 
@@ -470,6 +497,22 @@ public class MpController {
             "totalImportedPayments", totalCount,
             "message", "Debug endpoint - verificar datos en mp_imported_payments"
         );
+    }
+
+    private String extractUserIdFromState(String state) {
+        if (state == null || state.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "state es requerido");
+        }
+        try {
+            String decoded = new String(java.util.Base64.getUrlDecoder().decode(state), java.nio.charset.StandardCharsets.UTF_8);
+            String[] parts = decoded.split(":");
+            if (parts.length < 2 || parts[0].isBlank()) {
+                throw new IllegalArgumentException("state invalido");
+            }
+            return getCurrentUserUuid(parts[0]);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "state invalido", e);
+        }
     }
 
     /* ======================
@@ -571,8 +614,9 @@ public class MpController {
     @PutMapping("/payments/{registroId}/category")
     public Map<String, Object> updatePaymentCategory(
             @PathVariable Long registroId,
-            @RequestBody Map<String, String> request) {
-        final Long uid = currentUserId();
+            @RequestBody Map<String, String> request,
+            @RequestHeader("X-Usuario-Sub") String usuarioSub) {
+        final String uid = getCurrentUserUuid(usuarioSub);
         String newCategory = request.get("categoria");
         
         if (newCategory == null || newCategory.trim().isEmpty()) {

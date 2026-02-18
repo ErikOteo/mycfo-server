@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {
-    Box, Typography, Grid, Paper
+    Box, Typography, Grid, Paper, Snackbar, Alert
 } from '@mui/material';
 import TablaDetalle from './TablaDetalle';
 import Filtros from './Filtros';
@@ -8,9 +8,11 @@ import ExportadorSimple from '../../../shared-components/ExportadorSimple';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { exportToExcel } from '../../../utils/exportExcelUtils';
 import { exportPdfReport } from '../../../utils/exportPdfUtils';
+import { sendReportGenerated } from '../../../notificaciones/services/reportGeneratedService';
 import API_CONFIG from '../../../config/api-config';
 import LoadingSpinner from '../../../shared-components/LoadingSpinner';
 import CurrencyTabs, { usePreferredCurrency } from '../../../shared-components/CurrencyTabs';
+import { useChatbotScreenContext } from '../../../shared-components/useChatbotScreenContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919', '#19C9FF'];
 
@@ -24,8 +26,67 @@ export default function MainGrid() {
     const [loading, setLoading] = React.useState(false);
     const [exportingPdf, setExportingPdf] = React.useState(false);
     const [logoDataUrl, setLogoDataUrl] = React.useState(null);
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
 
     const [currency, setCurrency] = usePreferredCurrency("ARS");
+
+    const topIngresos = React.useMemo(() => {
+        const items = Array.isArray(data.detalleIngresos) ? data.detalleIngresos : [];
+        return [...items]
+            .sort((a, b) => Number(b?.total ?? 0) - Number(a?.total ?? 0))
+            .slice(0, 5);
+    }, [data.detalleIngresos]);
+
+    const topEgresos = React.useMemo(() => {
+        const items = Array.isArray(data.detalleEgresos) ? data.detalleEgresos : [];
+        return [...items]
+            .sort((a, b) => Math.abs(Number(b?.total ?? 0)) - Math.abs(Number(a?.total ?? 0)))
+            .slice(0, 5);
+    }, [data.detalleEgresos]);
+
+    const totalIngresos = React.useMemo(
+        () => (Array.isArray(data.detalleIngresos)
+            ? data.detalleIngresos.reduce((sum, item) => sum + (Number(item?.total) || 0), 0)
+            : 0),
+        [data.detalleIngresos]
+    );
+
+    const totalEgresos = React.useMemo(
+        () => (Array.isArray(data.detalleEgresos)
+            ? data.detalleEgresos.reduce((sum, item) => sum + Math.abs(Number(item?.total) || 0), 0)
+            : 0),
+        [data.detalleEgresos]
+    );
+
+    const chatbotContext = React.useMemo(
+        () => ({
+            screen: "reporte-mensual",
+            year: selectedYear,
+            month: selectedMonth + 1,
+            currency,
+            categoriasSeleccionadas: selectedCategoria,
+            ingresos: {
+                total: totalIngresos,
+                topCategorias: topIngresos,
+            },
+            egresos: {
+                total: totalEgresos,
+                topCategorias: topEgresos,
+            },
+        }),
+        [
+            selectedYear,
+            selectedMonth,
+            currency,
+            selectedCategoria,
+            totalIngresos,
+            totalEgresos,
+            topIngresos,
+            topEgresos,
+        ]
+    );
+
+    useChatbotScreenContext(chatbotContext);
 
     // Formateo de moneda dependiente de la preferencia seleccionada
     const formatCurrency = React.useCallback(
@@ -90,7 +151,7 @@ export default function MainGrid() {
         return meses[mesIndex];
     };
 
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const { detalleIngresos, detalleEgresos } = data;
         const mesNombre = getNombreMes(selectedMonth);
 
@@ -151,12 +212,20 @@ export default function MainGrid() {
                 freezePane: { rowSplit: 2, colSplit: 1 },
             }
         );
+
+        await sendReportGenerated({
+            reportType: "MONTHLY_REPORT",
+            reportName: "Reporte mensual (Excel)",
+            period: `${mesNombre} ${selectedYear}`,
+            downloadUrl: null,
+            hasAnomalies: false,
+        });
     };
 
     const handleExportPdf = async () => {
         const charts = [chartRefIngresos.current, chartRefEgresos.current].filter(Boolean);
         if (!charts.length) {
-            alert("No se encontraron graficos para exportar.");
+            setSnackbar({ open: true, message: "No se encontraron gráficos para exportar.", severity: "warning" });
             return;
         }
 
@@ -204,9 +273,17 @@ export default function MainGrid() {
                     ],
                 },
             });
+
+            await sendReportGenerated({
+                reportType: "MONTHLY_REPORT",
+                reportName: "Reporte mensual (PDF)",
+                period: `${getNombreMes(selectedMonth)} ${selectedYear}`,
+                downloadUrl: null,
+                hasAnomalies: false,
+            });
         } catch (e) {
             console.error("Error al generar el PDF:", e);
-            alert("No se pudo generar el PDF. Intente nuevamente.");
+            setSnackbar({ open: true, message: "No se pudo generar el PDF. Intente nuevamente.", severity: "error" });
         } finally {
             setExportingPdf(false);
         }
@@ -352,6 +429,21 @@ export default function MainGrid() {
                     </div>
                 </Grid>
             </Grid>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: "100%", borderRadius: 2 }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

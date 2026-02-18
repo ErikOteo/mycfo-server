@@ -34,9 +34,9 @@ public class ForecastService {
     private final ForecastConfigRepository forecastConfigRepository;
     private final RegistroService registroService;
     private final AdministracionService administracionService;
-    
+
     private final RestTemplate restTemplate = new RestTemplate();
-    
+
     @Value("${mycfo.forecast.url}")
     private String forecastUrl;
 
@@ -49,80 +49,93 @@ public class ForecastService {
      */
     @Transactional
     public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor) {
-        return generarForecast(forecastConfigId, creadoPor, null);
+        return generarForecast(forecastConfigId, creadoPor, null, null);
     }
 
     @Transactional
-    public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor, String authorization) {
+    public ForecastDTO generarForecast(Long forecastConfigId, String creadoPor, String authorization, String moneda) {
         var config = forecastConfigRepository.findById(forecastConfigId)
-                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, 
+                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,
                         "Configuración de forecast no encontrada"));
-        
+
         if (!config.isActivo()) {
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, 
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
                     "La configuración está inactiva");
         }
-        
+
         // 1. Obtener movimientos históricos mensuales desde Registro
-        Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales = 
-                registroService.obtenerMovimientosMensuales(config.getOrganizacionId(), authorization, creadoPor);
-        
-        // 2. Procesar y convertir movimientos al formato esperado por el servicio de forecast
-        List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales);
-        
+        Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales = registroService
+                .obtenerMovimientosMensuales(config.getOrganizacionId(), authorization, creadoPor);
+
+        // 2. Procesar y convertir movimientos al formato esperado por el servicio de
+        // forecast
+        List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales, moneda);
+
         // 3. Llamar al servicio de forecast
         Map<String, Object> responseForecast = llamarServicioForecast(dataHistorica, config.getHorizonteMeses());
-        
-        // 4. Guardar el forecast en la base de datos (incluyendo datos históricos y pronósticos)
-        return guardarForecast(config, responseForecast, creadoPor, dataHistorica.size(), dataHistorica);
+
+        // 4. Guardar el forecast en la base de datos (incluyendo datos históricos y
+        // pronósticos)
+        return guardarForecast(config, responseForecast, creadoPor, dataHistorica.size(), dataHistorica, moneda);
     }
 
     /**
      * Genera un rolling forecast en tiempo real sin guardarlo en base de datos
-     * @param usuarioSub Sub del usuario
+     * 
+     * @param usuarioSub     Sub del usuario
      * @param horizonteMeses Meses a pronosticar hacia adelante
      * @return Response del servicio de forecast con los resultados
      */
-    public Map<String, Object> generarRollingForecast(String usuarioSub, Integer horizonteMeses, String authorization) {
+    public Map<String, Object> generarRollingForecast(String usuarioSub, Integer horizonteMeses, String moneda,
+            String authorization) {
         // Validar que el usuario tiene empresa asociada
         Long organizacionId = administracionService.obtenerEmpresaIdPorUsuarioSub(usuarioSub);
-        
+
         // Validar horizonte
         if (horizonteMeses == null || horizonteMeses <= 0) {
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, 
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,
                     "El horizonte debe ser mayor a 0");
         }
-        
-        log.info("Generando rolling forecast para organización {} con horizonte {} meses", organizacionId, horizonteMeses);
-        
+
+        log.info("Generando rolling forecast para organización {} con horizonte {} meses", organizacionId,
+                horizonteMeses);
+
         // 1. Obtener movimientos históricos mensuales desde Registro
-        Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales = 
-                registroService.obtenerMovimientosMensuales(organizacionId, authorization, usuarioSub);
-        
-        // 2. Procesar y convertir movimientos al formato esperado por el servicio de forecast
-        List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales);
-        
-        // 3. Llamar al servicio de forecast
+        Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales = registroService
+                .obtenerMovimientosMensuales(organizacionId, authorization, usuarioSub);
+
+        // 2. Procesar y convertir movimientos al formato esperado por el servicio de
+        // forecast
+        List<Map<String, Object>> dataHistorica = procesarMovimientosParaForecast(movimientosMensuales, moneda);
+
+        // 3. Validar cantidad de datos históricos (mínimo 6 meses)
+        if (dataHistorica.size() < 6) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Datos insuficientes: Se requieren al menos 6 meses de datos históricos para generar el pronóstico.");
+        }
+
+        // 4. Llamar al servicio de forecast
         Map<String, Object> responseForecast = llamarServicioForecast(dataHistorica, horizonteMeses);
-        
-        // 4. Combinar datos históricos (real) con estimados
+
+        // 5. Combinar datos históricos (real) con estimados
         Map<String, Object> resultadoCombinado = combinarDatosRealesYEstimados(dataHistorica, responseForecast);
-        
+
         log.info("Rolling forecast generado exitosamente para organización {}", organizacionId);
-        
+
         return resultadoCombinado;
     }
-    
+
     /**
-     * Combina datos reales históricos con estimados en un formato unificado para el frontend
+     * Combina datos reales históricos con estimados en un formato unificado para el
+     * frontend
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> combinarDatosRealesYEstimados(
-            List<Map<String, Object>> dataHistorica, 
+            List<Map<String, Object>> dataHistorica,
             Map<String, Object> responseForecast) {
-        
+
         List<Map<String, Object>> datosCombinados = new ArrayList<>();
-        
+
         // Agregar datos históricos como "real"
         for (Map<String, Object> registro : dataHistorica) {
             Map<String, Object> combinado = new HashMap<>();
@@ -131,44 +144,46 @@ public class ForecastService {
             combinado.put("tipo", "real");
             combinado.put("ingresos", registro.get("ingresos"));
             combinado.put("egresos", registro.get("egresos"));
-            combinado.put("balance", ((Number) registro.get("ingresos")).doubleValue() + 
-                           ((Number) registro.get("egresos")).doubleValue());
+            combinado.put("balance", ((Number) registro.get("ingresos")).doubleValue() +
+                    ((Number) registro.get("egresos")).doubleValue());
             datosCombinados.add(combinado);
         }
-        
+
         // Agregar datos estimados
-        List<Map<String, Object>> forecastMensual = (List<Map<String, Object>>) responseForecast.get("forecast_mensual");
+        List<Map<String, Object>> forecastMensual = (List<Map<String, Object>>) responseForecast
+                .get("forecast_mensual");
         if (forecastMensual != null) {
             for (Map<String, Object> estimado : forecastMensual) {
                 Map<String, Object> combinado = new HashMap<>();
                 combinado.put("año", estimado.get("Año"));
                 combinado.put("mes", estimado.get("Mes"));
                 combinado.put("tipo", "estimado");
-                
+
                 Number ingresos = (Number) estimado.get("Ingresos_Esperados");
                 Number egresos = (Number) estimado.get("Egresos_Esperados");
                 Number balance = (Number) estimado.get("Balance_Neto_Esperado");
-                
+
                 combinado.put("ingresos", ingresos.doubleValue());
                 combinado.put("egresos", egresos.doubleValue());
                 combinado.put("balance", balance.doubleValue());
                 datosCombinados.add(combinado);
             }
         }
-        
+
         // Ordenar por año y mes
         datosCombinados.sort((a, b) -> {
             int añoComp = ((Integer) a.get("año")).compareTo((Integer) b.get("año"));
-            if (añoComp != 0) return añoComp;
+            if (añoComp != 0)
+                return añoComp;
             return ((Integer) a.get("mes")).compareTo((Integer) b.get("mes"));
         });
-        
+
         // Construir respuesta combinada
         Map<String, Object> resultado = new HashMap<>();
         resultado.put("status", "ok");
         resultado.put("datos_combinados", datosCombinados);
         resultado.put("parametros_usados", responseForecast.get("parametros_usados"));
-        
+
         return resultado;
     }
 
@@ -176,25 +191,31 @@ public class ForecastService {
      * Procesa los movimientos mensuales para el formato del servicio de forecast
      */
     private List<Map<String, Object>> procesarMovimientosParaForecast(
-            Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales) {
-        
+            Map<String, Map<String, List<Map<String, Object>>>> movimientosMensuales, String moneda) {
+
         List<Map<String, Object>> resultado = new ArrayList<>();
-        
+
         for (Map.Entry<String, Map<String, List<Map<String, Object>>>> entry : movimientosMensuales.entrySet()) {
             String yearMonth = entry.getKey(); // formato: "2023-01"
             String[] parts = yearMonth.split("-");
             int año = Integer.parseInt(parts[0]);
             int mes = Integer.parseInt(parts[1]);
-            
+
             Map<String, List<Map<String, Object>>> porTipo = entry.getValue();
-            
+
             // Calcular totales
             BigDecimal ingresos = BigDecimal.ZERO;
             BigDecimal egresos = BigDecimal.ZERO;
-            
+
             List<Map<String, Object>> ingresosList = porTipo.get("Ingreso");
             if (ingresosList != null) {
                 for (Map<String, Object> mov : ingresosList) {
+                    if (moneda != null && !moneda.isEmpty()) {
+                        String movMoneda = (String) mov.get("moneda");
+                        if (movMoneda != null && !movMoneda.equalsIgnoreCase(moneda)) {
+                            continue;
+                        }
+                    }
                     Object montoObj = mov.get("montoTotal");
                     if (montoObj != null) {
                         BigDecimal monto = new BigDecimal(montoObj.toString());
@@ -202,10 +223,16 @@ public class ForecastService {
                     }
                 }
             }
-            
+
             List<Map<String, Object>> egresosList = porTipo.get("Egreso");
             if (egresosList != null) {
                 for (Map<String, Object> mov : egresosList) {
+                    if (moneda != null && !moneda.isEmpty()) {
+                        String movMoneda = (String) mov.get("moneda");
+                        if (movMoneda != null && !movMoneda.equalsIgnoreCase(moneda)) {
+                            continue;
+                        }
+                    }
                     Object montoObj = mov.get("montoTotal");
                     if (montoObj != null) {
                         BigDecimal monto = new BigDecimal(montoObj.toString());
@@ -214,23 +241,24 @@ public class ForecastService {
                     }
                 }
             }
-            
+
             Map<String, Object> registro = new HashMap<>();
             registro.put("año", año);
             registro.put("mes", mes);
             registro.put("ingresos", ingresos.doubleValue());
             registro.put("egresos", egresos.doubleValue());
-            
+
             resultado.add(registro);
         }
-        
+
         // Ordenar por año y mes
         resultado.sort((a, b) -> {
             int añoComp = ((Integer) a.get("año")).compareTo((Integer) b.get("año"));
-            if (añoComp != 0) return añoComp;
+            if (añoComp != 0)
+                return añoComp;
             return ((Integer) a.get("mes")).compareTo((Integer) b.get("mes"));
         });
-        
+
         return resultado;
     }
 
@@ -238,29 +266,29 @@ public class ForecastService {
      * Llama al servicio externo de forecast
      */
     @SuppressWarnings("unchecked")
-    private Map<String, Object> llamarServicioForecast(List<Map<String, Object>> dataHistorica, Integer periodosAdelante) {
+    private Map<String, Object> llamarServicioForecast(List<Map<String, Object>> dataHistorica,
+            Integer periodosAdelante) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             Map<String, Object> request = new HashMap<>();
             request.put("data", dataHistorica);
             request.put("periodos_adelante", periodosAdelante);
-            
+
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(request, headers);
-            
+
             log.info("Llamando al servicio de forecast con {} datos históricos", dataHistorica.size());
-            
+
             ResponseEntity<Map> response = restTemplate.exchange(
                     forecastUrl + "/forecast",
                     HttpMethod.POST,
                     requestEntity,
-                    Map.class
-            );
-            
+                    Map.class);
+
             log.info("Forecast generado exitosamente");
             return response.getBody();
-            
+
         } catch (Exception e) {
             log.error("Error al llamar al servicio de forecast: {}", e.getMessage());
             throw new RuntimeException("Error al generar el forecast", e);
@@ -268,7 +296,8 @@ public class ForecastService {
     }
 
     /**
-     * Guarda el forecast en la base de datos (incluyendo datos históricos como "real" y pronósticos como "estimado")
+     * Guarda el forecast en la base de datos (incluyendo datos históricos como
+     * "real" y pronósticos como "estimado")
      */
     @Transactional
     private ForecastDTO guardarForecast(
@@ -276,8 +305,9 @@ public class ForecastService {
             Map<String, Object> responseForecast,
             String creadoPor,
             Integer periodosAnalizados,
-            List<Map<String, Object>> dataHistorica) {
-        
+            List<Map<String, Object>> dataHistorica,
+            String moneda) {
+
         YearMonth ahora = YearMonth.now();
         YearMonth inicio = ahora.plusMonths(1); // El siguiente mes
         YearMonth fin = ahora.plusMonths(config.getHorizonteMeses());
@@ -297,10 +327,11 @@ public class ForecastService {
                 .mesFinPronostico(fin.format(YEAR_MONTH))
                 .creadoPor(creadoPor)
                 .eliminado(false)
+                .moneda(moneda)
                 .build();
-        
+
         forecast = forecastRepository.save(forecast);
-        
+
         // Guardar datos históricos como "real"
         for (Map<String, Object> registroHistorico : dataHistorica) {
             Integer año = (Integer) registroHistorico.get("año");
@@ -308,7 +339,7 @@ public class ForecastService {
             Number ingresos = (Number) registroHistorico.get("ingresos");
             Number egresos = (Number) registroHistorico.get("egresos");
             BigDecimal balance = BigDecimal.valueOf(ingresos.doubleValue() + egresos.doubleValue());
-            
+
             ForecastLinea linea = ForecastLinea.builder()
                     .forecast(forecast)
                     .año(año)
@@ -318,14 +349,15 @@ public class ForecastService {
                     .egresosEsperados(new BigDecimal(egresos.toString()))
                     .balanceNetoEsperado(balance)
                     .build();
-            
+
             forecastLineaRepository.save(linea);
         }
-        
+
         // Guardar líneas del forecast como "estimado"
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> forecastMensual = (List<Map<String, Object>>) responseForecast.get("forecast_mensual");
-        
+        List<Map<String, Object>> forecastMensual = (List<Map<String, Object>>) responseForecast
+                .get("forecast_mensual");
+
         if (forecastMensual != null) {
             for (Map<String, Object> lineaData : forecastMensual) {
                 ForecastLinea linea = ForecastLinea.builder()
@@ -337,14 +369,14 @@ public class ForecastService {
                         .egresosEsperados(new BigDecimal(lineaData.get("Egresos_Esperados").toString()))
                         .balanceNetoEsperado(new BigDecimal(lineaData.get("Balance_Neto_Esperado").toString()))
                         .build();
-                
+
                 forecastLineaRepository.save(linea);
             }
         }
-        
-        log.info("Forecast guardado: ID={}, Organización={}, {} líneas reales, {} líneas estimadas", 
-                forecast.getId(), forecast.getOrganizacionId(), 
-                dataHistorica.size(), 
+
+        log.info("Forecast guardado: ID={}, Organización={}, {} líneas reales, {} líneas estimadas",
+                forecast.getId(), forecast.getOrganizacionId(),
+                dataHistorica.size(),
                 forecastMensual != null ? forecastMensual.size() : 0);
         return toDto(forecast);
     }
@@ -425,14 +457,14 @@ public class ForecastService {
      */
     public ForecastDTO obtenerForecast(Long id) {
         Forecast forecast = forecastRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, 
+                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,
                         "Forecast no encontrado"));
-        
+
         List<ForecastLinea> lineas = forecastLineaRepository.findByForecast_Id(id);
-        
+
         ForecastDTO dto = toDto(forecast);
         dto.setLineas(lineas.stream().map(this::toLineaDto).collect(Collectors.toList()));
-        
+
         return dto;
     }
 
@@ -469,7 +501,10 @@ public class ForecastService {
                 .mesFinPronostico(forecast.getMesFinPronostico())
                 .creadoPor(forecast.getCreadoPor())
                 .createdAt(forecast.getCreatedAt() != null ? forecast.getCreatedAt().format(ISO_DATE_TIME) : null)
+                .creadoPor(forecast.getCreadoPor())
+                .createdAt(forecast.getCreatedAt() != null ? forecast.getCreatedAt().format(ISO_DATE_TIME) : null)
                 .eliminado(forecast.isEliminado())
+                .moneda(forecast.getMoneda())
                 .build();
     }
 
@@ -484,6 +519,7 @@ public class ForecastService {
                 .horizonteMeses(forecast.getHorizonteMeses())
                 .createdAt(forecast.getCreatedAt() != null ? forecast.getCreatedAt().format(ISO_DATE_TIME) : null)
                 .creadoPor(forecast.getCreadoPor())
+                .moneda(forecast.getMoneda())
                 .build();
     }
 

@@ -58,7 +58,7 @@ public class AudioParserService {
         String textoProcesado = prepararTexto(transcript);
 
         extraerMonto(textoProcesado).ifPresent(valor -> resultado.put("montoTotal", valor));
-        resultado.put("moneda", "ARS");
+        extraerMoneda(textoProcesado).ifPresent(valor -> resultado.put("moneda", valor));
         extraerFecha(textoProcesado).ifPresent(valor -> resultado.put("fechaEmision", valor));
         extraerMedioPago(textoProcesado).ifPresent(valor -> resultado.put("medioPago", valor));
         extraerCategoria(textoProcesado).ifPresent(valor -> resultado.put("categoria", valor));
@@ -91,7 +91,7 @@ public class AudioParserService {
         String textoProcesado = prepararTexto(transcript);
 
         extraerMonto(textoProcesado).ifPresent(valor -> resultado.put("montoTotal", valor));
-        resultado.put("moneda", "ARS");
+        extraerMoneda(textoProcesado).ifPresent(valor -> resultado.put("moneda", valor));
         extraerFecha(textoProcesado).ifPresent(valor -> resultado.put("fechaEmision", valor));
         extraerNumeroDocumento(textoProcesado).ifPresent(valor -> resultado.put("numeroDocumento", valor));
         extraerTipoFactura(textoProcesado).ifPresent(valor -> resultado.put("tipoFactura", valor));
@@ -148,6 +148,17 @@ public class AudioParserService {
                     }
                 }
             }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> extraerMoneda(String texto) {
+        String normalizado = normalizar(texto);
+        if (normalizado.contains("usd") || normalizado.contains("dolar") || normalizado.contains("dolares")) {
+            return Optional.of("USD");
+        }
+        if (normalizado.contains("ars") || normalizado.contains("peso") || normalizado.contains("pesos")) {
+            return Optional.of("ARS");
         }
         return Optional.empty();
     }

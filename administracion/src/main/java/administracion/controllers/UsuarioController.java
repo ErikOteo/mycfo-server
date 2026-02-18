@@ -46,7 +46,20 @@ public class UsuarioController {
     }
 
     @GetMapping("/empresa/{empresaId}")
-    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleados(@PathVariable Long empresaId) {
+    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleados(
+            @RequestHeader(value = "X-Usuario-Sub") String subActual,
+            @PathVariable Long empresaId) {
+
+        if (!permissionService.tienePermiso(subActual, "admin", "view")) {
+            return ResponseEntity.status(403).build();
+        }
+
+        List<UsuarioDTO> empleados = usuarioService.obtenerEmpleadosPorEmpresa(empresaId);
+        return ResponseEntity.ok(empleados);
+    }
+
+    @GetMapping("/empresa/{empresaId}/interno")
+    public ResponseEntity<List<UsuarioDTO>> obtenerEmpleadosInterno(@PathVariable Long empresaId) {
         List<UsuarioDTO> empleados = usuarioService.obtenerEmpleadosPorEmpresa(empresaId);
         return ResponseEntity.ok(empleados);
     }
@@ -56,12 +69,19 @@ public class UsuarioController {
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub,
             @RequestBody ActualizarUsuarioDTO dto) {
-        
+
         try {
             UsuarioDTO actualizado = usuarioService.actualizarEmpleado(sub, dto, subUsuarioActual);
             return ResponseEntity.ok(actualizado);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(403).body(null);
+            String message = e.getMessage();
+            if (message != null
+                    && (message.contains("Solo los administradores") || message.contains("Solo un administrador"))) {
+                return ResponseEntity.status(403).body(null);
+            }
+            // Para otros errores (como truncado de datos o DB), devolver 500 para facilitar
+            // diagnóstico
+            return ResponseEntity.status(500).body(null);
         }
     }
 
@@ -69,7 +89,7 @@ public class UsuarioController {
     public ResponseEntity<Void> eliminarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub) {
-        
+
         try {
             usuarioService.eliminarEmpleado(sub, subUsuarioActual);
             return ResponseEntity.noContent().build();
@@ -82,7 +102,7 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> desactivarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub) {
-        
+
         try {
             UsuarioDTO desactivado = usuarioService.desactivarEmpleado(sub, subUsuarioActual);
             return ResponseEntity.ok(desactivado);
@@ -95,12 +115,35 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> activarEmpleado(
             @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual,
             @PathVariable String sub) {
-        
+
         try {
             UsuarioDTO activado = usuarioService.activarEmpleado(sub, subUsuarioActual);
             return ResponseEntity.ok(activado);
         } catch (RuntimeException e) {
             return ResponseEntity.status(403).build();
         }
+    }
+
+    @PostMapping("/abandonar")
+    public ResponseEntity<Void> abandonarEmpresa(
+            @RequestHeader(value = "X-Usuario-Sub") String subUsuarioActual) {
+        try {
+            usuarioService.abandonarEmpresa(subUsuarioActual);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            // Si el error es porque es propietario (400 Bad Request) o no encontrado (404)
+            if (e.getMessage().contains("Propietario")) {
+                return ResponseEntity.badRequest().build();
+            }
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/cambiar-password")
+    public ResponseEntity<Void> cambiarPassword(
+            @RequestHeader("Authorization") String token,
+            @RequestBody administracion.dtos.CambiarPasswordDTO dto) {
+        usuarioService.cambiarPassword(token, dto.getOldPassword(), dto.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 }

@@ -22,7 +22,9 @@ import { formatCurrencyByCode } from "../../utils/formatters";
 export default function DocumentoCard({ documento, onVincular }) {
   const formatMonto = (monto, moneda) => {
     if (!monto && monto !== 0) return "$0";
-    return formatCurrencyByCode(Math.abs(monto), moneda || "ARS", { fallback: "$0" });
+    return formatCurrencyByCode(Math.abs(monto), moneda || "ARS", {
+      fallback: "$0",
+    });
   };
 
   const formatFecha = (fecha) => {
@@ -234,18 +236,20 @@ export default function DocumentoCard({ documento, onVincular }) {
         </Box>
 
         {/* Botón de vincular */}
-        <Button
-          variant={
-            documento.nivelSugerencia === "ALTA" ? "contained" : "outlined"
-          }
-          color="primary"
-          startIcon={<LinkIcon />}
-          fullWidth
-          onClick={() => onVincular(documento.idDocumento)}
-          sx={{ mt: 1 }}
-        >
-          Vincular
-        </Button>
+        {onVincular && (
+          <Button
+            variant={
+              documento.nivelSugerencia === "ALTA" ? "contained" : "outlined"
+            }
+            color="primary"
+            startIcon={<LinkIcon />}
+            fullWidth
+            onClick={() => onVincular(documento.idDocumento)}
+            sx={{ mt: 1 }}
+          >
+            Vincular
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

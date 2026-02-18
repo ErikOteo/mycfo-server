@@ -16,6 +16,8 @@ import VerEgreso from "../movimientos-cargados/components/VerEgreso";
 import VerDeuda from "../movimientos-cargados/components/VerDeuda";
 import VerAcreencia from "../movimientos-cargados/components/VerAcreencia";
 import API_CONFIG from "../../config/api-config";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
+import { sessionService } from "../../shared-services/sessionService";
 
 // Lazy loading para componentes pesados
 const CargaFormulario = React.lazy(() =>
@@ -39,7 +41,7 @@ export default function CargaVistaFinal() {
   const endpointMap = {
     factura: {
       formulario: `${API_BASE}/api/carga-datos`,
-      documento: `${API_BASE}/facturas/documento`,
+      documento: `${API_BASE}/api/carga-datos/facturas/documento`,
       foto: `${API_BASE}/facturas/foto`,
       audio: `${API_BASE}/api/carga-datos/facturas/audio`,
     },
@@ -76,6 +78,23 @@ export default function CargaVistaFinal() {
   };
 
   const endpoint = endpointMap[tipo]?.[modo];
+  const disableDynamicCategorias = tipo === "factura" && modo === "documento";
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-vista-final",
+      tipo,
+      modo,
+      endpoint,
+      formData,
+      dialogOpen: formDialogOpen,
+      dialogMessage,
+      vistaPreviaDisponible: Boolean(dialogData),
+    }),
+    [tipo, modo, endpoint, formData, formDialogOpen, dialogMessage, dialogData]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const prepararVistaPrevia = (datos) => {
     if (!datos) return null;
@@ -94,6 +113,66 @@ export default function CargaVistaFinal() {
     };
   };
 
+  const isLimitedField = (key) =>
+    [
+      "tipoFactura",
+      "versionDocumento",
+      "moneda",
+      "medioPago",
+      "periodicidad",
+      "vendedorCondicionIVA",
+      "compradorCondicionIVA",
+    ].includes(key);
+
+  const sanitizeLimitedField = (key, value) => {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const lower = raw.toLowerCase();
+    switch (key) {
+      case "tipoFactura": {
+        const match = raw.match(/\b([ABC])\b/i);
+        return match ? match[1].toUpperCase() : null;
+      }
+      case "versionDocumento": {
+        if (lower.includes("original")) return "Original";
+        if (lower.includes("duplicado") || lower.includes("dup") || lower.includes("copia")) return "Duplicado";
+        return null;
+      }
+      case "moneda": {
+        if (lower.includes("usd") || lower.includes("dolar") || lower.includes("dólar") || lower.includes("u$s")) return "USD";
+        if (lower.includes("ars") || lower.includes("peso")) return "ARS";
+        return null;
+      }
+      case "medioPago": {
+        if (lower.includes("efectivo") || /\bcash\b/i.test(lower)) return "Efectivo";
+        if (lower.includes("transferencia") || lower.includes("transf") || lower.includes("banco") || lower.includes("cbu")) return "Transferencia";
+        if (lower.includes("cheque")) return "Cheque";
+        if (lower.includes("tarjeta") || lower.includes("debito") || lower.includes("débito") || lower.includes("credito") || lower.includes("crédito")) return "Tarjeta";
+        if (lower.includes("mercadopago") || lower.includes("mercado pago") || /\bmp\b/i.test(lower)) return "MercadoPago";
+        if (lower.includes("otro")) return "Otro";
+        return null;
+      }
+      case "periodicidad": {
+        if (lower.includes("mensual")) return "Mensual";
+        if (lower.includes("bimestral")) return "Bimestral";
+        if (lower.includes("trimestral")) return "Trimestral";
+        if (lower.includes("semestral")) return "Semestral";
+        if (lower.includes("anual")) return "Anual";
+        return null;
+      }
+      case "vendedorCondicionIVA":
+      case "compradorCondicionIVA": {
+        if (lower.includes("responsable")) return "Responsable Inscripto";
+        if (lower.includes("monotributo") || lower.includes("mono")) return "Monotributo";
+        if (lower.includes("exento")) return "Exento";
+        return null;
+      }
+      default:
+        return raw;
+    }
+  };
+
   const renderVistaPrevia = () => {
     if (!dialogData) return null;
     switch (tipo) {
@@ -110,6 +189,32 @@ export default function CargaVistaFinal() {
     }
   };
 
+  const completarEmpresaPorVersion = (datos) => {
+    if (!datos || (tipo || "").toLowerCase() !== "factura") return datos;
+    const empresa = sessionService.getEmpresa();
+    if (!empresa) return datos;
+    const version = datos.versionDocumento;
+    if (version === "Original") {
+      return {
+        ...datos,
+        compradorNombre: datos.compradorNombre || empresa.nombre || "",
+        compradorCuit: datos.compradorCuit || empresa.cuit || "",
+        compradorCondicionIVA: datos.compradorCondicionIVA || empresa.condicionIVA || "",
+        compradorDomicilio: datos.compradorDomicilio || empresa.domicilio || "",
+      };
+    }
+    if (version === "Duplicado") {
+      return {
+        ...datos,
+        vendedorNombre: datos.vendedorNombre || empresa.nombre || "",
+        vendedorCuit: datos.vendedorCuit || empresa.cuit || "",
+        vendedorCondicionIVA: datos.vendedorCondicionIVA || empresa.condicionIVA || "",
+        vendedorDomicilio: datos.vendedorDomicilio || empresa.domicilio || "",
+      };
+    }
+    return datos;
+  };
+
   const abrirDialogoFormulario = ({ datos = {}, vistaPrevia = null, mensaje = "" } = {}) => {
     setFormData(datos);
     setDialogData(vistaPrevia);
@@ -117,6 +222,14 @@ export default function CargaVistaFinal() {
     setDialogMessage(mensaje);
     setErrors({});
     setFormDialogOpen(true);
+  };
+
+  const resetFormulario = () => {
+    setFormData({});
+    setErrors({});
+    setDialogData(null);
+    setDialogMessage("");
+    setFormDialogOpen(false);
   };
 
   const handleFallbackManual = (info) => {
@@ -137,16 +250,21 @@ export default function CargaVistaFinal() {
     const normalizados = {};
     Object.entries(campos).forEach(([clave, valor]) => {
       if (!valor) return;
+      const sanitized = sanitizeLimitedField(clave, valor);
+      if (sanitized === null) {
+        return;
+      }
+      const valueToUse = sanitized;
       if (clave === "fechaEmision") {
-        const fecha = dayjs(valor);
+        const fecha = dayjs(valueToUse);
         if (fecha.isValid()) {
           normalizados[clave] = fecha;
         }
       } else {
-        normalizados[clave] = valor;
+        normalizados[clave] = valueToUse;
       }
     });
-    const merged = { ...formData, ...normalizados };
+    const merged = completarEmpresaPorVersion({ ...formData, ...normalizados });
 
     const transcript =
       respuesta.transcript ||
@@ -216,21 +334,29 @@ export default function CargaVistaFinal() {
     };
     Object.entries(campos).forEach(([clave, valor]) => {
       if (valor === null || valor === undefined || valor === "") return;
+      const sanitized = sanitizeLimitedField(clave, valor);
+      if (sanitized === null) {
+        if (isLimitedField(clave)) {
+          normalizados[clave] = null;
+        }
+        return;
+      }
+      const valueToUse = sanitized;
       if (clave === "fechaEmision" || clave === "fechaVencimiento") {
-        const fecha = dayjs(valor);
+        const fecha = dayjs(valueToUse);
         if (fecha.isValid()) {
           normalizados[clave] = fecha;
         }
       } else if (["montoTotal", "montoCuota", "tasaInteres", "cantidadCuotas", "cuotasPagadas"].includes(clave)) {
-        normalizados[clave] = normalizarNumero(valor);
+        normalizados[clave] = normalizarNumero(valueToUse);
       } else {
-        normalizados[clave] = valor;
+        normalizados[clave] = valueToUse;
       }
     });
     if (Object.keys(normalizados).length > 0 && !normalizados.moneda) {
       normalizados.moneda = "ARS";
     }
-    const merged = { ...formData, ...normalizados };
+    const merged = completarEmpresaPorVersion({ ...formData, ...normalizados });
 
     const camposDetectados =
       Object.entries(normalizados).some(([campo, valor]) => {
@@ -291,13 +417,19 @@ export default function CargaVistaFinal() {
               setFormData={setFormData}
               errors={errors}
               setErrors={setErrors}
+              disableDynamicCategorias={disableDynamicCategorias}
             />
           </Suspense>
         );
       case "documento":
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <CargaDocumento tipoDoc={tipo} endpoint={endpoint} />
+            <CargaDocumento
+              tipoDoc={tipo}
+              endpoint={endpoint}
+              onResultado={handleResultadoFoto}
+              onFallback={handleFallbackManual}
+            />
           </Suspense>
         );
       case "foto":
@@ -309,6 +441,7 @@ export default function CargaVistaFinal() {
               onResultado={handleResultadoFoto}
               onFallback={handleFallbackManual}
               dialogOpen={formDialogOpen}
+              onNewCapture={resetFormulario}
             />
           </Suspense>
         );
@@ -320,6 +453,7 @@ export default function CargaVistaFinal() {
               endpoint={endpoint}
               onResultado={handleResultadoAudio}
               onFallback={handleFallbackManual}
+              onNewCapture={resetFormulario}
             />
           </Suspense>
         );
@@ -379,6 +513,7 @@ export default function CargaVistaFinal() {
                 setFormData={setFormData}
                 errors={errors}
                 setErrors={setErrors}
+                disableDynamicCategorias={disableDynamicCategorias}
               />
             </Box>
           </Suspense>

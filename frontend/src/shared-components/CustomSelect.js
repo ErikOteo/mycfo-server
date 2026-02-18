@@ -15,9 +15,15 @@ export default function CustomSelect({
   onChange,
   options = [],
   error = "",
+  placeholder,
   width = "100%",
   disabled = false,
 }) {
+  const safeValue =
+    typeof value === "string" && value.trim().toLowerCase() === "monto"
+      ? ""
+      : value ?? "";
+  const displayPlaceholder = placeholder || "Seleccionar...";
   return (
     <Box sx={{ width }}>
       {label && (
@@ -29,7 +35,7 @@ export default function CustomSelect({
         labelId={`${name}-label`}
         id={name}
         name={name}
-        value={value}
+        value={safeValue}
         onChange={(e) => onChange(e.target.value)}
         displayEmpty
         size="small"
@@ -38,7 +44,7 @@ export default function CustomSelect({
         disabled={disabled}
       >
         <MenuItem value="" disabled>
-          Elegir...
+          {displayPlaceholder}
         </MenuItem>
         {options.map((opt, i) => (
           <MenuItem key={i} value={opt}>

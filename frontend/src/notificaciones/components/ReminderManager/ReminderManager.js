@@ -34,6 +34,7 @@ import dayjs from "dayjs";
 import CustomDatePicker from "../../../shared-components/CustomDatePicker";
 import CustomTimePicker from "../../../shared-components/CustomTimePicker";
 import { useReminders } from "../../hooks/useReminders";
+import { useChatbotScreenContext } from "../../../shared-components/useChatbotScreenContext";
 
 const FieldBox = ({ label, children }) => (
   <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -90,6 +91,51 @@ export default function ReminderManager() {
     { value: "NONE", label: "No recurrente" },
     ...recurrencePatterns,
   ];
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "recordatorios",
+      loading: remindersLoading || loading,
+      error: error ? error.message || String(error) : null,
+      openDialog,
+      editingReminderId: editingReminder?.id || null,
+      reminderCount: reminders.length,
+      reminders: reminders.slice(0, 5).map((reminder) => ({
+        id: reminder.id,
+        title: reminder.title,
+        scheduledFor: reminder.scheduledFor,
+        isRecurring: reminder.isRecurring,
+        recurrencePattern: reminder.recurrencePattern,
+        reminderType: reminder.reminderType,
+      })),
+      formDraft: openDialog
+        ? {
+            title: formData.title,
+            message: formData.message,
+            date: formData.date?.toISOString?.() ?? null,
+            time: formData.time?.toISOString?.() ?? null,
+            isRecurring: formData.isRecurring,
+            recurrencePattern: formData.recurrencePattern,
+            reminderType: formData.reminderType,
+          }
+        : null,
+      tiposDisponibles: reminderTypes.map((item) => item.value),
+      recurrenciasDisponibles: recurrenceOptions.map((item) => item.value),
+    }),
+    [
+      remindersLoading,
+      loading,
+      error,
+      openDialog,
+      editingReminder,
+      reminders,
+      formData,
+      reminderTypes,
+      recurrenceOptions,
+    ]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const handleOpenDialog = (reminder = null) => {
     if (reminder) {
@@ -212,8 +258,9 @@ export default function ReminderManager() {
       <Box
         sx={{
           display: "flex",
+          flexDirection: { xs: "column", sm: "row" }, // Columna en mobile, fila en desktop
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: { xs: "flex-start", sm: "center" }, // Alinear al inicio en mobile
           mb: 3,
           gap: 3,
         }}
@@ -230,6 +277,7 @@ export default function ReminderManager() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
+          sx={{ lineHeight: 1.2 }}
         >
           Nuevo Recordatorio
         </Button>
@@ -263,6 +311,7 @@ export default function ReminderManager() {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => handleOpenDialog()}
+                sx={{ lineHeight: 1.2 }}
               >
                 Crear Recordatorio
               </Button>
@@ -562,8 +611,8 @@ export default function ReminderManager() {
             {loading
               ? "Guardando..."
               : editingReminder
-              ? "Actualizar"
-              : "Crear"}
+                ? "Actualizar"
+                : "Crear"}
           </Button>
         </DialogActions>
       </Dialog>

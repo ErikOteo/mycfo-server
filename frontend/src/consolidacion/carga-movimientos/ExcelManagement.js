@@ -7,14 +7,18 @@ import {
   Tab,
   Button,
   Stack,
-  Alert,
+  useTheme,
+  useMediaQuery,
+  Snackbar,
 } from "@mui/material";
+import Alert from "@mui/material/Alert";
 import HistoryIcon from "@mui/icons-material/History";
 import UploadIcon from "@mui/icons-material/Upload";
 import CargaMovimientos from "./CargaMovimientos";
 import ExcelHistoryTable from "./components/ExcelHistoryTable";
 import http from "../../api/http";
 import API_CONFIG from "../../config/api-config";
+import { useChatbotScreenContext } from "../../shared-components/useChatbotScreenContext";
 
 export default function ExcelManagement() {
   const [activeTab, setActiveTab] = React.useState(0);
@@ -22,13 +26,31 @@ export default function ExcelManagement() {
   const [historialLoading, setHistorialLoading] = React.useState(false);
   const [historialPage, setHistorialPage] = React.useState(0);
   const [historialPageSize, setHistorialPageSize] = React.useState(20);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const chatbotContext = React.useMemo(
+    () => ({
+      screen: "carga-movimientos",
+      tab: activeTab === 0 ? "cargar" : "historial",
+      historial: historialData.slice(0, 5),
+      historialTotal: Array.isArray(historialData) ? historialData.length : 0,
+      historialPage,
+      historialPageSize,
+      historialLoading,
+    }),
+    [activeTab, historialData, historialPage, historialPageSize, historialLoading]
+  );
+
+  useChatbotScreenContext(chatbotContext);
 
   const loadHistorial = async () => {
     setHistorialLoading(true);
     try {
       const usuarioSub = sessionStorage.getItem("sub");
       if (!usuarioSub) {
-        alert("No se encontró la sesión del usuario. Volvé a iniciar sesión.");
+        setSnackbar({ open: true, message: "No se encontró la sesión del usuario. Volvé a iniciar sesión.", severity: "error" });
         setHistorialLoading(false);
         return;
       }
@@ -98,7 +120,11 @@ export default function ExcelManagement() {
         }}
       >
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant={isMobile ? "fullWidth" : "standard"}
+          >
             <Tab
               icon={<UploadIcon />}
               label="Cargar Excel"
@@ -106,7 +132,7 @@ export default function ExcelManagement() {
             />
             <Tab
               icon={<HistoryIcon />}
-              label="Historial de Cargas"
+              label={isMobile ? "Historial" : "Historial de Cargas"}
               iconPosition="start"
             />
           </Tabs>
@@ -159,6 +185,21 @@ export default function ExcelManagement() {
           </Box>
         </Paper>
       )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

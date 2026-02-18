@@ -26,7 +26,7 @@ public class PresupuestoEventService {
         this.restTemplate = new RestTemplate();
     }
 
-    public void sendBudgetExceededEvent(Presupuesto presupuesto, PresupuestoLinea linea) {
+    public void sendBudgetExceededEvent(Presupuesto presupuesto, PresupuestoLinea linea, String userSub) {
         try {
             // Calcular variación
             BigDecimal budgeted = linea.getMontoEstimado();
@@ -35,10 +35,11 @@ public class PresupuestoEventService {
 
             // Crear el evento
             Map<String, Object> event = new HashMap<>();
-            event.put("userId", 1L); // TODO: Obtener del contexto de usuario
+            event.put("userId", userSub);
             event.put("budgetId", presupuesto.getId());
             event.put("budgetName", presupuesto.getNombre());
             event.put("category", linea.getCategoria());
+            event.put("period", linea.getMes());
             event.put("budgeted", budgeted);
             event.put("actual", actual);
             event.put("variance", variance);
@@ -49,23 +50,45 @@ public class PresupuestoEventService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(event, headers);
-            
-            restTemplate.postForObject(
-                notificationsBaseUrl + "/api/events/budget-exceeded",
-                request,
-                Void.class
-            );
+            postWithFallback("/api/events/budget-exceeded", request);
             
         } catch (Exception e) {
             System.err.println("Error enviando evento de presupuesto excedido: " + e.getMessage());
         }
     }
 
-    public void sendBudgetCreatedEvent(Presupuesto presupuesto) {
+    public void sendBudgetExceededAnnual(Presupuesto presupuesto,
+                                         BigDecimal budgeted,
+                                         BigDecimal actual,
+                                         String userSub) {
+        try {
+            BigDecimal variance = actual.subtract(budgeted);
+
+            Map<String, Object> event = new HashMap<>();
+            event.put("userId", userSub);
+            event.put("budgetId", presupuesto.getId());
+            event.put("budgetName", presupuesto.getNombre());
+            event.put("category", "EGRESOS_TOTALES");
+            event.put("period", buildPeriod(presupuesto));
+            event.put("budgeted", budgeted);
+            event.put("actual", actual);
+            event.put("variance", variance);
+            event.put("occurredAt", Instant.now());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(event, headers);
+            postWithFallback("/api/events/budget-exceeded", request);
+        } catch (Exception e) {
+            System.err.println("Error enviando evento anual de presupuesto excedido: " + e.getMessage());
+        }
+    }
+
+    public void sendBudgetCreatedEvent(Presupuesto presupuesto, String userSub) {
         try {
             // Crear el evento
             Map<String, Object> event = new HashMap<>();
-            event.put("userId", 1L); // TODO: Obtener del contexto de usuario
+            event.put("userId", userSub);
             event.put("companyId", presupuesto.getOrganizacionId());
             event.put("budgetId", presupuesto.getId());
             event.put("budgetName", presupuesto.getNombre());
@@ -77,22 +100,17 @@ public class PresupuestoEventService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(event, headers);
-            
-            restTemplate.postForObject(
-                notificationsBaseUrl + "/api/events/budget-created",
-                request,
-                Void.class
-            );
+            postWithFallback("/api/events/budget-created", request);
             
         } catch (Exception e) {
             System.err.println("Error enviando evento de presupuesto creado: " + e.getMessage());
         }
     }
 
-    public void sendBudgetDeletedEvent(Presupuesto presupuesto) {
+    public void sendBudgetDeletedEvent(Presupuesto presupuesto, String userSub) {
         try {
             Map<String, Object> event = new HashMap<>();
-            event.put("userId", 1L); // TODO: Obtener del contexto de usuario
+            event.put("userId", userSub);
             event.put("companyId", presupuesto.getOrganizacionId());
             event.put("budgetId", presupuesto.getId());
             event.put("budgetName", presupuesto.getNombre());
@@ -103,12 +121,7 @@ public class PresupuestoEventService {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(event, headers);
-
-            restTemplate.postForObject(
-                    notificationsBaseUrl + "/api/events/budget-deleted",
-                    request,
-                    Void.class
-            );
+            postWithFallback("/api/events/budget-deleted", request);
         } catch (Exception e) {
             System.err.println("Error enviando evento de presupuesto eliminado: " + e.getMessage());
         }
@@ -135,5 +148,23 @@ public class PresupuestoEventService {
             return null;
         }
         return raw.substring(0, 7);
+    }
+
+    private void postWithFallback(String path, HttpEntity<Map<String, Object>> request) {
+        String primary = notificationsBaseUrl.replaceAll("/+$", "") + path;
+        try {
+            restTemplate.postForObject(primary, request, Void.class);
+        } catch (Exception e) {
+            if (e.getCause() instanceof java.net.UnknownHostException) {
+                String fallback = "http://localhost:8084" + path;
+                try {
+                    restTemplate.postForObject(fallback, request, Void.class);
+                    return;
+                } catch (Exception ex2) {
+                    System.err.println("Fallback también falló: " + ex2.getMessage());
+                }
+            }
+            throw e;
+        }
     }
 }

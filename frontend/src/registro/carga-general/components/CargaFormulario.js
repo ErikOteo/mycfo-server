@@ -68,6 +68,7 @@ export default function CargaFormulario({
   setFormData,
   errors,
   setErrors,
+  disableDynamicCategorias = false,
 }) {
   const [localErrors, setLocalErrors] = React.useState(errors);
   const [snackbar, setSnackbar] = React.useState({
@@ -136,14 +137,14 @@ export default function CargaFormulario({
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
-      alert("⚠️ Por favor completa todos los campos obligatorios");
+      setSnackbar({ open: true, severity: "warning", message: "⚠️ Por favor completa todos los campos obligatorios" });
       return;
     }
 
     try {
       const usuarioSub = sessionStorage.getItem("sub");
       if (!usuarioSub) {
-        alert("❌ Error: No se encontró el usuario en la sesión. Por favor, inicia sesión nuevamente.");
+        setSnackbar({ open: true, severity: "error", message: "❌ Error: No se encontró el usuario en la sesión. Por favor, inicia sesión nuevamente." });
         return;
       }
 
@@ -195,7 +196,12 @@ export default function CargaFormulario({
       case "factura":
         return (
           <LazyFormWrapper>
-            <FormFactura formData={formData} setFormData={setFormData} errors={localErrors} />
+            <FormFactura
+              formData={formData}
+              setFormData={setFormData}
+              errors={localErrors}
+              disableDynamicCategorias={disableDynamicCategorias}
+            />
           </LazyFormWrapper>
         );
       case "movimiento":

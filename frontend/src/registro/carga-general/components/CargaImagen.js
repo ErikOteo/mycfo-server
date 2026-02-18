@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -9,7 +9,9 @@ import {
   DialogTitle,
   Alert,
   Button,
+  ButtonBase,
   CircularProgress,
+  Snackbar,
 } from "@mui/material";
 import { CameraAlt, Check, Close, Delete } from "@mui/icons-material";
 import Webcam from "react-webcam";
@@ -25,7 +27,7 @@ const tipoMovimientoMap = {
   Acreencia: "Acreencia",
 };
 
-export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen }) {
+export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback, dialogOpen, onNewCapture }) {
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
   const [capturando, setCapturando] = useState(true);
@@ -35,8 +37,28 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
   const [fotoAmpliada, setFotoAmpliada] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [usarCamaraDefault, setUsarCamaraDefault] = useState(false);
+
+  const [camaraActiva, setCamaraActiva] = useState(false);
+
+  const esMobile = useMemo(
+    () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""),
+    []
+  );
+
+  const videoConstraints = useMemo(() => {
+    if (!esMobile || usarCamaraDefault) {
+      return undefined;
+    }
+    return { facingMode: { ideal: "environment" } };
+  }, [esMobile, usarCamaraDefault]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const tomarFoto = () => {
+    if (onNewCapture) {
+      onNewCapture();
+    }
+    setError(null);
     const img = webcamRef.current.getScreenshot();
     setFotoTemporal(img);
     setCapturando(false);
@@ -47,6 +69,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
     setFotoNombre("foto-capturada.jpg");
     setFotoTemporal(null);
     setCapturando(true);
+    setCamaraActiva(false); // Reset para la siguiente vez
   };
 
   const rechazarFoto = () => {
@@ -57,21 +80,26 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
   const eliminarFoto = () => {
     setFotoFinal(null);
     setFotoNombre(null);
+    setCamaraActiva(false);
   };
 
   const seleccionarArchivo = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (onNewCapture) {
+      onNewCapture();
+    }
+    setError(null);
     const reader = new FileReader();
     reader.onload = () => {
       setFotoFinal(reader.result);
       setFotoNombre(file.name || "imagen.jpg");
       setFotoTemporal(null);
       setCapturando(true);
+      setCamaraActiva(false);
     };
     reader.readAsDataURL(file);
   };
-
   const dataURLtoBlob = (dataURL) => {
     const byteString = atob(dataURL.split(",")[1]);
     const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
@@ -144,7 +172,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
       if (onResultado) {
         onResultado(response.data);
       } else {
-        alert("Fotos enviadas!");
+        setSnackbar({ open: true, message: "¡Fotos enviadas con éxito! 📸✅", severity: "success" });
       }
       setFotoFinal(null);
       setFotoNombre(null);
@@ -152,6 +180,7 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
     } catch (err) {
       console.error("❌ Error en envío de foto:", err);
       const mensaje = err.response?.data?.message || err.message || "Error al procesar las fotos.";
+      setSnackbar({ open: true, message: mensaje, severity: "error" });
       setError(mensaje);
       if (onFallback) {
         onFallback({
@@ -179,62 +208,130 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
 
   return (
     <Box sx={{ mt: 3 }}>
-      
       <Box
         sx={{
           position: "relative",
           width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           borderRadius: 2,
           overflow: "hidden",
         }}
       >
-        {capturando ? (
-          <Webcam
-            ref={webcamRef}
-            audio={false}
-            screenshotFormat="image/jpeg"
-            style={{ width: "100%" }}
-          />
-        ) : (
-          <img src={fotoTemporal} alt="captura" style={{ width: "100%" }} />
-        )}
-
-        {capturando ? (
-          <IconButton
-            onClick={tomarFoto}
-            color="primary"
-            disabled={cargando}
+        {!fotoFinal && !fotoTemporal && !camaraActiva ? (
+          <ButtonBase
+            onClick={() => setCamaraActiva(true)}
             sx={{
-              position: "absolute",
-              bottom: 16,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 50,
-              height: 50,
-            }}
-          >
-            <CameraAlt />
-          </IconButton>
-        ) : (
-          <Box
-            sx={{
-              position: "absolute",
-              bottom: 16,
-              width: "100%",
               display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               justifyContent: "center",
-              gap: 4,
+              borderRadius: 3,
+              border: "2px solid",
+              borderColor: "divider",
+              width: { xs: 120, md: 180 },
+              height: { xs: 120, md: 180 },
+              bgcolor: "background.paper",
+              color: "black",
+              "&:hover": { bgcolor: "action.hover" },
             }}
           >
-            <IconButton onClick={rechazarFoto} color="error" disabled={cargando} sx={{ width: 50, height: 50 }}>
-              <Close />
-            </IconButton>
-            <IconButton onClick={aceptarFoto} color="success" disabled={cargando} sx={{ width: 50, height: 50 }}>
-              <Check />
-            </IconButton>
-          </Box>
+            <CameraAlt sx={{ fontSize: { xs: 60, md: 90 }, mb: 0.5 }} />
+            <Typography
+              variant="button"
+              sx={{
+                fontSize: { xs: "0.75rem", md: "0.875rem" },
+                lineHeight: 1.1,
+                textAlign: "center",
+                px: 1,
+              }}
+            >
+              Sacar Foto
+            </Typography>
+          </ButtonBase>
+        ) : (
+          <>
+            {camaraActiva && capturando && (
+              <Webcam
+                ref={webcamRef}
+                audio={false}
+                screenshotFormat="image/jpeg"
+                videoConstraints={videoConstraints}
+                onUserMediaError={() => {
+                  if (!usarCamaraDefault) {
+                    setUsarCamaraDefault(true);
+                  }
+                }}
+                style={{ width: "100%" }}
+              />
+            )}
+            {!capturando && fotoTemporal && (
+              <img src={fotoTemporal} alt="captura" style={{ width: "100%" }} />
+            )}
+
+            {camaraActiva && capturando && (
+              <>
+                <IconButton
+                  onClick={() => setCamaraActiva(false)}
+                  color="error"
+                  sx={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    bgcolor: "rgba(255, 255, 255, 0.7)",
+                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.9)" },
+                    zIndex: 11,
+                  }}
+                  size="small"
+                >
+                  <Close />
+                </IconButton>
+                <IconButton
+                  onClick={tomarFoto}
+                  color="primary"
+                  disabled={cargando}
+                  sx={{
+                    position: "absolute",
+                    bottom: 16,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 50,
+                    height: 50,
+                    bgcolor: "rgba(255, 255, 255, 0.7)",
+                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.9)" },
+                    zIndex: 10,
+                  }}
+                >
+                  <CameraAlt />
+                </IconButton>
+              </>
+            )}
+
+            {!capturando && fotoTemporal && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  bottom: 16,
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 4,
+                  zIndex: 10,
+                }}
+              >
+                <IconButton onClick={rechazarFoto} color="error" disabled={cargando} sx={{ width: 50, height: 50, bgcolor: "rgba(255, 255, 255, 0.7)" }}>
+                  <Close />
+                </IconButton>
+                <IconButton onClick={aceptarFoto} color="success" disabled={cargando} sx={{ width: 50, height: 50, bgcolor: "rgba(255, 255, 255, 0.7)" }}>
+                  <Check />
+                </IconButton>
+              </Box>
+            )}
+          </>
         )}
       </Box>
+
 
       <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
         <input
@@ -245,11 +342,13 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
           style={{ display: "none" }}
         />
         <Button
-          variant="outlined"
+          variant="contained"
+          color="primary"
           disabled={cargando}
           onClick={() => fileInputRef.current?.click()}
+          sx={{ textTransform: "none" }}
         >
-          Subir imagen desde PC
+          Subir imagen
         </Button>
       </Box>
 
@@ -313,6 +412,21 @@ export default function CargaImagen({ tipoDoc, endpoint, onResultado, onFallback
           )}
         </DialogContent>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
